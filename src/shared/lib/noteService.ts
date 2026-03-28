@@ -24,6 +24,9 @@ export const noteService = {
     if (filter?.folderId !== undefined) {
       result = result.filter((n) => n.folderId === filter.folderId);
     }
+    if (filter?.projectId !== undefined) {
+      result = result.filter((n) => n.projectId === filter.projectId);
+    }
     if (filter?.isPinned !== undefined) {
       result = result.filter((n) => n.isPinned === filter.isPinned);
     }
