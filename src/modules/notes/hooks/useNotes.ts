@@ -65,6 +65,14 @@ export function useNoteSearch(query: string) {
   });
 }
 
+export function useBacklinks(noteId: string | null) {
+  return useQuery({
+    queryKey: [...NOTES_KEY, 'backlinks', noteId],
+    queryFn: () => (noteId ? noteService.getBacklinks(noteId) : Promise.resolve([])),
+    enabled: !!noteId,
+  });
+}
+
 export function useNoteStats() {
   return useQuery({
     queryKey: [...NOTES_KEY, 'stats'],

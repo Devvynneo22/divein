@@ -7,11 +7,13 @@ import {
   useCreateNote,
   useUpdateNote,
   useTrashNote,
+  useBacklinks,
 } from './hooks/useNotes';
 import { NotesSidebar } from './components/NotesSidebar';
 import { NoteEditor } from './components/NoteEditor';
 import { NoteHeader } from './components/NoteHeader';
 import { NoteBreadcrumb } from './components/NoteBreadcrumb';
+import { BacklinksPanel } from './components/BacklinksPanel';
 
 export function NotesPage() {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
@@ -21,6 +23,7 @@ export function NotesPage() {
   const { data: selectedNote } = useNote(selectedNoteId);
   const { data: ancestors = [] } = useNoteAncestors(selectedNoteId);
   const { data: children = [] } = useNoteChildren(selectedNoteId);
+  const { data: backlinks = [] } = useBacklinks(selectedNoteId);
 
   const createNote = useCreateNote();
   const updateNote = useUpdateNote();
@@ -165,6 +168,13 @@ export function NotesPage() {
               <NoteEditor
                 content={selectedNote.content}
                 onUpdate={handleEditorUpdate}
+                onNavigateToNote={handleSelect}
+              />
+
+              {/* Backlinks panel */}
+              <BacklinksPanel
+                backlinks={backlinks}
+                onNavigate={handleSelect}
               />
             </div>
           </>

@@ -44,6 +44,10 @@ import {
 import { SlashCommandMenu } from './SlashCommandMenu';
 import { EditorBubbleMenu } from './EditorBubbleMenu';
 import { EmojiPicker } from './EmojiPicker';
+import { WikiLinkSuggestion } from './WikiLinkSuggestion';
+import { WikiLink } from '../extensions/WikiLink';
+import { noteService } from '@/shared/lib/noteService';
+import type { Note } from '@/shared/types/note';
 
 // ─── Lowlight setup ──────────────────────────────────────────────────────────
 
@@ -77,6 +81,7 @@ const TEXT_COLORS = [
 interface NoteEditorProps {
   content: string | null;
   onUpdate: (content: string, textContent: string, wordCount: number) => void;
+  onNavigateToNote?: (noteId: string) => void;
 }
 
 // ─── Slash command state ─────────────────────────────────────────────────────
@@ -87,9 +92,17 @@ interface SlashMenuState {
   position: { top: number; left: number };
 }
 
+// ─── Wiki-link menu state ────────────────────────────────────────────────────
+
+interface WikiLinkMenuState {
+  open: boolean;
+  query: string;
+  position: { top: number; left: number };
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function NoteEditor({ content, onUpdate }: NoteEditorProps) {
+export function NoteEditor({ content, onUpdate, onNavigateToNote }: NoteEditorProps) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorWrapRef = useRef<HTMLDivElement>(null);
@@ -98,6 +111,12 @@ export function NoteEditor({ content, onUpdate }: NoteEditorProps) {
     query: '',
     position: { top: 0, left: 0 },
   });
+  const [wikiLinkMenu, setWikiLinkMenu] = useState<WikiLinkMenuState>({
+    open: false,
+    query: '',
+    position: { top: 0, left: 0 },
+  });
+  const [wikiLinkNotes, setWikiLinkNotes] = useState<Note[]>([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const colorPickerRef = useRef<HTMLDivElement>(null);
@@ -167,6 +186,7 @@ export function NoteEditor({ content, onUpdate }: NoteEditorProps) {
       TaskItem.configure({ nested: true }),
       Dropcursor,
       CodeBlockLowlight.configure({ lowlight }),
+      WikiLink,
     ],
     content: content ? (JSON.parse(content) as object) : undefined,
     editorProps: {
@@ -174,6 +194,18 @@ export function NoteEditor({ content, onUpdate }: NoteEditorProps) {
         class:
           'prose prose-invert prose-base max-w-none focus:outline-none px-1 leading-relaxed',
         style: 'min-height: calc(100vh - 200px)',
+      },
+      handleClick(view, _pos, event) {
+        const target = event.target as HTMLElement;
+        const wikiLink = target.closest('[data-wiki-link]');
+        if (wikiLink) {
+          const noteId = wikiLink.getAttribute('data-note-id');
+          if (noteId && onNavigateToNote) {
+            onNavigateToNote(noteId);
+          }
+          return true;
+        }
+        return false;
       },
       handleDrop(view, event) {
         const files = event.dataTransfer?.files;
@@ -248,16 +280,46 @@ export function NoteEditor({ content, onUpdate }: NoteEditorProps) {
     }
   }, [content, editor]);
 
-  // ─── Slash command detection via keydown ──────────────────────────────────
+  // ─── Slash command & wiki-link detection via keydown ─────────────────────
+
+  const lastKeyRef = useRef<string>('');
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (!editor) return;
 
-      if (slashMenu.open) {
-        // Navigation handled inside SlashCommandMenu via window listener
+      if (slashMenu.open || wikiLinkMenu.open) {
+        // Navigation handled inside respective menus via window listener
+        lastKeyRef.current = e.key;
         return;
       }
+
+      // Detect [[ for wiki-link
+      if (e.key === '[' && lastKeyRef.current === '[') {
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          const rect = range.getBoundingClientRect();
+          if (rect) {
+            // Load notes for the suggestion list
+            noteService.list({ isTrashed: false }).then((allNotes) => {
+              setWikiLinkNotes(allNotes);
+            });
+            setWikiLinkMenu({
+              open: true,
+              query: '',
+              position: {
+                top: rect.bottom + window.scrollY + 4,
+                left: Math.min(rect.left + window.scrollX, window.innerWidth - 280),
+              },
+            });
+          }
+        }
+        lastKeyRef.current = '';
+        return;
+      }
+
+      lastKeyRef.current = e.key;
 
       if (e.key === '/') {
         // Determine caret position for menu
@@ -279,7 +341,7 @@ export function NoteEditor({ content, onUpdate }: NoteEditorProps) {
         }
       }
     },
-    [editor, slashMenu.open]
+    [editor, slashMenu.open, wikiLinkMenu.open]
   );
 
   // Track typed query after '/' and close menu on backspace past '/'
@@ -314,6 +376,39 @@ export function NoteEditor({ content, onUpdate }: NoteEditorProps) {
       editor.off('selectionUpdate', update);
     };
   }, [editor, slashMenu.open]);
+
+  // Track typed query after '[[' and close menu on backspace past '[['
+  useEffect(() => {
+    if (!editor || !wikiLinkMenu.open) return;
+
+    const update = () => {
+      const { from, $from } = editor.state.selection;
+      const lineStart = $from.start();
+      const textBeforeCursor = editor.state.doc.textBetween(lineStart, from);
+      const triggerIdx = textBeforeCursor.lastIndexOf('[[');
+
+      if (triggerIdx === -1) {
+        setWikiLinkMenu((prev) => ({ ...prev, open: false }));
+        return;
+      }
+
+      const query = textBeforeCursor.slice(triggerIdx + 2);
+      // If there's a newline or ]] in the query, close the menu
+      if (query.includes('\n') || query.includes(']]')) {
+        setWikiLinkMenu((prev) => ({ ...prev, open: false }));
+        return;
+      }
+
+      setWikiLinkMenu((prev) => ({ ...prev, query }));
+    };
+
+    editor.on('update', update);
+    editor.on('selectionUpdate', update);
+    return () => {
+      editor.off('update', update);
+      editor.off('selectionUpdate', update);
+    };
+  }, [editor, wikiLinkMenu.open]);
 
   if (!editor) return null;
 
@@ -533,6 +628,17 @@ export function NoteEditor({ content, onUpdate }: NoteEditorProps) {
           position={slashMenu.position}
           onClose={() => setSlashMenu((prev) => ({ ...prev, open: false }))}
           triggerFileInput={triggerFileInput}
+        />
+      )}
+
+      {/* ─── Wiki-link suggestion menu ────────────────────────────────── */}
+      {wikiLinkMenu.open && (
+        <WikiLinkSuggestion
+          editor={editor}
+          query={wikiLinkMenu.query}
+          position={wikiLinkMenu.position}
+          notes={wikiLinkNotes}
+          onClose={() => setWikiLinkMenu((prev) => ({ ...prev, open: false }))}
         />
       )}
     </div>

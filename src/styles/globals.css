@@ -230,6 +230,22 @@ ul[data-type="taskList"] li[data-checked="true"] > div > p {
   color: var(--color-accent-hover);
 }
 
+/* Wiki-links */
+.ProseMirror .wiki-link {
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  padding: 1px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.ProseMirror .wiki-link:hover {
+  background: color-mix(in srgb, var(--color-accent) 20%, transparent);
+  text-decoration: underline;
+}
+
 /* Placeholder styling */
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);

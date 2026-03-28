@@ -340,6 +340,14 @@ export const noteService = {
     persist();
   },
 
+  async getBacklinks(noteId: string): Promise<Note[]> {
+    return notes.filter((n) => {
+      if (n.id === noteId || n.isTrashed) return false;
+      if (!n.content) return false;
+      return n.content.includes(noteId);
+    });
+  },
+
   async getStats(): Promise<{ total: number; favorites: number; trashed: number }> {
     return {
       total: notes.filter((n) => !n.isTrashed && !n.isArchived).length,
