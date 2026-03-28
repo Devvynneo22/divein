@@ -750,3 +750,72 @@ bbe28a0 docs: handover notes for Phase 2+3 completion
 ### 🏆🏆🏆 PHASES 1 + 2 + 3: ALL COMPLETE 🏆🏆🏆
 
 Every feature through Phase 3 is delivered. Next: Phase 4 (Electron wiring, SQLite, distribution).
+
+---
+
+## Session 11 — 2026-03-28 14:32–14:49 SGT (Claude Opus — Audit + Fix)
+
+**Worker:** Claude Opus 4 (main orchestrator + 3 audit agents + 4 fix agents)  
+**Model:** anthropic/claude-opus-4-6
+
+### Comprehensive Pitstop Audit
+
+Ran 3 parallel audit agents covering:
+- **Code & Logic:** Types, services, cross-module wiring, localStorage, runtime bugs
+- **UI/UX:** Components, React patterns, CSS, accessibility, missing wiring
+- **Docs & PM:** IMPLEMENTATION-STATUS, CHANGELOG, README, plan, package.json accuracy
+
+### Findings: 7 Critical, 17 Medium, 6 Doc Errors, 10+ Low issues
+
+### Fix Groups (4 parallel agents)
+
+**Group A — Data Layer (7 fixes)** ✅
+- Event date filtering: safe Date comparisons instead of string comparison
+- Multi-day events: overlap check (eventStart ≤ rangeEnd AND eventEnd ≥ rangeStart)
+- Exception field leaking: whitelisted fields only into occurrence exceptions
+- Task date filters: undated tasks now excluded from dueBefore/dueAfter
+- Recurring task without dueDate: console.warn + graceful skip
+- Weekly+daysOfWeek recurrence: rewritten to prevent skipped occurrences
+- Kanban drop: try/catch with finally for query invalidation
+
+**Group B — Editor + Shell (6 fixes)** ✅
+- EditorBubbleMenu memory leak: stable useCallback ref for blur handler
+- Bubble menu positioning: removed erroneous window.scrollY/X offsets
+- 404 route: catch-all redirects to /dashboard
+- PDF export: hidden iframe approach (no popup blocker issues)
+- NoteEditor handleFileChange: null guard for editorInstance
+
+**Group C — Persistence + Settings (7 fixes)** ✅
+- Timer settings: persist to localStorage (nexus-timer-settings key)
+- General settings: new appSettingsStore with Zustand + localStorage
+- Flashcard settings: wired to store with persistence
+- Data section text: corrected from "resets on refresh" to "persists via localStorage"
+- Global search: now checks note content + task descriptions (not just titles)
+- Audio notification: awaits AudioContext.resume() properly
+- Timer phase indicator: 🎯/☕/🌿 pill in hero section
+
+**Group D — Docs + Cleanup (8 tasks)** ✅
+- README.md: complete rewrite (accurate Phase 3 status)
+- 9 unused deps removed (dnd-kit, recharts, flexsearch, etc.)
+- highlight.js added as explicit dependency
+- dev script fixed (just runs vite; dev:full for electron)
+- Orphaned SubPagesList.tsx deleted
+- Dead code cleaned (unused imports in Dashboard + Flashcards)
+- CHANGELOG stale sections annotated
+- Plan checkboxes updated + 12 deferred features documented
+
+### Git log on Develop (as of 14:49 SGT)
+```
+03bedbf chore: docs rewrite, dependency cleanup, dead code removal
+b7cd9cb fix: persist settings, improve search, fix audio & add phase indicator
+c49086c fix: editor memory leak, bubble menu positioning, 404 route, PDF export, null guard
+70fba9e docs: CHANGELOG + IMPLEMENTATION-STATUS session 10 — Phase 2+3 complete
+```
+
+### Post-Audit Status
+- **TypeScript:** zero errors
+- **Working tree:** clean
+- **All critical bugs:** resolved
+- **All medium bugs addressed:** persistence, search, audio, UX indicators
+- **Documentation:** accurate and current
+- **Dependencies:** clean (no unused packages)
