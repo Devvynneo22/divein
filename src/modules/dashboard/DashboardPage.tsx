@@ -15,7 +15,7 @@ import type { HabitWithStatus } from '@/shared/types/habit';
 
 function useTasksDueToday() {
   return useQuery({
-    queryKey: ['dashboard', 'tasksDueToday'],
+    queryKey: ['tasks', 'dashboard', 'dueToday'],
     queryFn: async () => {
       const today = format(new Date(), 'yyyy-MM-dd');
       const tasks = await taskService.list();
@@ -27,38 +27,48 @@ function useTasksDueToday() {
           t.dueDate.startsWith(today)
       );
     },
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 }
 
 function useTodayEvents() {
   return useQuery({
-    queryKey: ['dashboard', 'todayEvents'],
+    queryKey: ['events', 'dashboard', 'today'],
     queryFn: async () => {
       const start = startOfDay(new Date()).toISOString();
       const end = endOfDay(new Date()).toISOString();
       return eventService.list(start, end);
     },
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 }
 
 function useHabitStatus() {
   return useQuery({
-    queryKey: ['dashboard', 'habitStatus'],
+    queryKey: ['habits', 'dashboard', 'todayStatus'],
     queryFn: () => habitService.getTodayStatus(),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 }
 
 function useDueCards() {
   return useQuery({
-    queryKey: ['dashboard', 'dueCards'],
+    queryKey: ['flashcard-due-total', 'dashboard'],
     queryFn: () => flashcardService.getTotalDueToday(),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 }
 
 function useTodayTime() {
   return useQuery({
-    queryKey: ['dashboard', 'todayTime'],
+    queryKey: ['timeEntries', 'todayTotal', 'dashboard'],
     queryFn: () => timerService.getTodayTotal(),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 }
 

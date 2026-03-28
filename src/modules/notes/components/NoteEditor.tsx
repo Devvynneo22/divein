@@ -2,7 +2,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   Bold,
   Italic,
@@ -33,7 +33,7 @@ export function NoteEditor({ content, onUpdate }: NoteEditorProps) {
         heading: { levels: [1, 2, 3] },
       }),
       Placeholder.configure({
-        placeholder: 'Start writing...',
+        placeholder: "Press '/' for commands or start typing...",
       }),
       Link.configure({
         openOnClick: true,
@@ -44,7 +44,7 @@ export function NoteEditor({ content, onUpdate }: NoteEditorProps) {
     editorProps: {
       attributes: {
         class:
-          'prose prose-invert prose-sm max-w-none focus:outline-none min-h-[300px] px-1',
+          'prose prose-invert prose-base max-w-none focus:outline-none min-h-[400px] px-1 leading-relaxed',
       },
     },
     onUpdate: ({ editor }) => {
@@ -75,7 +75,7 @@ export function NoteEditor({ content, onUpdate }: NoteEditorProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-[var(--color-border)] flex-wrap">
+      <div className="flex items-center gap-0.5 px-3 py-1.5 border-b border-[var(--color-border)] flex-wrap">
         <ToolbarButton
           onClick={() => editor.chain().focus().toggleBold().run()}
           active={editor.isActive('bold')}
@@ -166,8 +166,10 @@ export function NoteEditor({ content, onUpdate }: NoteEditorProps) {
       </div>
 
       {/* Editor */}
-      <div className="flex-1 overflow-y-auto p-4">
-        <EditorContent editor={editor} />
+      <div className="flex-1 overflow-y-auto px-8 py-4">
+        <div className="max-w-3xl mx-auto">
+          <EditorContent editor={editor} />
+        </div>
       </div>
     </div>
   );
@@ -190,7 +192,7 @@ function ToolbarButton({
       title={title}
       className={`p-1.5 rounded transition-colors ${
         active
-          ? 'bg-[var(--color-accent)] bg-opacity-20 text-[var(--color-accent)]'
+          ? 'bg-[var(--color-accent)]/20 text-[var(--color-accent)]'
           : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)]'
       }`}
     >
