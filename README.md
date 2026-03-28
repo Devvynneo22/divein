@@ -1,4 +1,4 @@
-# ⚡ Nexus — Productivity Super-App
+# ⚡ DiveIn — Productivity Super-App
 
 > Local-first, offline-capable productivity app built with React 19 + TypeScript + Vite
 
