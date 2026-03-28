@@ -1,10 +1,30 @@
-﻿/**
- * Note Data Service — in-memory implementation.
+/**
+ * Note Data Service — localStorage-persisted implementation.
  * Supports hierarchical page structure (Notion-like tree).
  */
 import type { Note, CreateNoteInput, UpdateNoteInput, NoteFilter, NoteTreeNode } from '@/shared/types/note';
 
-let notes: Note[] = [];
+const STORAGE_KEY = 'nexus-notes';
+
+function loadNotes(): Note[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as Note[];
+  } catch {
+    return [];
+  }
+}
+
+function persist(): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+  } catch {
+    // ignore storage errors (e.g. private browsing quota)
+  }
+}
+
+let notes: Note[] = loadNotes();
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -120,6 +140,7 @@ export const noteService = {
       }
     }
 
+    persist();
     return note;
   },
 
@@ -134,6 +155,7 @@ export const noteService = {
       tags: input.tags ?? existing.tags,
       updatedAt: now(),
     };
+    persist();
     return notes[idx];
   },
 
@@ -151,6 +173,8 @@ export const noteService = {
         notes[parentIdx] = { ...notes[parentIdx], hasChildren: stillHasChildren };
       }
     }
+
+    persist();
   },
 
   async trash(id: string): Promise<void> {
@@ -169,6 +193,8 @@ export const noteService = {
         notes[parentIdx] = { ...notes[parentIdx], hasChildren: stillHasChildren };
       }
     }
+
+    persist();
   },
 
   async restore(id: string): Promise<void> {
@@ -196,6 +222,8 @@ export const noteService = {
         notes[parentIdx] = { ...notes[parentIdx], hasChildren: true };
       }
     }
+
+    persist();
   },
 
   async getChildren(parentId: string): Promise<Note[]> {
@@ -279,6 +307,8 @@ export const noteService = {
         notes[newParentIdx] = { ...notes[newParentIdx], hasChildren: true };
       }
     }
+
+    persist();
   },
 
   async getDescendantIds(id: string): Promise<string[]> {
@@ -307,6 +337,7 @@ export const noteService = {
 
   async emptyTrash(): Promise<void> {
     notes = notes.filter((n) => !n.isTrashed);
+    persist();
   },
 
   async getStats(): Promise<{ total: number; favorites: number; trashed: number }> {

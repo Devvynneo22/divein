@@ -1,20 +1,17 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { FileText } from 'lucide-react';
 import {
   useNote,
-  useNoteTree,
   useNoteAncestors,
   useNoteChildren,
   useCreateNote,
   useUpdateNote,
   useTrashNote,
-  useRestoreNote,
 } from './hooks/useNotes';
 import { NotesSidebar } from './components/NotesSidebar';
 import { NoteEditor } from './components/NoteEditor';
 import { NoteHeader } from './components/NoteHeader';
 import { NoteBreadcrumb } from './components/NoteBreadcrumb';
-import { SubPagesList } from './components/SubPagesList';
 
 export function NotesPage() {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
@@ -63,17 +60,11 @@ export function NotesPage() {
   const handleCreateChild = useCallback(
     async (parentId: string) => {
       const note = await createNote.mutateAsync({ title: 'Untitled', parentId });
-      // Auto-expand parent
       setExpandedIds((prev) => new Set([...prev, parentId]));
       setSelectedNoteId(note.id);
     },
     [createNote]
   );
-
-  const handleCreateSubPage = useCallback(async () => {
-    if (!selectedNoteId) return;
-    await handleCreateChild(selectedNoteId);
-  }, [selectedNoteId, handleCreateChild]);
 
   // ─── Update ──────────────────────────────────────────────────────
 
@@ -128,6 +119,9 @@ export function NotesPage() {
     setSelectedNoteId(id);
   }, []);
 
+  // suppress unused warning — renamingId is passed to sidebar
+  void renamingId;
+
   return (
     <div className="flex h-full overflow-hidden">
       {/* Sidebar */}
@@ -157,7 +151,7 @@ export function NotesPage() {
               />
             </div>
 
-            {/* Scrollable content */}
+            {/* Scrollable content — seamless page feel */}
             <div className="flex-1 overflow-y-auto">
               {/* Page header */}
               <NoteHeader
@@ -167,23 +161,11 @@ export function NotesPage() {
                 onIconChange={handleIconChange}
               />
 
-              {/* Editor */}
-              <div className="border-t border-[var(--color-border)]" style={{ minHeight: 400 }}>
-                <NoteEditor
-                  content={selectedNote.content}
-                  onUpdate={handleEditorUpdate}
-                />
-              </div>
-
-              {/* Sub-pages list */}
-              <SubPagesList
-                pages={children}
-                onNavigate={handleSelect}
-                onCreateSubPage={handleCreateSubPage}
+              {/* Editor fills remaining space, no dividing border */}
+              <NoteEditor
+                content={selectedNote.content}
+                onUpdate={handleEditorUpdate}
               />
-
-              {/* Bottom padding */}
-              <div className="h-16" />
             </div>
           </>
         ) : (
