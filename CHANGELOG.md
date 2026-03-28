@@ -339,3 +339,105 @@ Verified in browser:
 
 ### Committed
 - `0726827` — Notes overhaul + dashboard fix (14 files, +1455/-229 lines)
+
+---
+
+## Session 6 — 2026-03-28 12:50–13:15 SGT (Claude Opus)
+
+**Worker:** Claude Opus 4 (main) + Claude Sonnet (initial pass, reviewed by Opus)
+**Model:** anthropic/claude-opus-4-6
+
+### 🔥 Major: Notes Editor Deep Overhaul (Per Devvyn's Request)
+Focus: make Notes the best module in the app. Quality over breadth.
+
+**Devvyn's specific requests:**
+- Notes should persist (not lost on refresh)
+- Add image support
+- Top = title area, bottom = freeform content (words, pictures, emojis)
+- Remove "add sub-page" button from editor (sidebar-only)
+- Make it truly great
+
+### What was built
+
+**1. localStorage Persistence**
+- Notes now survive page refresh via `localStorage` (`nexus-notes` key)
+- Every mutation (create/update/delete/trash/restore/move/emptyTrash) calls `persist()`
+- Bridge solution until Electron/SQLite wiring
+
+**2. Freeform Editor Layout**
+- Removed SubPagesList from editor area — sub-pages managed only from sidebar
+- Removed border between header and editor — flows as one continuous page
+- Editor fills all remaining space below header
+
+**3. Image Support**
+- Toolbar button opens file picker
+- Drag & drop images into editor
+- Paste from clipboard (Ctrl+V screenshots)
+- Images stored as base64 data URLs in content JSON
+- Images render with rounded corners, max-width 100%, selection outline
+
+**4. Slash Commands (/ menu)**
+- Type `/` to open floating command menu
+- 11 commands: Heading 1/2/3, Bullet/Numbered/To-do List, Image, Code Block, Quote, Divider, Callout
+- Fuzzy search as you type, keyboard navigation (↑↓ Enter Escape)
+- Menu positioned at caret, auto-deletes slash text on selection
+
+**5. Task Lists**
+- Interactive checkboxes via @tiptap/extension-task-list + task-item
+- Checked items get strikethrough + muted color
+- Custom checkbox styling (accent color, checkmark SVG)
+
+**6. Enhanced Toolbar**
+- Added: Underline, Highlight (yellow), Text color picker (9 colors + reset), Image, Emoji, Task List, Code Block
+- Emoji picker: 6 categories (Smileys, Gestures, Objects, Nature, Symbols, Activities), search, ~230 emojis
+
+**7. Floating Bubble Menu**
+- Appears on text selection
+- Bold, Italic, Underline, Strikethrough, Code, Highlight, Link + 7-color palette
+- Custom implementation (TipTap v3 doesn't export React BubbleMenu component)
+
+**8. Code Blocks with Syntax Highlighting**
+- Powered by @tiptap/extension-code-block-lowlight + lowlight
+- 8 languages: JavaScript, TypeScript, Python, CSS, HTML, JSON, SQL, Bash
+- Catppuccin-inspired dark theme for syntax colors
+
+**9. Editor CSS**
+- Task list checkbox styling with custom checkmark
+- Code block dark theme with rounded corners
+- Image styling with selection outline
+- Blockquote accent border
+- Inline code pink highlight
+- Link styling with underline offset
+- Horizontal rule styling
+
+### New files (3)
+- `SlashCommandMenu.tsx` — Floating slash command menu (192 lines)
+- `EditorBubbleMenu.tsx` — Custom floating selection toolbar (160 lines)
+- `EmojiPicker.tsx` — Rich categorized emoji picker (130 lines)
+
+### Modified files (5)
+- `noteService.ts` — localStorage persistence layer
+- `NotesPage.tsx` — Removed SubPagesList, seamless layout
+- `NoteEditor.tsx` — Complete rewrite with all new extensions
+- `globals.css` — All new editor styles (task lists, code blocks, images, etc.)
+- `package.json` — 10 new TipTap extensions
+
+### New dependencies installed
+@tiptap/extension-task-list, @tiptap/extension-task-item, @tiptap/extension-underline, @tiptap/extension-highlight, @tiptap/extension-text-style, @tiptap/extension-color, @tiptap/extension-typography, @tiptap/extension-dropcursor
+
+### Verification
+- `npx tsc --noEmit` — **zero errors** (with `--incremental false` to clear stale cache)
+- Tested in browser:
+  - ✅ Create page, type content, word count updates
+  - ✅ Slash command menu appears on `/`, all commands work
+  - ✅ Task list checkbox renders and is interactive
+  - ✅ **Content persists across full page refresh** (localStorage working)
+  - ✅ Sub-page creation from sidebar, tree hierarchy intact
+  - ✅ Breadcrumb navigation correct for nested pages
+  - ✅ Enhanced toolbar renders all new buttons
+
+### Committed
+- `75331e1` — Notes overhaul: localStorage, slash commands, images, task lists, enhanced editor (9 files, +1365/-67 lines)
+
+### Devvyn's Standing Instruction Update
+- **Sub-agents for coding must use Claude Opus 4-6** — not Sonnet or other models

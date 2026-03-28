@@ -60,7 +60,7 @@
 | Kanban board | 📋 |
 | Keyboard shortcuts | 📋 |
 
-### Notes & Knowledge Base ✅ (OVERHAULED Session 5)
+### Notes & Knowledge Base ✅ (OVERHAULED Sessions 5 & 6)
 | Feature | Status |
 |---------|--------|
 | Hierarchical page nesting (infinite depth) | ✅ |
@@ -68,14 +68,21 @@
 | Breadcrumb navigation (clickable hierarchy) | ✅ |
 | Page icons (emoji picker, 30+ presets) | ✅ |
 | Favorites section (pinned pages at sidebar top) | ✅ |
-| Sub-pages list at bottom of each page | ✅ |
 | Trash system (soft delete, restore, empty trash) | ✅ |
 | Search across all pages with breadcrumb context | ✅ |
 | TipTap rich text editor with toolbar | ✅ |
 | Auto-save (500ms debounce) | ✅ |
 | projectId filtering | ✅ |
+| **localStorage persistence** | ✅ |
+| **Slash commands** (/ menu: headings, lists, todo, image, code, quote, divider, callout) | ✅ |
+| **Image support** (toolbar, drag & drop, clipboard paste, base64) | ✅ |
+| **Task lists** (interactive checkboxes) | ✅ |
+| **Enhanced toolbar** (underline, highlight, text color, emoji picker, image) | ✅ |
+| **Floating bubble menu** (formatting on text selection) | ✅ |
+| **Code blocks** (syntax highlighting — JS, TS, Python, CSS, HTML, JSON, SQL, Bash) | ✅ |
+| **Emoji picker** (6 categories, search, inline insert) | ✅ |
+| Seamless header → editor layout (freeform editing) | ✅ |
 | Wiki-links / backlinks | 📋 |
-| Slash commands | 📋 |
 
 ### Calendar ✅
 | Feature | Status |
@@ -178,7 +185,8 @@
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Electron IPC wiring | 📋 | Main + preload + handlers |
-| SQLite persistence | 📋 | Swap in-memory → better-sqlite3 |
+| localStorage persistence (Notes) | ✅ | Bridge until Electron/SQLite |
+| SQLite persistence | 📋 | Swap localStorage/in-memory → better-sqlite3 |
 | Auto-backup | 📋 | |
 | Auto-updater | 📋 | |
 | CI/CD | 📋 | |
