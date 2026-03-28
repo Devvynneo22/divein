@@ -19,6 +19,14 @@ export function useTask(id: string) {
   });
 }
 
+export function useSubtasks(parentId: string | null) {
+  return useQuery({
+    queryKey: [...TASKS_KEY, 'subtasks', parentId],
+    queryFn: () => (parentId ? taskService.getSubtasks(parentId) : Promise.resolve([])),
+    enabled: !!parentId,
+  });
+}
+
 export function useCreateTask() {
   const qc = useQueryClient();
   return useMutation({
@@ -44,6 +52,17 @@ export function useDeleteTask() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => taskService.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: TASKS_KEY });
+    },
+  });
+}
+
+export function useReorderTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, newOrder }: { id: string; newOrder: number }) =>
+      taskService.reorder(id, newOrder),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: TASKS_KEY });
     },

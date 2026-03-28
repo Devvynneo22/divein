@@ -1,17 +1,68 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEvents, useCreateEvent, useUpdateEvent, useDeleteEvent } from './hooks/useEvents';
-import { X } from 'lucide-react';
+import { X, CheckCircle2, Circle, ArrowRight } from 'lucide-react';
 import type { CalendarEvent } from '@/shared/types/event';
+import type { Task } from '@/shared/types/task';
+import { taskService } from '@/shared/lib/taskService';
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function getPriorityColor(priority: number): string {
+  switch (priority) {
+    case 4: return '#ef4444'; // urgent - red
+    case 3: return '#f59e0b'; // high - amber
+    case 2: return '#3b82f6'; // medium - blue
+    case 1: return '#9ca3af'; // low - gray
+    default: return '#6366f1'; // indigo for no priority
+  }
+}
+
+function getPriorityLabel(priority: number): string {
+  switch (priority) {
+    case 4: return 'Urgent';
+    case 3: return 'High';
+    case 2: return 'Medium';
+    case 1: return 'Low';
+    default: return 'None';
+  }
+}
+
+function getStatusLabel(status: string): string {
+  switch (status) {
+    case 'inbox': return 'Inbox';
+    case 'todo': return 'To Do';
+    case 'in_progress': return 'In Progress';
+    case 'done': return 'Done';
+    case 'cancelled': return 'Cancelled';
+    default: return status;
+  }
+}
+
+// ─── Component ──────────────────────────────────────────────────────────────
 
 export function CalendarPage() {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
   const { data: events = [] } = useEvents();
   const createEvent = useCreateEvent();
   const updateEvent = useUpdateEvent();
   const deleteEvent = useDeleteEvent();
+
+  // Task query — fetch tasks that have a due date
+  const { data: tasks = [] } = useQuery({
+    queryKey: ['tasks', 'withDueDate'],
+    queryFn: async () => {
+      const all = await taskService.list();
+      return all.filter((t) => t.dueDate !== null);
+    },
+  });
 
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
@@ -22,8 +73,10 @@ export function CalendarPage() {
     description: '',
   });
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [showTasks, setShowTasks] = useState(true);
 
-  // Map to FullCalendar format
+  // Map calendar events to FullCalendar format
   const fcEvents = events.map((e) => ({
     id: e.id,
     title: e.title,
@@ -32,10 +85,26 @@ export function CalendarPage() {
     allDay: e.allDay,
     backgroundColor: e.color ?? 'var(--color-accent)',
     borderColor: e.color ?? 'var(--color-accent)',
-    extendedProps: { event: e },
+    extendedProps: { type: 'event' as const, event: e },
   }));
 
+  // Map tasks to FullCalendar events
+  const taskEvents = tasks.map((t) => ({
+    id: `task-${t.id}`,
+    title: `✓ ${t.title}`,
+    start: t.dueDate!,
+    allDay: true,
+    backgroundColor: t.status === 'done' ? '#22c55e' : getPriorityColor(t.priority),
+    borderColor: t.status === 'done' ? '#22c55e' : getPriorityColor(t.priority),
+    classNames: t.status === 'done' ? ['task-done'] : [],
+    extendedProps: { type: 'task' as const, task: t },
+  }));
+
+  // Combine both
+  const allFcEvents = [...fcEvents, ...(showTasks ? taskEvents : [])];
+
   function handleDateClick(info: { dateStr: string; allDay: boolean }) {
+    setSelectedTask(null);
     setFormData({
       title: '',
       startTime: info.allDay ? info.dateStr : info.dateStr,
@@ -48,10 +117,18 @@ export function CalendarPage() {
   }
 
   function handleEventClick(info: { event: { id: string; extendedProps: Record<string, unknown> } }) {
+    if (info.event.extendedProps.type === 'task') {
+      const task = info.event.extendedProps.task as Task;
+      setSelectedTask(task);
+      setShowForm(false);
+      return;
+    }
+
+    setSelectedTask(null);
     const evt = info.event.extendedProps.event as CalendarEvent;
     setFormData({
       title: evt.title,
-      startTime: evt.startTime.slice(0, 16), // datetime-local format
+      startTime: evt.startTime.slice(0, 16),
       endTime: evt.endTime?.slice(0, 16) ?? '',
       allDay: evt.allDay,
       description: evt.description ?? '',
@@ -61,6 +138,14 @@ export function CalendarPage() {
   }
 
   function handleEventDrop(info: { event: { id: string; startStr: string; endStr: string; allDay: boolean } }) {
+    if (info.event.id.startsWith('task-')) {
+      const taskId = info.event.id.replace('task-', '');
+      const newDate = info.event.startStr;
+      void taskService.update(taskId, { dueDate: newDate });
+      void queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      return;
+    }
+
     updateEvent.mutate({
       id: info.event.id,
       data: {
@@ -69,6 +154,14 @@ export function CalendarPage() {
         allDay: info.event.allDay,
       },
     });
+  }
+
+  async function handleToggleTaskStatus(task: Task) {
+    const newStatus = task.status === 'done' ? 'todo' : 'done';
+    await taskService.update(task.id, { status: newStatus });
+    void queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    // Update the selected task panel
+    setSelectedTask({ ...task, status: newStatus });
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -134,7 +227,23 @@ export function CalendarPage() {
           .fc .fc-scrollgrid { border-color: var(--color-border); }
           .fc td, .fc th { border-color: var(--color-border) !important; }
           .fc .fc-toolbar-title { font-size: 1.25rem; font-weight: 600; }
+          .fc .fc-event.task-done { opacity: 0.5; }
+          .fc .fc-event.task-done .fc-event-title { text-decoration: line-through; }
         `}</style>
+
+        {/* Show tasks toggle */}
+        <div className="flex items-center gap-2 mb-2">
+          <label className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={showTasks}
+              onChange={(e) => setShowTasks(e.target.checked)}
+              className="rounded"
+            />
+            Show tasks
+          </label>
+        </div>
+
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="dayGridMonth"
@@ -143,7 +252,7 @@ export function CalendarPage() {
             center: 'title',
             right: 'dayGridMonth,timeGridWeek,timeGridDay',
           }}
-          events={fcEvents}
+          events={allFcEvents}
           editable={true}
           selectable={true}
           dateClick={handleDateClick}
@@ -237,6 +346,81 @@ export function CalendarPage() {
               )}
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Task detail panel */}
+      {selectedTask && !showForm && (
+        <div className="w-80 border-l border-[var(--color-border)] bg-[var(--color-bg-secondary)] flex flex-col">
+          <div className="flex items-center justify-between px-4 h-12 border-b border-[var(--color-border)]">
+            <span className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wide">
+              Task Details
+            </span>
+            <button onClick={() => setSelectedTask(null)} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]">
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className="p-4 space-y-4">
+            {/* Title */}
+            <h3 className="text-sm font-medium text-[var(--color-text-primary)]">
+              {selectedTask.title}
+            </h3>
+
+            {/* Status toggle */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[var(--color-text-muted)]">Status</span>
+              <button
+                onClick={() => void handleToggleTaskStatus(selectedTask)}
+                className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-md hover:bg-[var(--color-bg-tertiary)] transition-colors"
+                style={{ color: selectedTask.status === 'done' ? '#22c55e' : 'var(--color-text-secondary)' }}
+              >
+                {selectedTask.status === 'done' ? <CheckCircle2 size={14} /> : <Circle size={14} />}
+                {getStatusLabel(selectedTask.status)}
+              </button>
+            </div>
+
+            {/* Priority */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[var(--color-text-muted)]">Priority</span>
+              <span
+                className="text-xs font-medium px-2 py-0.5 rounded"
+                style={{
+                  color: getPriorityColor(selectedTask.priority),
+                  backgroundColor: `${getPriorityColor(selectedTask.priority)}18`,
+                }}
+              >
+                {getPriorityLabel(selectedTask.priority)}
+              </span>
+            </div>
+
+            {/* Due date */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[var(--color-text-muted)]">Due Date</span>
+              <span className="text-xs text-[var(--color-text-secondary)]">
+                {selectedTask.dueDate ? new Date(selectedTask.dueDate).toLocaleDateString() : '—'}
+              </span>
+            </div>
+
+            {/* Description */}
+            {selectedTask.description && (
+              <div>
+                <span className="text-xs text-[var(--color-text-muted)] block mb-1">Description</span>
+                <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed">
+                  {selectedTask.description}
+                </p>
+              </div>
+            )}
+
+            {/* Open in Tasks button */}
+            <button
+              onClick={() => navigate('/tasks')}
+              className="flex items-center justify-center gap-1.5 w-full px-4 py-2 rounded-md bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] text-xs font-medium hover:bg-[var(--color-bg-elevated)] hover:text-[var(--color-text-primary)] transition-colors"
+            >
+              Open in Tasks
+              <ArrowRight size={12} />
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -161,4 +161,10 @@ export const taskService = {
       persist();
     }
   },
+
+  async getSubtasks(parentId: string): Promise<Task[]> {
+    return tasks
+      .filter((t) => t.parentId === parentId)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+  },
 };

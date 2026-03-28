@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X, Flag, Calendar, Tag, AlignLeft } from 'lucide-react';
+import { X, Flag, Calendar, Tag, AlignLeft, CheckCircle2, Circle, ListTodo } from 'lucide-react';
 import type { Task, UpdateTaskInput, TaskPriority, TaskStatus } from '@/shared/types/task';
+import { useSubtasks, useCreateTask, useUpdateTask, useDeleteTask } from '../hooks/useTasks';
 
 interface TaskDetailProps {
   task: Task;
@@ -28,6 +29,15 @@ export function TaskDetail({ task, onUpdate, onClose }: TaskDetailProps) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? '');
   const [tagInput, setTagInput] = useState('');
+  const [subtaskInput, setSubtaskInput] = useState('');
+
+  const { data: subtasks = [] } = useSubtasks(task.parentId === null ? task.id : null);
+  const createTask = useCreateTask();
+  const updateSubtask = useUpdateTask();
+  const deleteSubtask = useDeleteTask();
+
+  const isRootTask = task.parentId === null;
+  const doneCount = subtasks.filter((s) => s.status === 'done').length;
 
   // Sync state when task changes
   useEffect(() => {
@@ -60,6 +70,22 @@ export function TaskDetail({ task, onUpdate, onClose }: TaskDetailProps) {
 
   function handleRemoveTag(tag: string) {
     onUpdate({ tags: task.tags.filter((t) => t !== tag) });
+  }
+
+  function handleSubtaskToggle(subtask: Task) {
+    const newStatus: TaskStatus = subtask.status === 'done' ? 'todo' : 'done';
+    updateSubtask.mutate({ id: subtask.id, data: { status: newStatus } });
+  }
+
+  function handleAddSubtask(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter' && subtaskInput.trim()) {
+      createTask.mutate({ title: subtaskInput.trim(), parentId: task.id });
+      setSubtaskInput('');
+    }
+  }
+
+  function handleDeleteSubtask(id: string) {
+    deleteSubtask.mutate(id);
   }
 
   return (
@@ -180,6 +206,66 @@ export function TaskDetail({ task, onUpdate, onClose }: TaskDetailProps) {
             className="w-full px-3 py-2 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] outline-none resize-none"
           />
         </div>
+
+        {/* Subtasks section (only for root tasks) */}
+        {isRootTask && (
+          <div>
+            <label className="flex items-center gap-2 text-xs text-[var(--color-text-muted)] mb-1.5">
+              <ListTodo size={12} /> Subtasks
+              {subtasks.length > 0 && (
+                <span className="ml-auto text-[10px]">
+                  {doneCount}/{subtasks.length} complete
+                </span>
+              )}
+            </label>
+
+            {/* Subtask list */}
+            <div className="space-y-1 mb-2">
+              {subtasks.map((sub) => (
+                <div
+                  key={sub.id}
+                  className="flex items-center gap-2 px-2 py-1 rounded group hover:bg-[var(--color-bg-tertiary)]"
+                >
+                  <button
+                    onClick={() => handleSubtaskToggle(sub)}
+                    className={`flex-shrink-0 ${
+                      sub.status === 'done'
+                        ? 'text-[var(--color-success)]'
+                        : 'text-[var(--color-text-muted)] hover:text-[var(--color-accent)]'
+                    } transition-colors`}
+                  >
+                    {sub.status === 'done' ? <CheckCircle2 size={14} /> : <Circle size={14} />}
+                  </button>
+                  <span
+                    className={`flex-1 text-xs truncate ${
+                      sub.status === 'done'
+                        ? 'line-through text-[var(--color-text-muted)]'
+                        : 'text-[var(--color-text-primary)]'
+                    }`}
+                  >
+                    {sub.title}
+                  </span>
+                  <button
+                    onClick={() => handleDeleteSubtask(sub.id)}
+                    className="opacity-0 group-hover:opacity-100 text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-all"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Add subtask input */}
+            <input
+              type="text"
+              value={subtaskInput}
+              onChange={(e) => setSubtaskInput(e.target.value)}
+              onKeyDown={handleAddSubtask}
+              placeholder="Add subtask..."
+              className="w-full px-3 py-1.5 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] outline-none"
+            />
+          </div>
+        )}
 
         {/* Metadata */}
         <div className="text-[10px] text-[var(--color-text-muted)] space-y-0.5 pt-2 border-t border-[var(--color-border)]">
