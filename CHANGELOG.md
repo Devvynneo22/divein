@@ -286,3 +286,56 @@ Plus: Command Palette ✅, Settings ✅
 2. Cross-module integration (tasks on calendar, notes→flashcards)
 3. Keyboard shortcuts system
 4. Polish (error boundaries, loading states, animations)
+
+---
+
+## Session 5 — 2026-03-28 12:23–12:35 SGT (Claude Opus)
+
+**Worker:** Claude Opus 4 (main) + Claude Sonnet (Notes overhaul)
+**Model:** anthropic/claude-opus-4-6 (orchestrator), anthropic/claude-sonnet-4-6 (builder)
+
+### 🔥 Major: Notes Module Overhaul
+Complete rebuild from flat note list to Notion-level hierarchical knowledge base:
+
+**New architecture:**
+- Pages nest infinitely (any page can contain sub-pages)
+- Tree sidebar with expand/collapse, hover actions (+ sub-page, ⋯ menu)
+- Breadcrumb navigation showing full page path
+- Page icons (emoji picker with 30+ presets)
+- Favorites section (pinned pages at sidebar top)
+- Sub-pages list at bottom of each page editor
+- Soft delete with Trash (restore + empty trash)
+- Full-text search with breadcrumb context in results
+
+**New components created (8):**
+- `NotesSidebar.tsx` — Tree sidebar with search, favorites, pages, trash
+- `NoteTreeItem.tsx` — Recursive tree node with expand/collapse animations
+- `NoteBreadcrumb.tsx` — Clickable hierarchy breadcrumb
+- `NoteHeader.tsx` — Editable icon + title + creation meta
+- `SubPagesList.tsx` — Children shown at bottom of each page
+- `NoteSearchResults.tsx` — Search results with breadcrumb context
+- `TrashPanel.tsx` — Trash management (restore, empty)
+- `PageIconPicker.tsx` — Emoji grid picker
+
+**Rewritten files (5):**
+- `shared/types/note.ts` — Added parentId, icon, coverColor, isTrashed, depth, hasChildren, sortOrder, NoteTreeNode
+- `shared/lib/noteService.ts` — Full tree-aware service: getTree, getAncestors, moveTo, trash/restore, search, descendants
+- `modules/notes/hooks/useNotes.ts` — 15 hooks including useNoteTree, useNoteAncestors, useMoveNote, useTrashNote
+- `modules/notes/NotesPage.tsx` — Complete rebuild with sidebar + breadcrumb + header + editor + sub-pages
+- `modules/notes/components/NoteEditor.tsx` — Enhanced styling and placeholder
+
+### Fix: Dashboard Numbers Not Updating
+Root cause: dashboard query keys used `['dashboard', ...]` prefix which wasn't invalidated by module mutations.
+Fix: Aligned query keys to start with module prefix (e.g. `['tasks', 'dashboard', 'dueToday']`) so TanStack Query's prefix-based invalidation cascades from module mutations.
+Also set `staleTime: 0` and `refetchOnWindowFocus: true` for dashboard queries.
+
+### Thorough Testing Done
+Verified in browser:
+- ✅ Task creation + detail panel + status cycling
+- ✅ Notes: create root page, create sub-page, rename, breadcrumb navigation
+- ✅ Notes: tree sidebar expand/collapse, sub-pages list
+- ✅ Flashcards: create deck, view deck with stats
+- ✅ All modules render without errors
+
+### Committed
+- `0726827` — Notes overhaul + dashboard fix (14 files, +1455/-229 lines)
