@@ -25,7 +25,7 @@ interface NoteEditorProps {
 }
 
 export function NoteEditor({ content, onUpdate }: NoteEditorProps) {
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const editor = useEditor({
     extensions: [

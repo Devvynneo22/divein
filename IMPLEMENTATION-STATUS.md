@@ -1,6 +1,6 @@
 # Nexus — Implementation Status
 
-> Last updated: 2026-03-28 11:20 SGT  
+> Last updated: 2026-03-28 11:50 SGT  
 > Architecture: Electron (planned) + React 19 + TypeScript + Vite  
 > Current mode: Web-only dev (in-memory data layer, no Electron IPC yet)
 
@@ -20,13 +20,13 @@
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Project scaffolding (Vite + React + TS) | ✅ | Rebuilt from scratch — original was vanilla TS template, not React |
-| package.json with correct deps | ✅ | React 19, React Router, lucide-react, TanStack Query, all libs |
+| package.json with correct deps | ✅ | React 19, React Router, TanStack Query, all libs |
 | tsconfig.json (renderer) | ✅ | Strict mode, path aliases (@/, @shared/, @modules/) |
-| tsconfig.node.json (vite config) | ✅ | |
+| tsconfig.node.json (vite config) | ✅ | Fixed: composite + declaration enabled |
 | tsconfig.electron.json | ✅ | For future Electron main process compilation |
 | vite.config.ts | ✅ | React plugin, Tailwind plugin, path aliases |
 | Tailwind CSS 4 + globals.css | ✅ | Custom theme vars, dark mode, scrollbar styling |
-| App shell (Layout + Sidebar + StatusBar) | ✅ | Collapsible sidebar, nav sections, status bar |
+| App shell (Layout + Sidebar + StatusBar) | ✅ | Collapsible sidebar, nav sections, status bar with live timer |
 | React Router setup | ✅ | All 10 routes defined |
 | TanStack Query client | ✅ | 1min stale time, no retry (local data) |
 | Drizzle schemas (all tables) | ✅ | tasks, projects, notes, calendar, habits, flashcards, timer, tables, settings, tags, activity_log, schema_version |
@@ -36,11 +36,11 @@
 | Auto-backup service | 📋 | |
 | Logging service | 📋 | |
 | Error boundaries | 📋 | |
+| Old cruft files cleaned | ✅ | Removed unused src/assets/ (hero.png, typescript.svg, vite.svg) |
 
 ### Known Issues (Phase 0)
 1. **Electron is not wired yet.** The app runs purely as a Vite web app. The Electron main process, preload, and IPC handlers are scaffolded but not integrated. This is intentional — build and test UI first, wire Electron later.
-2. **Data is in-memory only.** Tasks (and all future modules) use an in-memory JavaScript array. Data is lost on page refresh. The `taskService` abstraction ensures zero code changes when we swap to Electron IPC + SQLite.
-3. The old Vite template files (`src/main.ts`, `src/counter.ts`, `src/style.css`) have been deleted but the `src/assets/` folder (hero.png, logos) still exists as unused cruft. Safe to delete.
+2. **Data is in-memory only.** All modules use in-memory JavaScript arrays. Data is lost on page refresh. The DataService abstraction ensures zero code changes when we swap to Electron IPC + SQLite.
 
 ---
 
@@ -49,17 +49,21 @@
 ### Module 1: Dashboard
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Dashboard page | ✅ | Stat cards (tasks due, events, habits, cards to review) |
-| Quick capture bar | ✅ | Present on dashboard, not wired to task creation yet |
-| Today's Tasks section | ✅ | Placeholder — needs to pull from task service |
-| Today's Events section | ✅ | Placeholder |
+| Dashboard page | ✅ | Fully wired to real data from all services |
+| Quick capture bar | ✅ | Creates tasks with today's due date via Enter key |
+| Today's Tasks section | ✅ | Pulls from taskService, shows up to 5 with "view all" |
+| Today's Events section | ✅ | Pulls from eventService with date range filtering |
+| Stat cards | ✅ | 5 cards: Tasks due, Events today, Habits (X/Y), Cards to review, Time today |
+| Today's Habits section | ✅ | Shows habit list with completion status |
+| Stat card navigation | ✅ | Click any stat card to navigate to that module |
+| Dynamic greeting | ✅ | Morning/afternoon/evening based on time |
 | Weekly overview | 📋 | |
 | Customizable widgets | 📋 | |
 
 ### Module 2: Task Manager
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Task types & interfaces | ✅ | Full TypeScript types: Task, CreateTaskInput, UpdateTaskInput, TaskFilter |
+| Task types & interfaces | ✅ | Full TypeScript types |
 | Data service (taskService) | ✅ | In-memory implementation matching IPC contract |
 | TanStack Query hooks | ✅ | useTasks, useTask, useCreateTask, useUpdateTask, useDeleteTask |
 | Quick-add input | ✅ | Enter to create, clears after |
@@ -75,70 +79,128 @@
 | Subtasks | 📋 | Schema supports parentId, UI not built |
 | Kanban board view | 📋 | |
 | Keyboard shortcuts | 📋 | N=new, 1-4=priority, D=done |
-| Global quick-add hotkey | 📋 | Requires Electron |
 | Drag-and-drop reorder | 📋 | dnd-kit installed |
 | Batch operations | 📋 | |
 | Saved filters | 📋 | |
-| Task dependencies | 📋 | Schema planned, not in Drizzle schema yet |
 | Recurring tasks | 📋 | |
 
 ### Module 3: Notes & Knowledge Base
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Note types & interfaces | ✅ | Note, NoteFolder, CreateNoteInput, UpdateNoteInput, NoteFilter |
+| Note types & interfaces | ✅ | |
 | Data service (noteService) | ✅ | In-memory with search, pinning, sorting |
-| TanStack Query hooks | ✅ | useNotes, useNote, useCreateNote, useUpdateNote, useDeleteNote |
-| Notes page with sidebar | ✅ | Search bar, new note button, note list, pin/delete actions |
+| TanStack Query hooks | ✅ | |
+| Notes page with sidebar | ✅ | Search bar, new note button, note list |
 | TipTap editor | ✅ | Full toolbar: B/I/S/Code, H1-H3, Lists, Quote, Divider, Undo/Redo |
-| Note title editing | ✅ | Inline editable title |
+| Note title editing | ✅ | |
 | Note metadata | ✅ | Updated date, word count |
 | Pin/unpin notes | ✅ | Pinned notes sort to top |
 | Debounced auto-save | ✅ | 500ms debounce on editor changes |
 | Search notes | ✅ | Searches title + content text |
 | Folder tree | 📋 | Service supports folders, UI not built |
-| Full-text search (FTS5) | 📋 | Requires SQLite |
 | Wiki-links | 📋 | |
 | Backlinks | 📋 | |
 | Slash commands | 📋 | |
-| Export to Markdown/PDF | 📋 | |
 
 ### Module 4: Calendar
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Event types & interfaces | ✅ | CalendarEvent, CreateEventInput, UpdateEventInput |
+| Event types & interfaces | ✅ | |
 | Data service (eventService) | ✅ | In-memory with date range filtering |
-| TanStack Query hooks | ✅ | useEvents, useCreateEvent, useUpdateEvent, useDeleteEvent |
-| FullCalendar integration | ✅ | Month, Week, Day views, dark theme, today highlight |
+| TanStack Query hooks | ✅ | |
+| FullCalendar integration | ✅ | Month, Week, Day views, dark theme |
 | Event CRUD | ✅ | Create/edit/delete via side panel form |
-| Click date to create event | ✅ | Opens form with pre-filled date |
-| Click event to edit | ✅ | Opens form with event data |
-| Drag-and-drop reschedule | ✅ | eventDrop handler updates start/end times |
-| All-day toggle | ✅ | Switches between date and datetime inputs |
-| Dark theme CSS vars | ✅ | Custom FullCalendar theme vars matching app |
+| Click date to create event | ✅ | |
+| Click event to edit | ✅ | |
+| Drag-and-drop reschedule | ✅ | |
+| All-day toggle | ✅ | |
+| Dark theme CSS vars | ✅ | |
 | Tasks on calendar | 📋 | Need cross-module integration |
 | Recurring events | 📋 | |
-| Reminders | 📋 | |
-| .ics import/export | 📋 | |
 
 ---
 
 ## Phase 2: Productivity Features
 
-All Phase 2 modules are 📋 (placeholder pages exist, no functionality).
+### Module 5: Habit Tracker ✅ NEW
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Habit types & interfaces | ✅ | Habit, HabitEntry, HabitFrequency, HabitWithStatus |
+| Data service (habitService) | ✅ | Full CRUD + checkIn/uncheckIn + streak/completion calculations |
+| TanStack Query hooks | ✅ | useHabits, useCheckIn, useUncheckIn, useTodayStatus, useHabitEntries |
+| Habits page | ✅ | Grouped habit list, today's date, side panel |
+| Habit item component | ✅ | Color border, boolean checkbox / measurable input+progress bar |
+| Streak display | ✅ | Current streak with 🔥 badge |
+| Create/edit habit form | ✅ | Name, description, color picker, emoji icon, frequency selector |
+| Frequency types | ✅ | Daily, specific days (Mon-Sun), X times per week |
+| Boolean vs Measurable | ✅ | Toggle with target value + unit for measurable |
+| Habit groups | ✅ | Group headers, autocomplete from existing groups |
+| Habit stats panel | ✅ | Current streak, longest streak, 7/30-day completion rates |
+| Heatmap calendar | ✅ | GitHub contribution-style 12-week grid with habit color intensity |
+| Empty state | ✅ | Friendly onboarding with "Add your first habit" button |
+| Dashboard integration | ✅ | Habits stat card + today's habits section on dashboard |
 
-- Habits page
-- Timer/Pomodoro page
-- Projects page
-- Command palette (Ctrl+K)
+### Module 6: Timer & Pomodoro ✅ NEW
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Timer types & interfaces | ✅ | TimeEntry, PomodoroSettings, PomodoroPhase, TimerState |
+| Data service (timerService) | ✅ | Start/stop, manual entry, today total, week summary |
+| Zustand store (timerStore) | ✅ | Drift-free tick via Date.now() epoch anchoring, phase transitions |
+| TanStack Query hooks | ✅ | useTimeEntries, useStartTimer, useStopTimer, useRunningEntry |
+| Timer page | ✅ | Big display, controls, description input, today's entries |
+| Timer display component | ✅ | SVG circular progress (Pomodoro) / plain digits (Stopwatch) |
+| Timer controls | ✅ | Play/Pause hero button, Stop, Skip, mode toggle |
+| Stopwatch mode | ✅ | Count-up timer |
+| Pomodoro mode | ✅ | Work/short break/long break with configurable intervals |
+| Phase transitions | ✅ | Auto-advance with optional auto-start |
+| Pomodoro settings | ✅ | Collapsible panel with duration sliders and toggles |
+| Time entry list | ✅ | Today's entries with time range, duration, 🍅 badge |
+| Manual time entry | ✅ | Add completed entry with start/end/duration |
+| StatusBar integration | ✅ | Live timer display with animated pulse when running |
+| Dashboard integration | ✅ | "Time today" stat card |
+
+### Module 7: Flashcards & Spaced Repetition ✅ NEW
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Flashcard types & interfaces | ✅ | Deck, Card, CardReview, StudySession, DeckStats |
+| SM-2 algorithm | ✅ | Pure function in sm2.ts with interval preview |
+| Data service (flashcardService) | ✅ | Full CRUD + study queue + review + stats |
+| TanStack Query hooks | ✅ | 13 hooks: useDecks, useCards, useStudyQueue, useReviewCard, etc. |
+| Flashcards page | ✅ | Two-mode: deck browser grid ↔ deck view |
+| Deck card component | ✅ | Color stripe, card count, due today badge |
+| Deck form | ✅ | Name, description, color picker, new cards per day |
+| Card list | ✅ | Status badges (new/learning/review/suspended), next review dates |
+| Card form | ✅ | Front/back textareas + tag input |
+| Study session | ✅ | One card at a time, show/hide answer with CSS 3D flip animation |
+| Review buttons | ✅ | Again/Hard/Good/Easy with live interval previews |
+| Session complete screen | ✅ | Stats summary with per-rating breakdown |
+| Study queue ordering | ✅ | Learning first → due for review → new cards (up to daily limit) |
+| Dashboard integration | ✅ | "Cards to review" stat card |
+
+### Remaining Phase 2
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Command palette (Ctrl+K) | 📋 | cmdk library installed |
+| Settings page | 📋 | Placeholder exists |
 
 ## Phase 3: Advanced Features
 
-All Phase 3 modules are 📋.
+### Module 8: Tables & Structured Data
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Tables page | 📋 | Placeholder only |
 
-- Flashcards / Spaced Repetition
-- Tables / Structured Data
-- Cross-module integration
-- Polish (keyboard shortcuts, settings)
+### Module 9: Project Management
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Projects page | 📋 | Placeholder only |
+
+### Cross-Module Integration
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Tasks on calendar | 📋 | |
+| Notes → Flashcards | 📋 | |
+| Keyboard shortcuts | 📋 | |
 
 ## Phase 4: Distribution & Sync
 
@@ -156,11 +218,13 @@ All Phase 4 items are 📋.
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-03-28 | Electron over Tauri | better-sqlite3 + Drizzle ORM can't run in Tauri's WebView; Rust learning curve too high |
-| 2026-03-28 | Web-first development | Build and test all UI as a web app, wire Electron IPC last. Zero code changes needed — DataService abstraction handles the swap. |
-| 2026-03-28 | In-memory data layer | Matches the Electron IPC contract exactly. When we swap, only the service implementation files change — no hooks, components, or pages touched. |
-| 2026-03-28 | Rebuilt from vanilla Vite template | Original scaffold used wrong template (vanilla TS, not React). Complete rebuild with proper React 19, Router, TanStack Query. |
-| 2026-03-28 | lucide-react over @radix-ui/react-icons | lucide has more icons (1500+), consistent style, tree-shakeable |
+| 2026-03-28 | Electron over Tauri | better-sqlite3 + Drizzle ORM can't run in Tauri's WebView |
+| 2026-03-28 | Web-first development | Build all UI as web app, wire Electron IPC last |
+| 2026-03-28 | In-memory data layer | Matches Electron IPC contract; only service files change on swap |
+| 2026-03-28 | Rebuilt from vanilla Vite template | Original scaffold used wrong template |
+| 2026-03-28 | lucide-react over @radix-ui/react-icons | More icons, consistent, tree-shakeable |
+| 2026-03-28 | Zustand for timer state | Real-time tick state can't be in React Query; Zustand is lightweight |
+| 2026-03-28 | SM-2 as pure function | Testable, no side effects, easy to verify correctness |
 
 ---
 
@@ -181,40 +245,82 @@ nexus/
 │   │   ├── App.tsx          # Root: QueryClient + Router + Layout
 │   │   ├── Layout.tsx       # Shell: Sidebar + main + StatusBar
 │   │   ├── Sidebar.tsx      # Navigation with sections
-│   │   └── StatusBar.tsx    # Bottom bar
+│   │   └── StatusBar.tsx    # Bottom bar (live timer integration)
 │   ├── modules/
-│   │   ├── dashboard/DashboardPage.tsx  # ✅ Working
-│   │   ├── tasks/
-│   │   │   ├── TasksPage.tsx            # ✅ Full CRUD
-│   │   │   ├── components/TaskItem.tsx  # ✅ Task row
-│   │   │   ├── components/TaskDetail.tsx # ✅ Detail panel
-│   │   │   └── hooks/useTasks.ts        # ✅ TanStack Query hooks
-│   │   ├── notes/NotesPage.tsx          # Placeholder
-│   │   ├── calendar/CalendarPage.tsx    # Placeholder
-│   │   ├── habits/HabitsPage.tsx        # Placeholder
-│   │   ├── timer/TimerPage.tsx          # Placeholder
-│   │   ├── flashcards/FlashcardsPage.tsx # Placeholder
-│   │   ├── tables/TablesPage.tsx        # Placeholder
-│   │   ├── projects/ProjectsPage.tsx    # Placeholder
-│   │   └── settings/SettingsPage.tsx    # Placeholder
+│   │   ├── dashboard/DashboardPage.tsx  # ✅ Wired to all services
+│   │   ├── tasks/                       # ✅ Full CRUD
+│   │   │   ├── TasksPage.tsx
+│   │   │   ├── components/TaskItem.tsx
+│   │   │   ├── components/TaskDetail.tsx
+│   │   │   └── hooks/useTasks.ts
+│   │   ├── notes/                       # ✅ Full CRUD + TipTap
+│   │   │   ├── NotesPage.tsx
+│   │   │   ├── components/NoteEditor.tsx
+│   │   │   └── hooks/useNotes.ts
+│   │   ├── calendar/                    # ✅ Full CRUD + FullCalendar
+│   │   │   ├── CalendarPage.tsx
+│   │   │   └── hooks/useEvents.ts
+│   │   ├── habits/                      # ✅ Full CRUD + heatmap
+│   │   │   ├── HabitsPage.tsx
+│   │   │   ├── components/HabitForm.tsx
+│   │   │   ├── components/HabitItem.tsx
+│   │   │   ├── components/HabitStats.tsx
+│   │   │   └── hooks/useHabits.ts
+│   │   ├── timer/                       # ✅ Stopwatch + Pomodoro
+│   │   │   ├── TimerPage.tsx
+│   │   │   ├── components/TimerDisplay.tsx
+│   │   │   ├── components/TimerControls.tsx
+│   │   │   ├── components/TimeEntryList.tsx
+│   │   │   ├── components/PomodoroSettings.tsx
+│   │   │   └── hooks/useTimer.ts
+│   │   ├── flashcards/                  # ✅ SM-2 + study sessions
+│   │   │   ├── FlashcardsPage.tsx
+│   │   │   ├── components/CardForm.tsx
+│   │   │   ├── components/CardList.tsx
+│   │   │   ├── components/DeckCard.tsx
+│   │   │   ├── components/DeckForm.tsx
+│   │   │   ├── components/StudySession.tsx
+│   │   │   └── hooks/useFlashcards.ts
+│   │   ├── tables/TablesPage.tsx        # 📋 Placeholder
+│   │   ├── projects/ProjectsPage.tsx    # 📋 Placeholder
+│   │   └── settings/SettingsPage.tsx    # 📋 Placeholder
 │   └── shared/
-│       ├── lib/taskService.ts           # ✅ In-memory task data layer
-│       └── types/task.ts                # ✅ Task type definitions
+│       ├── lib/
+│       │   ├── taskService.ts           # ✅ In-memory
+│       │   ├── noteService.ts           # ✅ In-memory
+│       │   ├── eventService.ts          # ✅ In-memory
+│       │   ├── habitService.ts          # ✅ In-memory
+│       │   ├── timerService.ts          # ✅ In-memory
+│       │   ├── flashcardService.ts      # ✅ In-memory
+│       │   └── sm2.ts                   # ✅ Pure SM-2 algorithm
+│       ├── stores/
+│       │   └── timerStore.ts            # ✅ Zustand (drift-free)
+│       └── types/
+│           ├── task.ts
+│           ├── note.ts
+│           ├── event.ts
+│           ├── habit.ts
+│           ├── timer.ts
+│           └── flashcard.ts
 ├── package.json
 ├── vite.config.ts
 ├── tsconfig.json
 ├── tsconfig.node.json
 ├── tsconfig.electron.json
-├── productivity-app-plan.md             # Full design document
-└── IMPLEMENTATION-STATUS.md             # This file
+├── productivity-app-plan.md
+├── IMPLEMENTATION-STATUS.md
+├── CHANGELOG.md
+└── README.md
 ```
 
 ---
 
 ## Next Steps (Priority Order)
 
-1. **Wire Dashboard to real task data** — quick capture creates tasks, Today's Tasks shows due items
-2. **Build Notes module** — TipTap editor, folder tree, search
-3. **Build Calendar module** — FullCalendar integration, event CRUD, tasks on calendar
-4. **Wire Electron** — main process, preload, IPC handlers, SQLite persistence
-5. **Add remaining modules** — Habits, Timer, Flashcards, Tables, Projects
+1. **Build Tables module** — TanStack Table, column types, inline editing
+2. **Build Projects module** — project container grouping tasks/notes/time
+3. **Wire Electron** — main process, preload, IPC handlers, SQLite persistence
+4. **Command palette** (Ctrl+K) — cmdk library
+5. **Settings page** — all configurable preferences
+6. **Keyboard shortcuts system** — global shortcut handler
+7. **Cross-module integration** — tasks on calendar, notes→flashcards

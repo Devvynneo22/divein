@@ -47,8 +47,8 @@ export function CalendarPage() {
     setShowForm(true);
   }
 
-  function handleEventClick(info: { event: { id: string; extendedProps: { event: CalendarEvent } } }) {
-    const evt = info.event.extendedProps.event;
+  function handleEventClick(info: { event: { id: string; extendedProps: Record<string, unknown> } }) {
+    const evt = info.event.extendedProps.event as CalendarEvent;
     setFormData({
       title: evt.title,
       startTime: evt.startTime.slice(0, 16), // datetime-local format
