@@ -1,6 +1,6 @@
 # Nexus — Implementation Status
 
-> Last updated: 2026-03-28 12:15 SGT  
+> Last updated: 2026-03-28 12:50 SGT  
 > Architecture: Electron (planned) + React 19 + TypeScript + Vite  
 > Current mode: Web-only dev (in-memory data layer, no Electron IPC yet)
 
@@ -60,14 +60,22 @@
 | Kanban board | 📋 |
 | Keyboard shortcuts | 📋 |
 
-### Notes & Knowledge Base ✅
+### Notes & Knowledge Base ✅ (OVERHAULED Session 5)
 | Feature | Status |
 |---------|--------|
-| Full CRUD with TipTap rich text editor | ✅ |
-| Toolbar, pin/unpin, search, auto-save (500ms debounce) | ✅ |
+| Hierarchical page nesting (infinite depth) | ✅ |
+| Tree sidebar with expand/collapse | ✅ |
+| Breadcrumb navigation (clickable hierarchy) | ✅ |
+| Page icons (emoji picker, 30+ presets) | ✅ |
+| Favorites section (pinned pages at sidebar top) | ✅ |
+| Sub-pages list at bottom of each page | ✅ |
+| Trash system (soft delete, restore, empty trash) | ✅ |
+| Search across all pages with breadcrumb context | ✅ |
+| TipTap rich text editor with toolbar | ✅ |
+| Auto-save (500ms debounce) | ✅ |
 | projectId filtering | ✅ |
-| Folder tree | 📋 |
 | Wiki-links / backlinks | 📋 |
+| Slash commands | 📋 |
 
 ### Calendar ✅
 | Feature | Status |
