@@ -478,3 +478,76 @@ All 7 remaining data services now persist to localStorage (Notes was done in ses
 
 ### Impact
 **The app is now genuinely usable as a daily tool.** Every module retains data across sessions. This was the single biggest blocker to MVP usability.
+
+---
+
+## Session 8 — 2026-03-28 13:36–13:43 SGT (Claude Opus)
+
+**Worker:** Claude Opus 4 (main) + 2× Claude Opus sub-agents (parallel)
+**Model:** anthropic/claude-opus-4-6
+
+### 🎯 MVP1 Completion — Tasks Polish + Tasks on Calendar
+
+**Goal:** Complete all remaining Phase 1 MVP features per the product plan.
+
+### Tasks Module Polish (Agent 1)
+
+**1. Subtasks (one level deep)**
+- taskService: Added `getSubtasks(parentId)` method
+- useTasks: Added `useSubtasks(parentId)` hook
+- TaskItem: Expand/collapse chevron, indented subtask rendering, "+" hover button for adding subtasks
+- TaskDetail: Subtasks section with checkboxes, done/total counter, inline add
+- TasksPage: Filters main list to root tasks only (parentId === null)
+
+**2. Keyboard shortcuts**
+- `n` → focus quick-add input
+- `Enter` → select first task / open detail
+- `Escape` → close detail panel
+- `1-4` → set priority on selected task
+- `d` → toggle done/todo
+- `Delete`/`Backspace` → delete selected task
+- `j`/`↓` and `k`/`↑` → navigate task list
+- Skips when focused in input/textarea
+
+**3. Drag to reorder**
+- HTML5 drag and drop on TaskItems
+- Visual accent-colored drop indicator
+- Midpoint sort order computation
+- `useReorderTask()` mutation hook
+
+**4. Undo on delete (Toast)**
+- Fixed bottom-center toast, 5s auto-dismiss
+- Stores full task data before delete
+- "Undo" re-creates with same properties
+
+### Calendar Integration (Agent 2)
+
+**Tasks on Calendar:**
+- Tasks with due dates rendered as FullCalendar events alongside regular events
+- `✓` prefix to visually distinguish from events
+- Priority-based color coding (P1=red, P2=orange, P3=blue, P4=gray, none=indigo)
+- Done tasks dimmed (opacity-50) with strikethrough
+- Click task → side panel with status toggle, priority, due date, "Open in Tasks" button
+- Drag task on calendar → reschedules due date
+- "Show tasks" toggle checkbox at top of calendar
+
+### Verification
+- `npx tsc --noEmit --incremental false` — **zero errors**
+- Tested in browser:
+  - ✅ Task detail panel shows subtasks section with "Add subtask" input
+  - ✅ Task with due date (High priority) appears on calendar in orange
+  - ✅ Calendar event "Persistence test event" still renders alongside task
+  - ✅ Show/hide tasks toggle visible at top-left of calendar
+
+### Committed
+- `b3b74d1` — MVP1 completion: Tasks polish + Tasks on Calendar (6 files, +748/-87 lines)
+
+### 🏆 MVP1 STATUS: COMPLETE
+Phase 1 from the product plan is now fully delivered:
+- ✅ Dashboard (wired to all services, live data)
+- ✅ Tasks (full CRUD + subtasks + keyboard shortcuts + drag reorder + undo)
+- ✅ Notes (Notion-level editor with slash commands, images, persistence)
+- ✅ Calendar (events + tasks with due dates, drag reschedule)
+- ✅ All data persists via localStorage
+
+Remaining Phase 1 plan items deferred to Phase 3: wiki-links/backlinks (Notes), recurring events (Calendar).

@@ -52,13 +52,15 @@
 ### Task Manager ✅
 | Feature | Status |
 |---------|--------|
-| Full CRUD with in-memory service | ✅ |
+| Full CRUD with localStorage persistence | ✅ |
 | Quick-add, status tabs, priority flags, tags, due dates | ✅ |
 | Detail panel with inline editing | ✅ |
 | Status cycling, auto completedAt | ✅ |
-| Subtasks | 📋 |
+| **Subtasks** (one level deep, expand/collapse, detail panel section) | ✅ |
+| **Keyboard shortcuts** (n/Enter/Esc/1-4/d/Delete/j/k/↑↓) | ✅ |
+| **Drag to reorder** (HTML5 DnD, visual drop indicator) | ✅ |
+| **Undo on delete** (toast with 5s auto-dismiss) | ✅ |
 | Kanban board | 📋 |
-| Keyboard shortcuts | 📋 |
 
 ### Notes & Knowledge Base ✅ (OVERHAULED Sessions 5 & 6)
 | Feature | Status |
@@ -88,7 +90,8 @@
 | Feature | Status |
 |---------|--------|
 | FullCalendar (month/week/day), event CRUD, drag reschedule | ✅ |
-| Tasks on calendar | 📋 |
+| **Tasks on calendar** (due dates shown, priority colors, drag reschedule, side panel) | ✅ |
+| **Show/hide tasks toggle** | ✅ |
 | Recurring events | 📋 |
 
 ---
@@ -171,7 +174,7 @@
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Tasks on calendar | 📋 | Cross-module integration |
+| Tasks on calendar | ✅ | Cross-module integration |
 | Notes → Flashcards | 📋 | Select text → create card |
 | Keyboard shortcuts system | 📋 | Global handler + ? discovery |
 | Formula columns in Tables | 📋 | SUM, AVG, COUNT, IF |
