@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -6,20 +6,23 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEvents, useCreateEvent, useUpdateEvent, useDeleteEvent } from './hooks/useEvents';
-import { X, CheckCircle2, Circle, ArrowRight } from 'lucide-react';
+import { X, CheckCircle2, Circle, ArrowRight, Repeat } from 'lucide-react';
 import type { CalendarEvent } from '@/shared/types/event';
 import type { Task } from '@/shared/types/task';
+import type { RecurrenceRule, RecurrenceFrequency } from '@/shared/types/recurrence';
+import { FREQUENCY_OPTIONS, describeRecurrence } from '@/shared/types/recurrence';
+import { eventService } from '@/shared/lib/eventService';
 import { taskService } from '@/shared/lib/taskService';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function getPriorityColor(priority: number): string {
   switch (priority) {
-    case 4: return '#ef4444'; // urgent - red
-    case 3: return '#f59e0b'; // high - amber
-    case 2: return '#3b82f6'; // medium - blue
-    case 1: return '#9ca3af'; // low - gray
-    default: return '#6366f1'; // indigo for no priority
+    case 4: return '#ef4444';
+    case 3: return '#f59e0b';
+    case 2: return '#3b82f6';
+    case 1: return '#9ca3af';
+    default: return '#6366f1';
   }
 }
 
@@ -42,6 +45,142 @@ function getStatusLabel(status: string): string {
     case 'cancelled': return 'Cancelled';
     default: return status;
   }
+}
+
+// ─── Recurrence Form Component ──────────────────────────────────────────────
+
+interface RecurrenceFormProps {
+  recurrence: RecurrenceRule | null;
+  onChange: (rule: RecurrenceRule | null) => void;
+}
+
+function RecurrenceForm({ recurrence, onChange }: RecurrenceFormProps) {
+  const enabled = recurrence !== null;
+
+  function handleToggle() {
+    if (enabled) {
+      onChange(null);
+    } else {
+      onChange({ frequency: 'weekly', interval: 1 });
+    }
+  }
+
+  function handleFrequency(freq: RecurrenceFrequency) {
+    if (!recurrence) return;
+    onChange({ ...recurrence, frequency: freq });
+  }
+
+  function handleInterval(val: string) {
+    if (!recurrence) return;
+    const n = parseInt(val, 10);
+    if (n > 0) onChange({ ...recurrence, interval: n });
+  }
+
+  function handleEndDate(val: string) {
+    if (!recurrence) return;
+    if (val) {
+      onChange({ ...recurrence, endDate: val });
+    } else {
+      const { endDate: _, ...rest } = recurrence;
+      onChange(rest as RecurrenceRule);
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-2">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={handleToggle}
+          className="rounded"
+        />
+        <label className="flex items-center gap-1 text-xs text-[var(--color-text-secondary)]">
+          <Repeat size={12} /> Recurring
+        </label>
+      </div>
+
+      {enabled && recurrence && (
+        <div className="space-y-2 pl-5">
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="text-[10px] text-[var(--color-text-muted)] mb-0.5 block">Frequency</label>
+              <select
+                value={recurrence.frequency}
+                onChange={(e) => handleFrequency(e.target.value as RecurrenceFrequency)}
+                className="w-full px-2 py-1.5 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-xs text-[var(--color-text-primary)] outline-none"
+              >
+                {FREQUENCY_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="w-16">
+              <label className="text-[10px] text-[var(--color-text-muted)] mb-0.5 block">Every</label>
+              <input
+                type="number"
+                min={1}
+                value={recurrence.interval}
+                onChange={(e) => handleInterval(e.target.value)}
+                className="w-full px-2 py-1.5 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-xs text-[var(--color-text-primary)] outline-none"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] text-[var(--color-text-muted)] mb-0.5 block">End Date (optional)</label>
+            <input
+              type="date"
+              value={recurrence.endDate ?? ''}
+              onChange={(e) => handleEndDate(e.target.value)}
+              className="w-full px-2 py-1.5 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-xs text-[var(--color-text-primary)] outline-none"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Edit Scope Dialog ──────────────────────────────────────────────────────
+
+type EditScope = 'this' | 'all';
+
+interface EditScopeDialogProps {
+  onSelect: (scope: EditScope) => void;
+  onCancel: () => void;
+}
+
+function EditScopeDialog({ onSelect, onCancel }: EditScopeDialogProps) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg p-6 shadow-xl max-w-xs w-full">
+        <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mb-3">Edit Recurring Event</h3>
+        <p className="text-xs text-[var(--color-text-secondary)] mb-4">
+          This event is part of a series. What would you like to edit?
+        </p>
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={() => onSelect('this')}
+            className="px-4 py-2 rounded-md bg-[var(--color-bg-tertiary)] text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)] transition-colors"
+          >
+            Edit this event
+          </button>
+          <button
+            onClick={() => onSelect('all')}
+            className="px-4 py-2 rounded-md bg-[var(--color-accent)] text-white text-sm hover:bg-[var(--color-accent-hover)] transition-colors"
+          >
+            Edit all events
+          </button>
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────
@@ -71,15 +210,19 @@ export function CalendarPage() {
     endTime: '',
     allDay: false,
     description: '',
+    recurrence: null as RecurrenceRule | null,
   });
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editScope, setEditScope] = useState<EditScope | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTasks, setShowTasks] = useState(true);
+  const [pendingEventClick, setPendingEventClick] = useState<CalendarEvent | null>(null);
+  const [showScopeDialog, setShowScopeDialog] = useState(false);
 
   // Map calendar events to FullCalendar format
   const fcEvents = events.map((e) => ({
     id: e.id,
-    title: e.title,
+    title: (e.recurrence ? '🔁 ' : '') + e.title,
     start: e.startTime,
     end: e.endTime ?? undefined,
     allDay: e.allDay,
@@ -89,16 +232,19 @@ export function CalendarPage() {
   }));
 
   // Map tasks to FullCalendar events
-  const taskEvents = tasks.map((t) => ({
-    id: `task-${t.id}`,
-    title: `✓ ${t.title}`,
-    start: t.dueDate!,
-    allDay: true,
-    backgroundColor: t.status === 'done' ? '#22c55e' : getPriorityColor(t.priority),
-    borderColor: t.status === 'done' ? '#22c55e' : getPriorityColor(t.priority),
-    classNames: t.status === 'done' ? ['task-done'] : [],
-    extendedProps: { type: 'task' as const, task: t },
-  }));
+  const taskEvents = tasks.map((t) => {
+    const hasRecurrence = !!t.recurrence;
+    return {
+      id: `task-${t.id}`,
+      title: `✓ ${hasRecurrence ? '🔁 ' : ''}${t.title}`,
+      start: t.dueDate!,
+      allDay: true,
+      backgroundColor: t.status === 'done' ? '#22c55e' : getPriorityColor(t.priority),
+      borderColor: t.status === 'done' ? '#22c55e' : getPriorityColor(t.priority),
+      classNames: t.status === 'done' ? ['task-done'] : [],
+      extendedProps: { type: 'task' as const, task: t },
+    };
+  });
 
   // Combine both
   const allFcEvents = [...fcEvents, ...(showTasks ? taskEvents : [])];
@@ -111,8 +257,30 @@ export function CalendarPage() {
       endTime: '',
       allDay: info.allDay,
       description: '',
+      recurrence: null,
     });
     setEditingId(null);
+    setEditScope(null);
+    setShowForm(true);
+  }
+
+  function openEventForm(evt: CalendarEvent, scope: EditScope) {
+    const baseRecurrence = evt.recurrence ?? null;
+    setFormData({
+      title: evt.title,
+      startTime: evt.startTime.slice(0, 16),
+      endTime: evt.endTime?.slice(0, 16) ?? '',
+      allDay: evt.allDay,
+      description: evt.description ?? '',
+      recurrence: baseRecurrence,
+    });
+    // For "this" scope, use the occurrence ID; for "all", use the base ID
+    if (scope === 'all') {
+      setEditingId(eventService.getBaseId(evt.id));
+    } else {
+      setEditingId(evt.id);
+    }
+    setEditScope(scope);
     setShowForm(true);
   }
 
@@ -126,15 +294,28 @@ export function CalendarPage() {
 
     setSelectedTask(null);
     const evt = info.event.extendedProps.event as CalendarEvent;
-    setFormData({
-      title: evt.title,
-      startTime: evt.startTime.slice(0, 16),
-      endTime: evt.endTime?.slice(0, 16) ?? '',
-      allDay: evt.allDay,
-      description: evt.description ?? '',
-    });
-    setEditingId(evt.id);
-    setShowForm(true);
+
+    // Check if this is a recurring event — ask user scope
+    if (eventService.isRecurringId(evt.id)) {
+      setPendingEventClick(evt);
+      setShowScopeDialog(true);
+      return;
+    }
+
+    openEventForm(evt, 'all');
+  }
+
+  const handleScopeSelect = useCallback((scope: EditScope) => {
+    setShowScopeDialog(false);
+    if (pendingEventClick) {
+      openEventForm(pendingEventClick, scope);
+      setPendingEventClick(null);
+    }
+  }, [pendingEventClick]);
+
+  function handleScopeCancel() {
+    setShowScopeDialog(false);
+    setPendingEventClick(null);
   }
 
   function handleEventDrop(info: { event: { id: string; startStr: string; endStr: string; allDay: boolean } }) {
@@ -160,7 +341,6 @@ export function CalendarPage() {
     const newStatus = task.status === 'done' ? 'todo' : 'done';
     await taskService.update(task.id, { status: newStatus });
     void queryClient.invalidateQueries({ queryKey: ['tasks'] });
-    // Update the selected task panel
     setSelectedTask({ ...task, status: newStatus });
   }
 
@@ -177,6 +357,7 @@ export function CalendarPage() {
           endTime: formData.endTime || null,
           allDay: formData.allDay,
           description: formData.description || null,
+          recurrence: formData.recurrence,
         },
       });
     } else {
@@ -186,6 +367,7 @@ export function CalendarPage() {
         endTime: formData.endTime || undefined,
         allDay: formData.allDay,
         description: formData.description || undefined,
+        recurrence: formData.recurrence,
       });
     }
     setShowForm(false);
@@ -200,6 +382,11 @@ export function CalendarPage() {
 
   return (
     <div className="flex h-full">
+      {/* Scope dialog for recurring events */}
+      {showScopeDialog && (
+        <EditScopeDialog onSelect={handleScopeSelect} onCancel={handleScopeCancel} />
+      )}
+
       <div className="flex-1 p-4 overflow-auto">
         <style>{`
           .fc {
@@ -267,14 +454,18 @@ export function CalendarPage() {
         <div className="w-80 border-l border-[var(--color-border)] bg-[var(--color-bg-secondary)] flex flex-col">
           <div className="flex items-center justify-between px-4 h-12 border-b border-[var(--color-border)]">
             <span className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wide">
-              {editingId ? 'Edit Event' : 'New Event'}
+              {editingId
+                ? editScope === 'this'
+                  ? 'Edit This Occurrence'
+                  : 'Edit Event'
+                : 'New Event'}
             </span>
             <button onClick={() => setShowForm(false)} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]">
               <X size={16} />
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-4 space-y-4">
+          <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto flex-1">
             <div>
               <label className="text-xs text-[var(--color-text-muted)] mb-1 block">Title</label>
               <input
@@ -328,6 +519,14 @@ export function CalendarPage() {
               />
             </div>
 
+            {/* Recurrence section — hide when editing single occurrence */}
+            {editScope !== 'this' && (
+              <RecurrenceForm
+                recurrence={formData.recurrence}
+                onChange={(r) => setFormData({ ...formData, recurrence: r })}
+              />
+            )}
+
             <div className="flex gap-2">
               <button
                 type="submit"
@@ -366,6 +565,20 @@ export function CalendarPage() {
             <h3 className="text-sm font-medium text-[var(--color-text-primary)]">
               {selectedTask.title}
             </h3>
+
+            {/* Recurrence badge */}
+            {selectedTask.recurrence && (
+              <div className="flex items-center gap-1.5 text-xs text-[var(--color-accent)]">
+                <Repeat size={12} />
+                {(() => {
+                  try {
+                    return describeRecurrence(JSON.parse(selectedTask.recurrence));
+                  } catch {
+                    return 'Recurring';
+                  }
+                })()}
+              </div>
+            )}
 
             {/* Status toggle */}
             <div className="flex items-center justify-between">

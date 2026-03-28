@@ -56,6 +56,9 @@ function expandRecurring(event: CalendarEvent, rangeStart: Date, rangeEnd: Date)
       ? addMilliseconds(parseISO(dateStr), baseDuration).toISOString()
       : null;
 
+    // Skip deleted exceptions
+    if (exception && (exception as Record<string, unknown>).title === '__DELETED__') return null;
+
     const occurrence: CalendarEvent = {
       ...event,
       id: `${event.id}_${dateKey}`,
@@ -65,7 +68,7 @@ function expandRecurring(event: CalendarEvent, rangeStart: Date, rangeEnd: Date)
       ...(exception ? exception : {}),
     };
     return occurrence;
-  });
+  }).filter((o): o is CalendarEvent => o !== null);
 }
 
 /** Parse a virtual occurrence ID into base ID and date key */

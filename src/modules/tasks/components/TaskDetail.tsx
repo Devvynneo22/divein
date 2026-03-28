@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import { X, Flag, Calendar, Tag, AlignLeft, CheckCircle2, Circle, ListTodo } from 'lucide-react';
+import { X, Flag, Calendar, Tag, AlignLeft, CheckCircle2, Circle, ListTodo, Repeat } from 'lucide-react';
 import type { Task, UpdateTaskInput, TaskPriority, TaskStatus } from '@/shared/types/task';
+import type { RecurrenceRule, RecurrenceFrequency } from '@/shared/types/recurrence';
+import { FREQUENCY_OPTIONS, describeRecurrence } from '@/shared/types/recurrence';
 import { useSubtasks, useCreateTask, useUpdateTask, useDeleteTask } from '../hooks/useTasks';
 
 interface TaskDetailProps {
@@ -30,6 +32,12 @@ export function TaskDetail({ task, onUpdate, onClose }: TaskDetailProps) {
   const [description, setDescription] = useState(task.description ?? '');
   const [tagInput, setTagInput] = useState('');
   const [subtaskInput, setSubtaskInput] = useState('');
+
+  // Parse recurrence from JSON string
+  const parsedRecurrence: RecurrenceRule | null = (() => {
+    if (!task.recurrence) return null;
+    try { return JSON.parse(task.recurrence) as RecurrenceRule; } catch { return null; }
+  })();
 
   const { data: subtasks = [] } = useSubtasks(task.parentId === null ? task.id : null);
   const createTask = useCreateTask();
@@ -159,6 +167,63 @@ export function TaskDetail({ task, onUpdate, onClose }: TaskDetailProps) {
             onChange={(e) => onUpdate({ dueDate: e.target.value || null })}
             className="w-full px-3 py-2 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] outline-none"
           />
+        </div>
+
+        {/* Recurrence */}
+        <div>
+          <label className="flex items-center gap-2 text-xs text-[var(--color-text-muted)] mb-1.5">
+            <Repeat size={12} /> Recurrence
+          </label>
+          {parsedRecurrence ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)]">
+                <Repeat size={12} className="text-[var(--color-accent)]" />
+                <span className="text-xs text-[var(--color-text-primary)]">
+                  {describeRecurrence(parsedRecurrence)}
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <select
+                  value={parsedRecurrence.frequency}
+                  onChange={(e) => {
+                    const updated: RecurrenceRule = { ...parsedRecurrence, frequency: e.target.value as RecurrenceFrequency };
+                    onUpdate({ recurrence: JSON.stringify(updated) });
+                  }}
+                  className="flex-1 px-2 py-1.5 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-xs text-[var(--color-text-primary)] outline-none"
+                >
+                  {FREQUENCY_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  min={1}
+                  value={parsedRecurrence.interval}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value, 10);
+                    if (n > 0) {
+                      const updated: RecurrenceRule = { ...parsedRecurrence, interval: n };
+                      onUpdate({ recurrence: JSON.stringify(updated) });
+                    }
+                  }}
+                  className="w-16 px-2 py-1.5 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-xs text-[var(--color-text-primary)] outline-none"
+                />
+              </div>
+              <button
+                onClick={() => onUpdate({ recurrence: null })}
+                className="text-[10px] text-[var(--color-text-muted)] hover:text-[var(--color-danger)]"
+              >
+                Remove recurrence
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => onUpdate({ recurrence: JSON.stringify({ frequency: 'weekly', interval: 1 } as RecurrenceRule) })}
+              className="w-full px-3 py-2 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-accent)] transition-colors text-left"
+            >
+              + Add recurrence
+            </button>
+          )}
         </div>
 
         {/* Tags */}

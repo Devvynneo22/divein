@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Circle, CheckCircle2, Clock, Trash2, Flag, ChevronRight, ChevronDown, Plus } from 'lucide-react';
+import { Circle, CheckCircle2, Clock, Trash2, Flag, ChevronRight, ChevronDown, Plus, Repeat } from 'lucide-react';
 import type { Task, TaskStatus, TaskPriority } from '@/shared/types/task';
 import { useSubtasks, useCreateTask, useUpdateTask, useDeleteTask } from '../hooks/useTasks';
 import { format, isToday, isTomorrow, isPast } from 'date-fns';
@@ -177,6 +177,11 @@ export function TaskItem({
         >
           {task.title}
         </span>
+
+        {/* Recurrence badge */}
+        {task.recurrence && (
+          <Repeat size={12} className="flex-shrink-0 text-[var(--color-accent)]" />
+        )}
 
         {/* Subtask count */}
         {hasSubtasks && (
