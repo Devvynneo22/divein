@@ -33,6 +33,7 @@ export interface CreateTaskInput {
   startDate?: string;
   tags?: string[];
   estimatedMin?: number;
+  recurrence?: string | null;
 }
 
 export interface UpdateTaskInput {
@@ -49,6 +50,7 @@ export interface UpdateTaskInput {
   tags?: string[];
   estimatedMin?: number | null;
   sortOrder?: number;
+  recurrence?: string | null;
 }
 
 export interface TaskFilter {

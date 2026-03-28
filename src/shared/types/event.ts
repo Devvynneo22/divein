@@ -1,3 +1,5 @@
+import type { RecurrenceRule } from './recurrence';
+
 export interface CalendarEvent {
   id: string;
   title: string;
@@ -9,6 +11,9 @@ export interface CalendarEvent {
   color: string | null;
   category: string | null;
   projectId: string | null;
+  recurrence: RecurrenceRule | null;
+  /** Maps occurrence date keys to overridden fields (single-occurrence edits) */
+  exceptions?: Record<string, Partial<CalendarEvent>> | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -23,6 +28,7 @@ export interface CreateEventInput {
   color?: string;
   category?: string;
   projectId?: string;
+  recurrence?: RecurrenceRule | null;
 }
 
 export interface UpdateEventInput {
@@ -35,4 +41,6 @@ export interface UpdateEventInput {
   color?: string | null;
   category?: string | null;
   projectId?: string | null;
+  recurrence?: RecurrenceRule | null;
+  exceptions?: Record<string, Partial<CalendarEvent>> | null;
 }

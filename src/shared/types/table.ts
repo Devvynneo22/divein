@@ -7,7 +7,8 @@ export type ColumnType =
   | 'select'
   | 'multiselect'
   | 'url'
-  | 'email';
+  | 'email'
+  | 'formula';
 
 export interface ColumnDef {
   id: string; // stable UUID
@@ -16,6 +17,7 @@ export interface ColumnDef {
   width?: number; // pixel width, default 150
   options?: string[]; // for 'select' and 'multiselect' types — the available choices
   required?: boolean;
+  formula?: string; // for 'formula' type — the expression to evaluate
 }
 
 export interface TableDef {

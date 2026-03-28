@@ -34,6 +34,7 @@ const TYPE_ICONS: Record<ColumnType, React.ReactNode> = {
   multiselect: <Tags size={12} />,
   url: <Link size={12} />,
   email: <Mail size={12} />,
+  formula: <span className="text-[10px] font-bold italic leading-none">ƒ</span>,
 };
 
 const COLUMN_TYPES: ColumnType[] = [
@@ -45,6 +46,7 @@ const COLUMN_TYPES: ColumnType[] = [
   'multiselect',
   'url',
   'email',
+  'formula',
 ];
 
 export function ColumnHeader({

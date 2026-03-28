@@ -11,6 +11,7 @@ import {
 import { Plus, Trash2 } from 'lucide-react';
 import { format, parseISO, isValid } from 'date-fns';
 import type { TableDef, TableRow, TableFilter, TableSort, ColumnDef } from '@/shared/types/table';
+import { evaluateFormula } from '@/shared/lib/formulaEngine';
 import { CellEditor } from './CellEditor';
 import { ColumnHeader } from './ColumnHeader';
 import { useUpdateCell, useCreateRow, useDeleteRow, useUpdateColumn, useDeleteColumn, useAddColumn } from '../hooks/useTables';
@@ -32,6 +33,43 @@ interface TableGridProps {
 }
 
 // ─── Cell display renderer ────────────────────────────────────────────────────
+
+function FormulaCell({
+  column,
+  row,
+  allColumns,
+}: {
+  column: ColumnDef;
+  row: Record<string, unknown>;
+  allColumns: ColumnDef[];
+}) {
+  const result = evaluateFormula(column.formula ?? '', row, allColumns);
+  const isError = typeof result === 'string' && result.startsWith('#');
+
+  return (
+    <div className="w-full h-full flex items-center px-2 gap-1.5 select-none">
+      <span
+        className="text-[9px] font-bold italic leading-none text-[var(--color-text-muted)] flex-shrink-0"
+        title={`Formula: ${column.formula}`}
+      >
+        ƒ
+      </span>
+      <span
+        className={`text-xs truncate ${
+          isError
+            ? 'text-[var(--color-danger)] font-medium'
+            : typeof result === 'boolean'
+              ? result
+                ? 'text-[var(--color-success)]'
+                : 'text-[var(--color-text-muted)]'
+              : 'text-[var(--color-text-primary)]'
+        }`}
+      >
+        {typeof result === 'boolean' ? (result ? 'TRUE' : 'FALSE') : String(result)}
+      </span>
+    </div>
+  );
+}
 
 function DisplayCell({ column, value }: { column: ColumnDef; value: unknown }) {
   if (value === null || value === undefined || value === '') {
@@ -232,6 +270,17 @@ export function TableGrid({
           const isEditing =
             editingCell?.rowId === rowId && editingCell?.columnId === col.id;
 
+          // Formula: read-only computed cell
+          if (col.type === 'formula') {
+            return (
+              <FormulaCell
+                column={col}
+                row={row.original.data}
+                allColumns={table.columns}
+              />
+            );
+          }
+
           // Checkbox: toggle on click, no edit mode
           if (col.type === 'checkbox') {
             return (
@@ -300,7 +349,7 @@ export function TableGrid({
     const positions: Array<{ rowId: string; columnId: string }> = [];
     tanTable.getRowModel().rows.forEach((row) => {
       table.columns.forEach((col) => {
-        if (col.type !== 'checkbox') {
+        if (col.type !== 'checkbox' && col.type !== 'formula') {
           positions.push({ rowId: row.original.id, columnId: col.id });
         }
       });

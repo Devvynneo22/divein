@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { LoadingSpinner } from '@/app/LoadingSpinner';
 import { Plus, Inbox, CheckCircle2, Circle, Clock, XCircle } from 'lucide-react';
 import { useTasks, useCreateTask, useUpdateTask, useDeleteTask, useReorderTask } from './hooks/useTasks';
 import { TaskItem } from './components/TaskItem';

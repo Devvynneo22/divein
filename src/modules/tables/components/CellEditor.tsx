@@ -179,6 +179,7 @@ export function CellEditor({
     );
   }
 
+  // ── Formula — read-only, never editable ────────────────────────────────────
   // ── Checkbox — handled by click toggle in TableGrid, not rendered here ────
   return null;
 }

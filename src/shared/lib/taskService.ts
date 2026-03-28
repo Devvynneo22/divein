@@ -6,6 +6,8 @@
  *          changing any component or hook code.
  */
 import type { Task, CreateTaskInput, UpdateTaskInput, TaskFilter, TaskStatus } from '@/shared/types/task';
+import type { RecurrenceRule } from '@/shared/types/recurrence';
+import { getNextOccurrence } from '@/shared/types/recurrence';
 
 // ─── In-memory store (temporary until Electron IPC is wired) ────────────────
 
@@ -116,7 +118,7 @@ export const taskService = {
       dueDate: input.dueDate ?? null,
       startDate: input.startDate ?? null,
       completedAt: null,
-      recurrence: null,
+      recurrence: input.recurrence ?? null,
       sortOrder: maxOrder + 1,
       tags: input.tags ?? [],
       estimatedMin: input.estimatedMin ?? null,
@@ -143,6 +145,39 @@ export const taskService = {
     // Auto-set completedAt when status transitions to done
     if (input.status === 'done' && existing.status !== 'done') {
       updated.completedAt = now();
+
+      // Auto-create next occurrence for recurring tasks
+      if (existing.recurrence && existing.dueDate) {
+        try {
+          const rule: RecurrenceRule = JSON.parse(existing.recurrence);
+          const nextDate = getNextOccurrence(existing.dueDate, rule);
+          if (nextDate) {
+            const maxOrder = tasks.length > 0 ? Math.max(...tasks.map((t) => t.sortOrder)) : 0;
+            const nextTask: Task = {
+              id: generateId(),
+              title: existing.title,
+              description: existing.description,
+              status: 'todo',
+              priority: existing.priority,
+              projectId: existing.projectId,
+              parentId: existing.parentId,
+              milestoneId: existing.milestoneId,
+              dueDate: nextDate.split('T')[0],
+              startDate: null,
+              completedAt: null,
+              recurrence: existing.recurrence,
+              sortOrder: maxOrder + 1,
+              tags: [...existing.tags],
+              estimatedMin: existing.estimatedMin,
+              createdAt: now(),
+              updatedAt: now(),
+            };
+            tasks.push(nextTask);
+          }
+        } catch {
+          // Invalid recurrence JSON — skip
+        }
+      }
     }
     if (input.status && input.status !== 'done') {
       updated.completedAt = null;

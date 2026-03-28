@@ -16,6 +16,7 @@ const COLUMN_TYPES: { type: ColumnType; label: string; icon: React.ReactNode }[]
   { type: 'multiselect', label: 'Multi-select', icon: <Tags size={14} /> },
   { type: 'url', label: 'URL', icon: <Link size={14} /> },
   { type: 'email', label: 'Email', icon: <Mail size={14} /> },
+  { type: 'formula', label: 'Formula', icon: <span className="text-xs font-bold italic leading-none">ƒ</span> },
 ];
 
 export function AddColumnPanel({ onSave, onCancel }: AddColumnPanelProps) {
@@ -23,9 +24,11 @@ export function AddColumnPanel({ onSave, onCancel }: AddColumnPanelProps) {
   const [type, setType] = useState<ColumnType>('text');
   const [options, setOptions] = useState<string[]>(['Option 1']);
   const [optionInput, setOptionInput] = useState('');
+  const [formula, setFormula] = useState('');
   const [width, setWidth] = useState('150');
 
   const needsOptions = type === 'select' || type === 'multiselect';
+  const needsFormula = type === 'formula';
 
   function addOption() {
     const trimmed = optionInput.trim();
@@ -49,6 +52,7 @@ export function AddColumnPanel({ onSave, onCancel }: AddColumnPanelProps) {
       type,
       width: isNaN(parsedWidth) || parsedWidth < 60 ? 150 : parsedWidth,
       ...(needsOptions && { options }),
+      ...(needsFormula && { formula: formula.trim() }),
     };
     onSave(col);
   }
@@ -132,6 +136,38 @@ export function AddColumnPanel({ onSave, onCancel }: AddColumnPanelProps) {
             >
               <Plus size={12} />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Formula input */}
+      {needsFormula && (
+        <div>
+          <label className="block text-xs text-[var(--color-text-muted)] mb-1">Formula</label>
+          <input
+            value={formula}
+            onChange={(e) => setFormula(e.target.value)}
+            placeholder="e.g. SUM(Price, Tax)"
+            className="w-full bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] outline-none focus:border-[var(--color-accent)] transition-colors font-mono"
+          />
+          <div className="mt-2 space-y-1">
+            <p className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium">
+              Functions
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {['SUM', 'AVG', 'COUNT', 'MIN', 'MAX', 'IF'].map((fn) => (
+                <span
+                  key={fn}
+                  className="px-1.5 py-0.5 rounded bg-[var(--color-bg-tertiary)] text-[var(--color-accent)] text-[10px] font-mono cursor-pointer hover:bg-[var(--color-border-hover)] transition-colors"
+                  onClick={() => setFormula((f) => f + (f ? ' ' : '') + fn + '()')}
+                >
+                  {fn}()
+                </span>
+              ))}
+            </div>
+            <p className="text-[10px] text-[var(--color-text-muted)] mt-1">
+              Use column names as references. Arithmetic: <code className="text-[var(--color-accent)]">+ - * /</code>
+            </p>
           </div>
         </div>
       )}

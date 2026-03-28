@@ -1,19 +1,22 @@
-import { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Plus, Table2, Filter, ArrowUpDown } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { ArrowLeft, Plus, Table2, Filter, ArrowUpDown, Download, Upload, LayoutGrid, Columns3, X } from 'lucide-react';
 import {
   useTables,
   useCreateTable,
   useUpdateTable,
   useDeleteTable,
   useRows,
+  useCreateRow,
   useAddColumn,
 } from './hooks/useTables';
 import { TableCard } from './components/TableCard';
 import { TableGrid } from './components/TableGrid';
+import { TableBoardView } from './components/TableBoardView';
 import { FilterBar } from './components/FilterBar';
 import { SortBar } from './components/SortBar';
 import { AddColumnPanel } from './components/AddColumnPanel';
 import { tableService } from '@/shared/lib/tableService';
+import { exportTableToCSV, downloadCSV, parseCSVToRows, type CSVParseResult } from '@/shared/lib/csvService';
 import type { TableDef, TableFilter, TableSort, ColumnDef } from '@/shared/types/table';
 
 // ─── Row count fetcher for cards ──────────────────────────────────────────────
@@ -29,7 +32,115 @@ function TableCardWithCount({
   return <TableCard table={table} rowCount={rows.length} onClick={onSelect} />;
 }
 
+// ─── CSV Import Preview Modal ─────────────────────────────────────────────
+
+interface ImportPreviewModalProps {
+  parseResult: CSVParseResult;
+  tableName: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isImporting: boolean;
+}
+
+function ImportPreviewModal({ parseResult, tableName, onConfirm, onCancel, isImporting }: ImportPreviewModalProps) {
+  const mappedCount = parseResult.mappedColumns.filter((m) => m.column !== null).length;
+  const totalCols = parseResult.headers.length;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onCancel}>
+      <div
+        className="bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col m-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-[var(--color-border)] flex items-center justify-between flex-shrink-0">
+          <div>
+            <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
+              Import CSV into &ldquo;{tableName}&rdquo;
+            </h2>
+            <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+              {parseResult.rows.length} rows · {mappedCount}/{totalCols} columns mapped
+            </p>
+          </div>
+          <button onClick={onCancel} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Column mapping summary */}
+        <div className="px-5 py-3 border-b border-[var(--color-border)] flex-shrink-0">
+          <p className="text-xs font-medium text-[var(--color-text-secondary)] mb-2">Column Mapping</p>
+          <div className="flex flex-wrap gap-1.5">
+            {parseResult.mappedColumns.map((m) => (
+              <span
+                key={m.csvHeader}
+                className={`px-2 py-0.5 rounded text-[11px] font-medium ${
+                  m.column
+                    ? 'bg-green-500/15 text-green-400'
+                    : 'bg-yellow-500/15 text-yellow-400'
+                }`}
+              >
+                {m.csvHeader} {m.column ? `→ ${m.column.name}` : '(skipped)'}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Data preview */}
+        <div className="flex-1 overflow-auto px-5 py-3">
+          <p className="text-xs font-medium text-[var(--color-text-secondary)] mb-2">
+            Preview (first {Math.min(parseResult.rows.length, 10)} rows)
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-[var(--color-bg-tertiary)]">
+                  {parseResult.headers.map((h) => (
+                    <th key={h} className="px-2 py-1.5 text-left font-medium text-[var(--color-text-secondary)] border border-[var(--color-border)] whitespace-nowrap">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {parseResult.rows.slice(0, 10).map((row, i) => (
+                  <tr key={i} className="hover:bg-[var(--color-bg-secondary)]">
+                    {parseResult.headers.map((h) => (
+                      <td key={h} className="px-2 py-1 border border-[var(--color-border)] text-[var(--color-text-primary)] max-w-[200px] truncate">
+                        {row.raw[h] ?? ''}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3 border-t border-[var(--color-border)] flex items-center justify-end gap-2 flex-shrink-0">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 rounded-lg text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isImporting || parseResult.rows.length === 0}
+            className="px-4 py-2 rounded-lg bg-[var(--color-accent)] text-white text-sm font-medium hover:bg-[var(--color-accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {isImporting ? 'Importing...' : `Import ${parseResult.rows.length} rows`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Table View ───────────────────────────────────────────────────────────────
+
+type ViewMode = 'grid' | 'board';
 
 interface TableViewProps {
   table: TableDef;
@@ -44,12 +155,30 @@ function TableView({ table, onBack }: TableViewProps) {
   const [showAddColumn, setShowAddColumn] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState(table.name);
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [importPreview, setImportPreview] = useState<CSVParseResult | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+
+  // Board view state
+  const selectColumns = table.columns.filter((c) => c.type === 'select');
+  const [groupByColumnId, setGroupByColumnId] = useState<string>(
+    selectColumns[0]?.id ?? '',
+  );
+
+  // Update groupByColumnId when columns change
+  useEffect(() => {
+    if (!selectColumns.find((c) => c.id === groupByColumnId) && selectColumns.length > 0) {
+      setGroupByColumnId(selectColumns[0].id);
+    }
+  }, [table.columns, groupByColumnId, selectColumns]);
 
   const nameRef = useRef<HTMLInputElement>(null);
   const addColumnRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const updateTable = useUpdateTable();
   const addColumn = useAddColumn();
+  const createRow = useCreateRow();
   const { data: rows = [], isLoading } = useRows(table.id, filters, sorts);
 
   useEffect(() => {
@@ -81,6 +210,52 @@ function TableView({ table, onBack }: TableViewProps) {
     addColumn.mutate({ tableId: table.id, column });
     setShowAddColumn(false);
   }
+
+  // ── CSV Export ──────────────────────────────────────────────────────────────
+
+  const handleExport = useCallback(() => {
+    const csv = exportTableToCSV(table, rows);
+    const safeName = table.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+    downloadCSV(csv, `${safeName}.csv`);
+  }, [table, rows]);
+
+  // ── CSV Import ──────────────────────────────────────────────────────────────
+
+  const handleFileSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const text = ev.target?.result as string;
+        const result = parseCSVToRows(text, table.columns);
+        setImportPreview(result);
+      };
+      reader.readAsText(file);
+      // Reset input so same file can be re-selected
+      e.target.value = '';
+    },
+    [table.columns],
+  );
+
+  const handleImportConfirm = useCallback(async () => {
+    if (!importPreview) return;
+    setIsImporting(true);
+    try {
+      for (const row of importPreview.rows) {
+        await tableService.createRow({ tableId: table.id, data: row.data });
+      }
+      // Invalidate rows query by creating a dummy mutation
+      createRow.reset();
+      // Force refetch by re-triggering
+      setImportPreview(null);
+      setIsImporting(false);
+      // Trigger a re-render of rows — simplest: toggle filters
+      setFilters((f) => [...f]);
+    } catch {
+      setIsImporting(false);
+    }
+  }, [importPreview, table.id, createRow]);
 
   return (
     <div className="flex flex-col h-full">
