@@ -1,8 +1,8 @@
 # Nexus — Implementation Status
 
-> Last updated: 2026-03-28 12:50 SGT  
+> Last updated: 2026-03-28 14:30 SGT  
 > Architecture: Electron (planned) + React 19 + TypeScript + Vite  
-> Current mode: Web-only dev (in-memory data layer, no Electron IPC yet)
+> Current mode: Web-only dev (localStorage persistence, no Electron IPC yet)
 
 ---
 
@@ -28,11 +28,12 @@
 | React Router setup | ✅ | All 10 routes |
 | TanStack Query client | ✅ | |
 | Drizzle schemas (all tables) | ✅ | 10 schema files |
-| Command Palette (Ctrl+K) | ✅ | cmdk-powered, navigation + create actions |
+| Command Palette (Ctrl+K) | ✅ | cmdk-powered, navigation + create + global search |
+| Error boundaries | ✅ | Top-level + per-module route wrapping |
+| Loading states | ✅ | LoadingSpinner + ModuleSkeleton across all pages |
 | Electron main.ts | ⚠️ | Scaffolded, not wired |
 | Electron preload.ts | ⚠️ | Scaffolded, not wired |
 | DB connection (better-sqlite3) | ⚠️ | Scaffolded, not wired |
-| Error boundaries | 📋 | |
 | Logging service | 📋 | |
 
 ---
@@ -56,13 +57,15 @@
 | Quick-add, status tabs, priority flags, tags, due dates | ✅ |
 | Detail panel with inline editing | ✅ |
 | Status cycling, auto completedAt | ✅ |
-| **Subtasks** (one level deep, expand/collapse, detail panel section) | ✅ |
-| **Keyboard shortcuts** (n/Enter/Esc/1-4/d/Delete/j/k/↑↓) | ✅ |
-| **Drag to reorder** (HTML5 DnD, visual drop indicator) | ✅ |
-| **Undo on delete** (toast with 5s auto-dismiss) | ✅ |
-| Kanban board | 📋 |
+| Subtasks (one level deep, expand/collapse, detail panel section) | ✅ |
+| Keyboard shortcuts (n/Enter/Esc/1-4/d/Delete/j/k/↑↓) | ✅ |
+| Drag to reorder (HTML5 DnD, visual drop indicator) | ✅ |
+| Undo on delete (toast with 5s auto-dismiss) | ✅ |
+| **Recurring tasks** (auto-create next occurrence on completion) | ✅ |
+| **Recurrence UI** (frequency/interval selector in detail panel) | ✅ |
+| **Recurrence badge** (🔁 icon on task items) | ✅ |
 
-### Notes & Knowledge Base ✅ (OVERHAULED Sessions 5 & 6)
+### Notes & Knowledge Base ✅
 | Feature | Status |
 |---------|--------|
 | Hierarchical page nesting (infinite depth) | ✅ |
@@ -74,26 +77,29 @@
 | Search across all pages with breadcrumb context | ✅ |
 | TipTap rich text editor with toolbar | ✅ |
 | Auto-save (500ms debounce) | ✅ |
-| projectId filtering | ✅ |
-| **localStorage persistence** | ✅ |
-| **Slash commands** (/ menu: headings, lists, todo, image, code, quote, divider, callout) | ✅ |
-| **Image support** (toolbar, drag & drop, clipboard paste, base64) | ✅ |
-| **Task lists** (interactive checkboxes) | ✅ |
-| **Enhanced toolbar** (underline, highlight, text color, emoji picker, image) | ✅ |
-| **Floating bubble menu** (formatting on text selection) | ✅ |
-| **Code blocks** (syntax highlighting — JS, TS, Python, CSS, HTML, JSON, SQL, Bash) | ✅ |
-| **Emoji picker** (6 categories, search, inline insert) | ✅ |
-| Seamless header → editor layout (freeform editing) | ✅ |
-| **Wiki-links `[[...]]`** (autocomplete, clickable, styled inline nodes) | ✅ |
-| **Backlinks panel** (collapsible, shows linking pages) | ✅ |
+| localStorage persistence | ✅ |
+| Slash commands (/ menu) | ✅ |
+| Image support (toolbar, drag & drop, clipboard paste, base64) | ✅ |
+| Task lists (interactive checkboxes) | ✅ |
+| Enhanced toolbar (underline, highlight, text color, emoji, image) | ✅ |
+| Floating bubble menu (formatting on text selection) | ✅ |
+| Code blocks (syntax highlighting) | ✅ |
+| Emoji picker (6 categories, search, inline insert) | ✅ |
+| Wiki-links `[[...]]` (autocomplete, clickable, styled) | ✅ |
+| Backlinks panel (collapsible, shows linking pages) | ✅ |
+| **Notes → Flashcards** (select text → create card via bubble menu/toolbar) | ✅ |
+| **Export to Markdown** (⋯ menu in header) | ✅ |
+| **Export to PDF** (⋯ menu in header) | ✅ |
 
 ### Calendar ✅
 | Feature | Status |
 |---------|--------|
 | FullCalendar (month/week/day), event CRUD, drag reschedule | ✅ |
-| **Tasks on calendar** (due dates shown, priority colors, drag reschedule, side panel) | ✅ |
-| **Show/hide tasks toggle** | ✅ |
-| Recurring events | 📋 |
+| Tasks on calendar (due dates shown, priority colors, drag reschedule) | ✅ |
+| Show/hide tasks toggle | ✅ |
+| **Recurring events** (daily/weekly/monthly/yearly, interval, end date) | ✅ |
+| **Recurrence UI** (form fields, 🔁 icon, edit scope dialog) | ✅ |
+| **Single-occurrence exceptions** (edit this vs edit all) | ✅ |
 
 ---
 
@@ -119,6 +125,9 @@
 | Manual time entry | ✅ |
 | Configurable settings | ✅ |
 | StatusBar live timer | ✅ |
+| **Audio notifications** (Web Audio API, work/break complete tones) | ✅ |
+| **Audio toggle** in Pomodoro settings | ✅ |
+| **Task linking** (searchable task selector, shows linked task in entries) | ✅ |
 
 ### Flashcards & Spaced Repetition ✅
 | Feature | Status |
@@ -140,9 +149,10 @@
 | Column management (add/rename/type change/delete) | ✅ |
 | Tab navigation between cells | ✅ |
 | Default template (Name + Status + Notes) | ✅ |
-| Formula columns | 📋 |
-| Board/Calendar views | 📋 |
-| CSV import/export | 📋 |
+| **Formula columns** (SUM, AVG, COUNT, MIN, MAX, IF, arithmetic) | ✅ |
+| **Board/Kanban view** (group by select column, drag between columns) | ✅ |
+| **CSV export** (RFC 4180, all column types) | ✅ |
+| **CSV import** (file picker, column mapping, preview, type coercion) | ✅ |
 
 ### Project Management ✅
 | Feature | Status |
@@ -152,8 +162,8 @@
 | 4-tab view: Overview, Tasks, Notes, Activity | ✅ |
 | Task quick-add with auto projectId | ✅ |
 | Note creation with auto projectId | ✅ |
-| Milestones | 📋 |
-| Kanban board per project | 📋 |
+| **Milestones** (CRUD, progress bars, due date countdown, completion toggle) | ✅ |
+| **Kanban board** (5 status columns, drag to change status, task cards) | ✅ |
 
 ### Settings ✅
 | Feature | Status |
@@ -161,6 +171,8 @@
 | Tabbed settings page (General/Pomodoro/Flashcards/Data/About) | ✅ |
 | Pomodoro settings wired to Zustand store | ✅ |
 | Theme, date format, start of week options | ✅ |
+| **Customizable shortcuts** (shortcutService, per-shortcut edit, reset) | ✅ |
+| **Shortcuts tab** in Settings | ✅ |
 
 ### Command Palette ✅
 | Feature | Status |
@@ -168,28 +180,41 @@
 | Ctrl+K trigger with backdrop overlay | ✅ |
 | Fuzzy search, keyboard navigation | ✅ |
 | Navigation + Create action groups | ✅ |
+| **Global search** (all 7 services, debounced, type badges, navigate on select) | ✅ |
+
+### Keyboard Shortcuts ✅
+| Feature | Status |
+|---------|--------|
+| **Shortcut cheatsheet** (`?` key, grouped modal) | ✅ |
+| **Shortcut registry** (shortcutService, defaults + user overrides) | ✅ |
+| **Customizable shortcuts** (inline edit in Settings) | ✅ |
 
 ---
 
-## Phase 3: Advanced Features
+## Phase 3: Advanced Features (ALL COMPLETE ✅)
 
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Tasks on calendar | ✅ | Cross-module integration |
-| Notes → Flashcards | 📋 | Select text → create card |
-| Keyboard shortcuts system | 📋 | Global handler + ? discovery |
-| Formula columns in Tables | 📋 | SUM, AVG, COUNT, IF |
-| Board/Calendar views for Tables | 📋 | |
-| CSV import/export | 📋 | |
+| Notes → Flashcards | ✅ | Select text → create card (bubble menu + toolbar) |
+| Keyboard shortcuts system | ✅ | Global handler + `?` discovery + customizable |
+| Formula columns in Tables | ✅ | SUM, AVG, COUNT, MIN, MAX, IF, arithmetic |
+| Board/Calendar views for Tables | ✅ | Board view with drag-and-drop |
+| CSV import/export | ✅ | RFC 4180, column mapping, preview |
 | Wiki-links + backlinks | ✅ | Completed in session 9 |
-| Full-text search | 📋 | |
+| Full-text search | ✅ | Global search across all 7 services via Ctrl+K |
+| Recurring events and tasks | ✅ | Daily/weekly/monthly/yearly, exceptions, auto-create |
+| Error boundaries + loading states | ✅ | Per-module boundaries, LoadingSpinner |
+| Export notes to Markdown/PDF | ✅ | ⋯ menu in NoteHeader |
+
+---
 
 ## Phase 4: Distribution & Sync
 
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Electron IPC wiring | 📋 | Main + preload + handlers |
-| localStorage persistence (ALL services) | ✅ | 12 keys, bridge until Electron/SQLite |
+| localStorage persistence (ALL services) | ✅ | 12+ keys, bridge until Electron/SQLite |
 | SQLite persistence | 📋 | Swap localStorage → better-sqlite3 |
 | Auto-backup | 📋 | |
 | Auto-updater | 📋 | |
@@ -209,15 +234,13 @@
 | 2026-03-28 | SM-2 as pure function | Testable, no side effects |
 | 2026-03-28 | cmdk for command palette | Lightweight, accessible, keyboard-first |
 | 2026-03-28 | Projects as org layer | No own data — filters existing services by projectId |
-| 2026-03-28 | Column types as JSON | Flexible schema, extensible for Formula type later |
+| 2026-03-28 | Column types as JSON | Flexible schema, extensible for Formula type |
+| 2026-03-28 | Formula engine: recursive descent | Clean parser, extensible, no eval() |
+| 2026-03-28 | Recurring events: virtual expansion | Base event + exceptions pattern, no data duplication |
+| 2026-03-28 | shortcutService registry | Centralized defaults + user overrides in localStorage |
 
 ---
 
-## Next Steps (Priority Order)
+## 🏆 Phase 1 + 2 + 3: ALL COMPLETE
 
-1. **Electron IPC wiring** — main process, preload, IPC handlers, SQLite persistence
-2. **Cross-module integration** — tasks on calendar, notes→flashcards
-3. **Keyboard shortcuts system** — global handler
-4. **Polish** — error boundaries, loading states, animations
-5. **Formula columns** in Tables
-6. **CSV import/export**
+Every feature from the plan through Phase 3 is implemented. Phase 4 (Electron/distribution) is next.

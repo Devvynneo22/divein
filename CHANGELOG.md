@@ -660,3 +660,89 @@ Phase 1 (MVP) is 100% complete. Devvyn wants Phase 2 and Phase 3 finished before
 - **TypeScript:** `npx tsc --noEmit --incremental false` must pass zero errors
 - Sub-agents can be spawned freely, in parallel where possible
 - Always verify sub-agent work — check TS compilation, test in browser
+
+---
+
+## Session 10 — 2026-03-28 14:10–14:30 SGT (Claude Opus × 8 sub-agents)
+
+**Worker:** Claude Opus 4 (main orchestrator + 8 parallel sub-agents)  
+**Model:** anthropic/claude-opus-4-6
+
+### 🏆 Phase 2 + Phase 3: COMPLETE
+
+All 15 remaining plan items delivered across two parallel batches of sub-agents.
+
+### Batch 1 (4 agents, 14:11–14:18)
+
+**1. Timer Enhancements** ✅ (commit `3ec0a35`)
+- Audio notifications via Web Audio API (oscillator-based, no external files)
+  - Work complete: cheerful ascending C major arpeggio
+  - Break complete: gentle descending two-note chime
+- `audioEnabled` setting with toggle in PomodoroSettings
+- Task linking: searchable task selector dropdown when starting timer
+- Time entry list shows linked task name with icon
+
+**2. Notes → Flashcards** ✅ (commit `3427fa6`)
+- Brain icon in bubble menu (on text selection) and editor toolbar
+- CreateFlashcardModal: front pre-filled with selected text, back auto-focused
+- Deck selector with existing decks + "Create new deck" option
+- Ctrl+Enter to save, success animation, auto-close
+
+**3. Global Search + Shortcuts** ✅ (commit `e278c9d`)
+- Global search in Command Palette: queries all 7 services in parallel
+- 300ms debounced, fuzzy substring matching, color-coded type badges
+- Shortcut cheatsheet (`?` key): grouped modal overlay
+- shortcutService registry: 20+ defaults, localStorage persistence
+- Settings → Shortcuts tab: inline editing, "custom" badges, per-shortcut reset
+
+**4. Projects Expansion** ✅ (commit `e278c9d` — files included in same commit)
+- Kanban board: 5 status columns, draggable task cards, Board tab in project view
+- Milestones: full CRUD, progress bars, due date countdown, completion toggle
+- `milestoneId` added to Task type for linking
+
+### Batch 2 (4 agents, 14:18–14:27)
+
+**5. Formula Columns** ✅ (commit `c364e10`)
+- `formulaEngine.ts`: recursive-descent parser with tokenizer and evaluator
+- Functions: SUM, AVG, COUNT, MIN, MAX, IF
+- Arithmetic: +, -, *, / with comparisons
+- Column name references (case-insensitive), error handling (#ERROR, #REF, #DIV/0!)
+- "ƒ" indicator on formula cells and column headers
+- Formula input in AddColumnPanel with function hints
+
+**6. Recurring Events and Tasks** ✅ (commit `806ee80`)
+- `recurrence.ts`: shared RecurrenceRule type + getNextOccurrence/expandOccurrences
+- Events: virtual occurrence expansion in list(), single-occurrence exceptions
+- Tasks: auto-create next occurrence on completion
+- Calendar UI: recurrence form, edit scope dialog ("this" vs "all"), 🔁 icon
+- Task UI: recurrence selector in detail panel, 🔁 badge on items
+
+**7. CSV Import/Export + Board View** ✅ (commit `c364e10` + `17ddd1b`)
+- `csvService.ts`: RFC 4180 export/import with proper quoted field handling
+- Export: toolbar button, browser download, all column types handled
+- Import: file picker, column mapping (case-insensitive), preview modal, type coercion
+- Board view: Grid | Board toggle, group by select column, drag-and-drop
+
+**8. Error Boundaries + Loading States + Note Export** ✅ (commit `c364e10` + `17ddd1b`)
+- ErrorBoundary + ModuleErrorBoundary: route wrapping, friendly error screens
+- LoadingSpinner + ModuleSkeleton: replaced plain "Loading..." across all pages
+- Note export: ⋯ dropdown menu in NoteHeader with Markdown and PDF export
+
+### Verification
+- `npx tsc --noEmit --incremental false` — **zero errors** after all changes
+- All uncommitted work from concurrent agents committed in `17ddd1b`
+
+### Git log on Develop (as of 14:30 SGT)
+```
+17ddd1b feat: loading states + note export menu + CSV import/board view fixups
+806ee80 feat: add recurring events and tasks support
+c364e10 feat(tables): add formula column type with expression engine
+e278c9d feat: add global search, keyboard shortcut cheatsheet, and customizable shortcuts
+3427fa6 feat: add Notes → Flashcards cross-module integration
+3ec0a35 feat(timer): add audio notifications on pomodoro phase transitions and task linking
+bbe28a0 docs: handover notes for Phase 2+3 completion
+```
+
+### 🏆🏆🏆 PHASES 1 + 2 + 3: ALL COMPLETE 🏆🏆🏆
+
+Every feature through Phase 3 is delivered. Next: Phase 4 (Electron wiring, SQLite, distribution).
