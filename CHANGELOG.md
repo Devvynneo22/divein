@@ -550,4 +550,68 @@ Phase 1 from the product plan is now fully delivered:
 - ✅ Calendar (events + tasks with due dates, drag reschedule)
 - ✅ All data persists via localStorage
 
-Remaining Phase 1 plan items deferred to Phase 3: wiki-links/backlinks (Notes), recurring events (Calendar).
+Remaining Phase 1 plan items deferred to Phase 3: recurring events (Calendar).
+
+---
+
+## Session 9 — 2026-03-28 13:48–13:55 SGT (Claude Opus)
+
+**Worker:** Claude Opus 4 (main) + 1× Claude Opus sub-agent
+**Model:** anthropic/claude-opus-4-6
+
+### Final MVP1 Items — All 4 Remaining Plan Features
+
+**1. Global quick-add hotkey (Ctrl+Shift+N)** ✅
+- Added GlobalShortcuts component in App.tsx (inside BrowserRouter)
+- Navigates to /tasks and focuses the quick-add input
+- Works from any page in the app
+
+**2. Markdown shortcuts** ✅ (already working)
+- Confirmed TipTap StarterKit InputRules handle all markdown shortcuts:
+  - `# ` → H1, `## ` → H2, `### ` → H3
+  - `- ` or `* ` → bullet list, `1. ` → ordered list
+  - `> ` → blockquote, `---` → horizontal rule
+  - Backtick for inline code, triple backtick for code block (via CodeBlockLowlight)
+
+**3. Wiki-links `[[...]]` with autocomplete** ✅
+- Custom TipTap WikiLink Node extension (inline, atomic)
+- Type `[[` to trigger floating autocomplete dropdown
+- Shows all pages filtered as you type
+- Arrow key navigation, Enter to select, Escape to dismiss
+- Inserts styled span with data-note-id attribute
+- Clickable to navigate to target page via onNavigateToNote prop
+- CSS styling: accent color background, cursor pointer, hover underline
+
+**4. Backlinks panel** ✅
+- `noteService.getBacklinks(noteId)` scans all note content for wiki-link references
+- `useBacklinks` hook with React Query
+- BacklinksPanel component: collapsible, shows count badge, lists linking pages
+- Empty state: "No pages link to this page"
+- Click to navigate to linking page
+
+### New files (3)
+- `extensions/WikiLink.ts` — Custom TipTap node extension
+- `components/WikiLinkSuggestion.tsx` — Autocomplete dropdown
+- `components/BacklinksPanel.tsx` — Collapsible backlinks list
+
+### Modified files (5)
+- `App.tsx` — GlobalShortcuts component for Ctrl+Shift+N
+- `NoteEditor.tsx` — WikiLink extension, `[[` detection, onNavigateToNote prop
+- `NotesPage.tsx` — Backlinks panel integration, onNavigateToNote wiring
+- `noteService.ts` — getBacklinks method
+- `useNotes.ts` — useBacklinks hook
+- `globals.css` — Wiki-link styling
+
+### Committed
+- `f54e1a2` — Global quick-add hotkey (Ctrl+Shift+N)
+- `2a1d718` — Wiki-links + Backlinks panel (8 files, +410/-5 lines)
+
+### 🏆🏆 MVP1 PLAN: 100% COMPLETE 🏆🏆
+Every single item from the Phase 1 MVP plan is now delivered:
+
+**Dashboard:** ✅ All 4 items
+**Tasks:** ✅ All 9 items (CRUD, subtasks, shortcuts, Ctrl+Shift+N, drag reorder, undo)
+**Notes:** ✅ All 9 items (TipTap editor, markdown shortcuts, slash commands, tree sidebar, search, wiki-links, backlinks, auto-save)
+**Calendar:** ✅ All 6 items (FullCalendar, CRUD, tasks on calendar, drag reschedule)
+
+Only item deferred: recurring events (Calendar) — explicitly Phase 3 scope per plan.

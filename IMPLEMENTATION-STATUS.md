@@ -84,7 +84,8 @@
 | **Code blocks** (syntax highlighting — JS, TS, Python, CSS, HTML, JSON, SQL, Bash) | ✅ |
 | **Emoji picker** (6 categories, search, inline insert) | ✅ |
 | Seamless header → editor layout (freeform editing) | ✅ |
-| Wiki-links / backlinks | 📋 |
+| **Wiki-links `[[...]]`** (autocomplete, clickable, styled inline nodes) | ✅ |
+| **Backlinks panel** (collapsible, shows linking pages) | ✅ |
 
 ### Calendar ✅
 | Feature | Status |
@@ -180,7 +181,7 @@
 | Formula columns in Tables | 📋 | SUM, AVG, COUNT, IF |
 | Board/Calendar views for Tables | 📋 | |
 | CSV import/export | 📋 | |
-| Wiki-links + backlinks | 📋 | |
+| Wiki-links + backlinks | ✅ | Completed in session 9 |
 | Full-text search | 📋 | |
 
 ## Phase 4: Distribution & Sync
