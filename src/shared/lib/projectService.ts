@@ -93,11 +93,26 @@ export const projectService = {
   },
 
   async delete(id: string): Promise<void> {
-    // Deleting a project does NOT cascade-delete linked items.
-    // Linked tasks/notes/entries retain their projectId (they become "orphaned").
-    // When moving to Electron + SQLite, implement proper FK behavior there.
     projects = projects.filter((p) => p.id !== id);
     persist();
+
+    // Clean up orphaned milestones belonging to the deleted project
+    const deletedMilestoneIds = milestones
+      .filter((m) => m.projectId === id)
+      .map((m) => m.id);
+    if (deletedMilestoneIds.length > 0) {
+      milestones = milestones.filter((m) => m.projectId !== id);
+      persistMilestones();
+
+      // Clear milestoneId on tasks that referenced deleted milestones
+      const allTasks = await taskService.list({});
+      const orphanedTasks = allTasks.filter(
+        (t) => t.milestoneId && deletedMilestoneIds.includes(t.milestoneId),
+      );
+      for (const task of orphanedTasks) {
+        await taskService.update(task.id, { milestoneId: null });
+      }
+    }
   },
 
   async archive(id: string): Promise<Project> {

@@ -331,8 +331,8 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
               open: true,
               query: '',
               position: {
-                top: rect.bottom + window.scrollY + 4,
-                left: Math.min(rect.left + window.scrollX, window.innerWidth - 280),
+                top: rect.bottom + 4,
+                left: Math.min(rect.left, window.innerWidth - 280),
               },
             });
           }
@@ -355,8 +355,8 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
               open: true,
               query: '',
               position: {
-                top: rect.bottom + window.scrollY + 4,
-                left: Math.min(rect.left + window.scrollX, window.innerWidth - 280),
+                top: rect.bottom + 4,
+                left: Math.min(rect.left, window.innerWidth - 280),
               },
             });
           }

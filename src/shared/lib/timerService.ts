@@ -39,6 +39,22 @@ function persist(): void {
 
 let entries: TimeEntry[] = loadEntries();
 
+// Clean up orphaned running entries from previous sessions (e.g. tab closed mid-timer)
+(function cleanupOrphanedEntries(): void {
+  const running = entries.filter((e) => e.isRunning);
+  if (running.length > 0) {
+    const now = nowISO();
+    for (const entry of running) {
+      entry.endTime = now;
+      entry.durationSec = Math.round(
+        (new Date(now).getTime() - new Date(entry.startTime).getTime()) / 1000,
+      );
+      entry.isRunning = false;
+    }
+    persist();
+  }
+})();
+
 function generateId(): string {
   return crypto.randomUUID();
 }
