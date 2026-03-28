@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Layout } from './Layout';
 import { CommandPalette } from './CommandPalette';
@@ -22,10 +23,37 @@ const queryClient = new QueryClient({
   },
 });
 
+/** Global keyboard shortcut handler — runs inside BrowserRouter context */
+function GlobalShortcuts() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    function handler(e: KeyboardEvent) {
+      // Ctrl+Shift+N — Global quick-add: navigate to Tasks and focus input
+      if (e.ctrlKey && e.shiftKey && e.key === 'N') {
+        e.preventDefault();
+        navigate('/tasks');
+        // Focus the quick-add input after navigation renders
+        requestAnimationFrame(() => {
+          const input = document.querySelector<HTMLInputElement>(
+            'input[placeholder*="Add a task"]'
+          );
+          input?.focus();
+        });
+      }
+    }
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [navigate]);
+
+  return null;
+}
+
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <GlobalShortcuts />
         <CommandPalette />
         <Routes>
           <Route element={<Layout />}>
