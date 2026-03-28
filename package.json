@@ -1,0 +1,94 @@
+{
+  "name": "nexus",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first productivity super-app",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "concurrently -n renderer,electron \"vite\" \"npm run dev:electron\"",
+    "dev:electron": "tsx watch electron/main.ts",
+    "dev:renderer": "vite",
+    "build": "tsc -b && vite build && npm run build:electron",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "preview": "vite preview",
+    "package": "npm run build && electron-builder",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@fullcalendar/core": "^6.1.20",
+    "@fullcalendar/daygrid": "^6.1.20",
+    "@fullcalendar/interaction": "^6.1.20",
+    "@fullcalendar/react": "^6.1.20",
+    "@fullcalendar/timegrid": "^6.1.20",
+    "@radix-ui/react-icons": "^1.3.2",
+    "@tanstack/react-query": "^5.95.2",
+    "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-virtual": "^3.13.23",
+    "@tiptap/extension-code-block-lowlight": "^3.21.0",
+    "@tiptap/extension-image": "^3.21.0",
+    "@tiptap/extension-link": "^3.21.0",
+    "@tiptap/extension-placeholder": "^3.21.0",
+    "@tiptap/react": "^3.21.0",
+    "@tiptap/starter-kit": "^3.21.0",
+    "better-sqlite3": "^12.8.0",
+    "cmdk": "^1.1.1",
+    "date-fns": "^4.1.0",
+    "drizzle-orm": "^0.45.2",
+    "electron-store": "^11.0.2",
+    "electron-updater": "^6.8.3",
+    "flexsearch": "^0.8.212",
+    "lucide-react": "^0.500.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.6.0",
+    "recharts": "^3.8.1",
+    "tailwindcss": "^4.2.2",
+    "zustand": "^5.0.12"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "@testing-library/react": "^16.3.2",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^4.5.0",
+    "concurrently": "^9.1.0",
+    "drizzle-kit": "^0.31.10",
+    "electron": "^33.4.0",
+    "electron-builder": "^26.8.1",
+    "playwright": "^1.58.2",
+    "tsx": "^4.19.0",
+    "typescript": "~5.7.0",
+    "vite": "^6.3.0",
+    "vitest": "^4.1.2"
+  },
+  "build": {
+    "appId": "com.nexus.app",
+    "productName": "Nexus",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "win": {
+      "target": ["nsis"],
+      "icon": "public/favicon.svg"
+    },
+    "mac": {
+      "target": ["dmg"],
+      "icon": "public/favicon.svg"
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "icon": "public/favicon.svg"
+    }
+  }
+}
