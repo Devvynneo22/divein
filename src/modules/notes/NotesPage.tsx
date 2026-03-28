@@ -167,6 +167,7 @@ export function NotesPage() {
               {/* Editor fills remaining space, no dividing border */}
               <NoteEditor
                 content={selectedNote.content}
+                noteId={selectedNote.id}
                 onUpdate={handleEditorUpdate}
                 onNavigateToNote={handleSelect}
               />

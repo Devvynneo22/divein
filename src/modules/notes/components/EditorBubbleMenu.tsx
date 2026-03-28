@@ -8,15 +8,17 @@ import {
   Code,
   Link,
   Highlighter,
+  Brain,
 } from 'lucide-react';
 
 interface EditorBubbleMenuProps {
   editor: Editor;
+  onCreateFlashcard?: (selectedText: string) => void;
 }
 
 const COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
 
-export function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
+export function EditorBubbleMenu({ editor, onCreateFlashcard }: EditorBubbleMenuProps) {
   const [visible, setVisible] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
   const menuRef = useRef<HTMLDivElement>(null);
@@ -142,6 +144,23 @@ export function EditorBubbleMenu({ editor }: EditorBubbleMenuProps) {
       >
         <Link size={13} />
       </BubbleButton>
+
+      {onCreateFlashcard && (
+        <>
+          <div className="w-px h-4 bg-[var(--color-border)] mx-0.5" />
+          <BubbleButton
+            onClick={() => {
+              const { from, to } = editor.state.selection;
+              const text = editor.state.doc.textBetween(from, to, ' ');
+              onCreateFlashcard(text);
+            }}
+            active={false}
+            title="Create Flashcard"
+          >
+            <Brain size={13} />
+          </BubbleButton>
+        </>
+      )}
 
       <div className="w-px h-4 bg-[var(--color-border)] mx-0.5" />
 

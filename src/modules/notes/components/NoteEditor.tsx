@@ -40,11 +40,13 @@ import {
   SmilePlus,
   CheckSquare,
   Code2,
+  Brain,
 } from 'lucide-react';
 import { SlashCommandMenu } from './SlashCommandMenu';
 import { EditorBubbleMenu } from './EditorBubbleMenu';
 import { EmojiPicker } from './EmojiPicker';
 import { WikiLinkSuggestion } from './WikiLinkSuggestion';
+import { CreateFlashcardModal } from './CreateFlashcardModal';
 import { WikiLink } from '../extensions/WikiLink';
 import { noteService } from '@/shared/lib/noteService';
 import type { Note } from '@/shared/types/note';
@@ -80,6 +82,7 @@ const TEXT_COLORS = [
 
 interface NoteEditorProps {
   content: string | null;
+  noteId?: string;
   onUpdate: (content: string, textContent: string, wordCount: number) => void;
   onNavigateToNote?: (noteId: string) => void;
 }
@@ -102,10 +105,15 @@ interface WikiLinkMenuState {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function NoteEditor({ content, onUpdate, onNavigateToNote }: NoteEditorProps) {
+export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: NoteEditorProps) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorWrapRef = useRef<HTMLDivElement>(null);
+  const [flashcardModal, setFlashcardModal] = useState<{ open: boolean; text: string }>({
+    open: false,
+    text: '',
+  });
+  const [hasSelection, setHasSelection] = useState(false);
   const [slashMenu, setSlashMenu] = useState<SlashMenuState>({
     open: false,
     query: '',
@@ -268,6 +276,19 @@ export function NoteEditor({ content, onUpdate, onNavigateToNote }: NoteEditorPr
     editorInstance.current = editor;
   }, [editor]);
 
+  // Track text selection state for toolbar flashcard button
+  useEffect(() => {
+    if (!editor) return;
+    const updateSelection = () => {
+      const { from, to, empty } = editor.state.selection;
+      setHasSelection(!empty && from !== to);
+    };
+    editor.on('selectionUpdate', updateSelection);
+    return () => {
+      editor.off('selectionUpdate', updateSelection);
+    };
+  }, [editor]);
+
   // Sync content when note changes
   useEffect(() => {
     if (editor && content) {
@@ -409,6 +430,22 @@ export function NoteEditor({ content, onUpdate, onNavigateToNote }: NoteEditorPr
       editor.off('selectionUpdate', update);
     };
   }, [editor, wikiLinkMenu.open]);
+
+  const handleCreateFlashcard = useCallback(
+    (text?: string) => {
+      if (!editor) return;
+      const selectedText =
+        text ??
+        (() => {
+          const { from, to } = editor.state.selection;
+          return editor.state.doc.textBetween(from, to, ' ');
+        })();
+      if (selectedText.trim()) {
+        setFlashcardModal({ open: true, text: selectedText });
+      }
+    },
+    [editor],
+  );
 
   if (!editor) return null;
 
@@ -594,6 +631,16 @@ export function NoteEditor({ content, onUpdate, onNavigateToNote }: NoteEditorPr
             />
           )}
         </div>
+
+        <Divider />
+
+        {/* Create Flashcard from selection */}
+        <ToolbarButton
+          onClick={() => handleCreateFlashcard()}
+          active={false}
+          icon={<Brain size={14} />}
+          title={hasSelection ? 'Create Flashcard from Selection' : 'Select text first to create a flashcard'}
+        />
       </div>
 
       {/* Hidden file input */}
@@ -613,7 +660,7 @@ export function NoteEditor({ content, onUpdate, onNavigateToNote }: NoteEditorPr
       >
         <div className="max-w-3xl mx-auto">
           {/* Bubble menu */}
-          <EditorBubbleMenu editor={editor} />
+          <EditorBubbleMenu editor={editor} onCreateFlashcard={handleCreateFlashcard} />
 
           {/* Content */}
           <EditorContent editor={editor} />
@@ -639,6 +686,15 @@ export function NoteEditor({ content, onUpdate, onNavigateToNote }: NoteEditorPr
           position={wikiLinkMenu.position}
           notes={wikiLinkNotes}
           onClose={() => setWikiLinkMenu((prev) => ({ ...prev, open: false }))}
+        />
+      )}
+
+      {/* ─── Create Flashcard modal ──────────────────────────────────── */}
+      {flashcardModal.open && (
+        <CreateFlashcardModal
+          selectedText={flashcardModal.text}
+          sourceNoteId={noteId}
+          onClose={() => setFlashcardModal({ open: false, text: '' })}
         />
       )}
     </div>
