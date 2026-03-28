@@ -2,6 +2,20 @@ import { create } from 'zustand';
 import type { PomodoroPhase, PomodoroSettings } from '@/shared/types/timer';
 import { playWorkCompleteTone, playBreakCompleteTone } from '@/shared/lib/audioNotification';
 
+const SETTINGS_KEY = 'nexus-timer-settings';
+
+function loadSettings(): PomodoroSettings {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+  } catch { /* ignore */ }
+  return DEFAULT_SETTINGS;
+}
+
+function persistSettings(settings: PomodoroSettings): void {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch { /* ignore */ }
+}
+
 const DEFAULT_SETTINGS: PomodoroSettings = {
   workMin: 25,
   shortBreakMin: 5,
@@ -45,13 +59,13 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
   isPomodoroMode: false,
   phase: 'work',
   secondsElapsed: 0,
-  secondsRemaining: DEFAULT_SETTINGS.workMin * 60,
+  secondsRemaining: loadSettings().workMin * 60,
   pomodoroCount: 0,
   currentEntryId: null,
-  settings: DEFAULT_SETTINGS,
+  settings: loadSettings(),
   _startEpoch: null,
   _baseElapsed: 0,
-  _baseRemaining: DEFAULT_SETTINGS.workMin * 60,
+  _baseRemaining: loadSettings().workMin * 60,
 
   startStopwatch: (entryId) => {
     set({
@@ -207,6 +221,7 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
 
   updateSettings: (partial) => {
     const next = { ...get().settings, ...partial };
+    persistSettings(next);
     set({ settings: next });
     // If not running, update the displayed remaining to reflect new work duration
     if (!get().isRunning && get().phase === 'work') {

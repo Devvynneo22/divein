@@ -88,9 +88,12 @@ export const eventService = {
       if (event.recurrence) {
         result.push(...expandRecurring(event, rangeStart, rangeEnd));
       } else {
-        // Non-recurring: simple date filter
-        if (start && event.startTime < start) continue;
-        if (end && event.startTime > end) continue;
+        // Non-recurring: proper date overlap check
+        const eventStart = parseISO(event.startTime);
+        const eventEnd = event.endTime ? parseISO(event.endTime) : eventStart;
+        // Event overlaps range if: eventStart <= rangeEnd AND eventEnd >= rangeStart
+        if (eventStart > rangeEnd) continue;
+        if (eventEnd < rangeStart) continue;
         result.push(event);
       }
     }
@@ -143,9 +146,16 @@ export const eventService = {
 
     if (dateKey && events[idx].recurrence) {
       // Single occurrence edit — store as exception
+      // Strip fields that should never leak into exception records
+      const { recurrence: _r, exceptions: _e, ...safeInput } = input;
+      const allowedFields: Record<string, unknown> = {};
+      const ALLOWED_KEYS = ['title', 'description', 'startTime', 'endTime', 'allDay', 'location', 'color', 'category', 'projectId'] as const;
+      for (const key of ALLOWED_KEYS) {
+        if (key in safeInput) allowedFields[key] = (safeInput as Record<string, unknown>)[key];
+      }
       const existing = events[idx];
       const exceptions = { ...(existing.exceptions ?? {}) };
-      exceptions[dateKey] = { ...(exceptions[dateKey] ?? {}), ...input };
+      exceptions[dateKey] = { ...(exceptions[dateKey] ?? {}), ...allowedFields };
       events[idx] = { ...existing, exceptions, updatedAt: now() };
     } else {
       // Update all occurrences (or non-recurring event)

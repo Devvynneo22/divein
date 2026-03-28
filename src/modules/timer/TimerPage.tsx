@@ -201,6 +201,17 @@ export function TimerPage() {
 
         {/* ── Timer hero section ───────────────────────────────── */}
         <div className="flex flex-col items-center gap-6 px-6 py-8">
+          {/* Phase indicator */}
+          {store.isPomodoroMode && (
+            <div className={`text-sm font-medium px-3 py-1 rounded-full ${
+              store.phase === 'work'
+                ? 'bg-[var(--color-accent)]/20 text-[var(--color-accent)]'
+                : 'bg-[var(--color-success)]/20 text-[var(--color-success)]'
+            }`}>
+              {store.phase === 'work' ? '🎯 Focus Time' : store.phase === 'short_break' ? '☕ Short Break' : '🌿 Long Break'}
+            </div>
+          )}
+
           {/* Big timer */}
           <TimerDisplay
             isPomodoroMode={store.isPomodoroMode}

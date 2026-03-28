@@ -41,12 +41,12 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
   const results: SearchResult[] = [];
 
   for (const t of tasks) {
-    if (fuzzyMatch(t.title, query)) {
+    if (fuzzyMatch(t.title, query) || (t.description && fuzzyMatch(t.description, query))) {
       results.push({ id: t.id, title: t.title, type: 'Task', route: '/tasks' });
     }
   }
   for (const n of notes) {
-    if (fuzzyMatch(n.title, query)) {
+    if (fuzzyMatch(n.title, query) || (n.contentText && fuzzyMatch(n.contentText, query))) {
       results.push({ id: n.id, title: n.title, type: 'Note', route: '/notes' });
     }
   }

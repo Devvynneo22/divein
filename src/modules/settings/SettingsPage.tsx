@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Settings, Palette, Clock, BookOpen, Database, Info, RotateCcw, Keyboard, CornerDownLeft } from 'lucide-react';
 import { useTimerStore } from '@/shared/stores/timerStore';
+import { useAppSettingsStore } from '@/shared/stores/appSettingsStore';
 import { shortcutService, type ShortcutDef, type ShortcutGroup } from '@/shared/lib/shortcutService';
 import type { PomodoroSettings } from '@/shared/types/timer';
 
@@ -60,14 +61,18 @@ export function SettingsPage() {
 // ─── General ────────────────────────────────────────────────────────────────
 
 function GeneralSettings() {
+  const { app, updateApp } = useAppSettingsStore();
+  const selectClass = "px-3 py-1.5 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] outline-none";
+
   return (
     <div>
       <SectionHeader title="General" description="App-wide preferences." />
 
       <SettingRow label="Theme" description="Color scheme for the app.">
         <select
-          defaultValue="dark"
-          className="px-3 py-1.5 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] outline-none"
+          value={app.theme}
+          onChange={(e) => updateApp({ theme: e.target.value as 'dark' | 'light' })}
+          className={selectClass}
         >
           <option value="dark">Dark</option>
           <option value="light" disabled>
@@ -78,8 +83,9 @@ function GeneralSettings() {
 
       <SettingRow label="Sidebar" description="Default sidebar state on app start.">
         <select
-          defaultValue="expanded"
-          className="px-3 py-1.5 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] outline-none"
+          value={app.sidebarDefault}
+          onChange={(e) => updateApp({ sidebarDefault: e.target.value as 'expanded' | 'collapsed' })}
+          className={selectClass}
         >
           <option value="expanded">Expanded</option>
           <option value="collapsed">Collapsed</option>
@@ -88,8 +94,9 @@ function GeneralSettings() {
 
       <SettingRow label="Date format" description="How dates appear throughout the app.">
         <select
-          defaultValue="relative"
-          className="px-3 py-1.5 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] outline-none"
+          value={app.dateFormat}
+          onChange={(e) => updateApp({ dateFormat: e.target.value as 'relative' | 'short' | 'long' })}
+          className={selectClass}
         >
           <option value="relative">Relative (Today, Tomorrow)</option>
           <option value="short">Short (Mar 28)</option>
@@ -99,8 +106,9 @@ function GeneralSettings() {
 
       <SettingRow label="Start of week" description="First day of the week in calendar views.">
         <select
-          defaultValue="1"
-          className="px-3 py-1.5 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] outline-none"
+          value={String(app.startOfWeek)}
+          onChange={(e) => updateApp({ startOfWeek: Number(e.target.value) as 0 | 1 | 6 })}
+          className={selectClass}
         >
           <option value="0">Sunday</option>
           <option value="1">Monday</option>
@@ -215,6 +223,8 @@ function PomodoroSettingsPanel() {
 // ─── Flashcards ─────────────────────────────────────────────────────────────
 
 function FlashcardSettings() {
+  const { flashcard, updateFlashcard } = useAppSettingsStore();
+
   return (
     <div>
       <SectionHeader title="Flashcards" description="Spaced repetition preferences." />
@@ -225,7 +235,8 @@ function FlashcardSettings() {
             type="number"
             min={1}
             max={100}
-            defaultValue={20}
+            value={flashcard.newCardsPerDay}
+            onChange={(e) => updateFlashcard({ newCardsPerDay: Number(e.target.value) || 20 })}
             className="w-20 px-3 py-1.5 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] outline-none text-center"
           />
           <span className="text-xs text-[var(--color-text-muted)]">cards</span>
@@ -233,7 +244,10 @@ function FlashcardSettings() {
       </SettingRow>
 
       <SettingRow label="Show interval preview" description="Display next review interval on rating buttons.">
-        <ToggleSwitch checked={true} onChange={() => {}} />
+        <ToggleSwitch
+          checked={flashcard.showIntervalPreview}
+          onChange={(v) => updateFlashcard({ showIntervalPreview: v })}
+        />
       </SettingRow>
     </div>
   );
@@ -249,7 +263,7 @@ function DataSettings() {
       <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] p-4 mb-4">
         <div className="text-sm font-medium mb-1">Current storage</div>
         <div className="text-xs text-[var(--color-text-muted)]">
-          In-memory (web-only development mode). Data resets on page refresh.
+          localStorage (browser). Your data persists across page refreshes.
         </div>
         <div className="text-xs text-[var(--color-text-muted)] mt-1">
           SQLite persistence will be available when Electron is wired.

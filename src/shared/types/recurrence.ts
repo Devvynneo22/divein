@@ -52,49 +52,72 @@ export function expandOccurrences(
   const maxCount = rule.count ?? 1000; // safety limit
   let count = 0;
 
-  while (count < maxCount) {
-    const day = startOfDay(current);
+  // Special handling for weekly + daysOfWeek to avoid skipping occurrences
+  if (rule.frequency === 'weekly' && rule.daysOfWeek && rule.daysOfWeek.length > 0) {
+    const sortedDays = [...rule.daysOfWeek].sort((a, b) => a - b);
+    const baseTime = parseISO(startDate);
+    const baseHours = baseTime.getHours();
+    const baseMinutes = baseTime.getMinutes();
+    const baseSeconds = baseTime.getSeconds();
+    // Start from the beginning of the week containing startDate
+    const startDayOfWeek = current.getDay();
+    let weekStart = startOfDay(addDays(current, -startDayOfWeek));
 
-    // Past the range? Done.
-    if (isAfter(day, startOfDay(rangeEnd))) break;
+    while (count < maxCount) {
+      // Check each specified day in this week
+      for (const dayOfWeek of sortedDays) {
+        const candidate = addDays(weekStart, dayOfWeek);
+        // Build candidate with original time preserved
+        const candidateFull = new Date(candidate.getFullYear(), candidate.getMonth(), candidate.getDate(),
+          baseHours, baseMinutes, baseSeconds);
 
-    // Past the end date? Done.
-    if (endLimit && isAfter(day, startOfDay(endLimit))) break;
+        const day = startOfDay(candidateFull);
 
-    // Within range? Include.
-    if (
-      (isAfter(day, startOfDay(rangeStart)) || isEqual(day, startOfDay(rangeStart))) &&
-      (isBefore(day, startOfDay(rangeEnd)) || isEqual(day, startOfDay(rangeEnd)))
-    ) {
-      // For weekly with daysOfWeek, check if current day matches
-      if (rule.frequency === 'weekly' && rule.daysOfWeek && rule.daysOfWeek.length > 0) {
-        if (rule.daysOfWeek.includes(current.getDay())) {
-          results.push(format(current, "yyyy-MM-dd'T'HH:mm:ss"));
+        // Skip dates before the original start date
+        if (isBefore(day, startOfDay(parseISO(startDate)))) continue;
+
+        // Past the range? Done.
+        if (isAfter(day, startOfDay(rangeEnd))) { count = maxCount; break; }
+
+        // Past the end date? Done.
+        if (endLimit && isAfter(day, startOfDay(endLimit))) { count = maxCount; break; }
+
+        // Within range? Include.
+        if (
+          (isAfter(day, startOfDay(rangeStart)) || isEqual(day, startOfDay(rangeStart))) &&
+          (isBefore(day, startOfDay(rangeEnd)) || isEqual(day, startOfDay(rangeEnd)))
+        ) {
+          results.push(format(candidateFull, "yyyy-MM-dd'T'HH:mm:ss"));
         }
-      } else {
+
+        count++;
+        if (count >= maxCount) break;
+      }
+
+      // Jump to the next target week
+      weekStart = addWeeks(weekStart, rule.interval);
+    }
+  } else {
+    while (count < maxCount) {
+      const day = startOfDay(current);
+
+      // Past the range? Done.
+      if (isAfter(day, startOfDay(rangeEnd))) break;
+
+      // Past the end date? Done.
+      if (endLimit && isAfter(day, startOfDay(endLimit))) break;
+
+      // Within range? Include.
+      if (
+        (isAfter(day, startOfDay(rangeStart)) || isEqual(day, startOfDay(rangeStart))) &&
+        (isBefore(day, startOfDay(rangeEnd)) || isEqual(day, startOfDay(rangeEnd)))
+      ) {
         results.push(format(current, "yyyy-MM-dd'T'HH:mm:ss"));
       }
-    }
 
-    // Advance
-    if (rule.frequency === 'weekly' && rule.daysOfWeek && rule.daysOfWeek.length > 0) {
-      // For weekly + daysOfWeek: advance day by day within the week, then jump by interval weeks
-      const nextDay = addDays(current, 1);
-      const currentWeekStart = startOfDay(addDays(current, -current.getDay()));
-      const nextWeekStart = startOfDay(addDays(nextDay, -nextDay.getDay()));
-
-      if (isEqual(currentWeekStart, nextWeekStart)) {
-        // Same week — just advance a day
-        current = nextDay;
-      } else {
-        // New week — jump by (interval - 1) more weeks, start from Sunday
-        current = addWeeks(nextWeekStart, rule.interval - 1);
-      }
-    } else {
       current = advanceDate(current, rule.frequency, rule.interval);
+      count++;
     }
-
-    count++;
   }
 
   return results;

@@ -66,11 +66,13 @@ function matchesFilter(task: Task, filter?: TaskFilter): boolean {
     if (task.milestoneId !== filter.milestoneId) return false;
   }
 
-  if (filter.dueBefore && task.dueDate) {
+  if (filter.dueBefore) {
+    if (!task.dueDate) return false;
     if (task.dueDate > filter.dueBefore) return false;
   }
 
-  if (filter.dueAfter && task.dueDate) {
+  if (filter.dueAfter) {
+    if (!task.dueDate) return false;
     if (task.dueDate < filter.dueAfter) return false;
   }
 
@@ -147,6 +149,9 @@ export const taskService = {
       updated.completedAt = now();
 
       // Auto-create next occurrence for recurring tasks
+      if (existing.recurrence && !existing.dueDate) {
+        console.warn(`Recurring task "${existing.title}" (${existing.id}) has no dueDate — skipping next occurrence creation.`);
+      }
       if (existing.recurrence && existing.dueDate) {
         try {
           const rule: RecurrenceRule = JSON.parse(existing.recurrence);

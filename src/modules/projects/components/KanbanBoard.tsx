@@ -25,8 +25,13 @@ export function KanbanBoard({ projectId, tasks }: KanbanBoardProps) {
       const task = tasks.find((t) => t.id === taskId);
       if (!task || task.status === newStatus) return;
 
-      await taskService.update(taskId, { status: newStatus });
-      qc.invalidateQueries({ queryKey: ['tasks', { projectId }] });
+      try {
+        await taskService.update(taskId, { status: newStatus });
+      } catch (error) {
+        console.error('Failed to update task status on drop:', error);
+      } finally {
+        qc.invalidateQueries({ queryKey: ['tasks', { projectId }] });
+      }
     },
     [tasks, projectId, qc],
   );

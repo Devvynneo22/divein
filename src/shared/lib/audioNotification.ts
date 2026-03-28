@@ -16,15 +16,15 @@ function getAudioContext(): AudioContext {
  * Play a sequence of tones.
  * Each note: { freq, duration, delay } in seconds.
  */
-function playTones(
+async function playTones(
   notes: { freq: number; duration: number; delay: number; type?: OscillatorType }[],
   volume = 0.15,
-) {
+): Promise<void> {
   const ctx = getAudioContext();
 
   // Resume context if suspended (browser autoplay policy)
   if (ctx.state === 'suspended') {
-    void ctx.resume();
+    await ctx.resume();
   }
 
   const now = ctx.currentTime;
@@ -54,8 +54,8 @@ function playTones(
  * Cheerful/triumphant tone — work phase complete!
  * Ascending arpeggio (C5 → E5 → G5 → C6).
  */
-export function playWorkCompleteTone(): void {
-  playTones([
+export async function playWorkCompleteTone(): Promise<void> {
+  await playTones([
     { freq: 523.25, duration: 0.15, delay: 0, type: 'sine' },     // C5
     { freq: 659.25, duration: 0.15, delay: 0.15, type: 'sine' },   // E5
     { freq: 783.99, duration: 0.15, delay: 0.3, type: 'sine' },    // G5
@@ -67,8 +67,8 @@ export function playWorkCompleteTone(): void {
  * Gentle chime — break phase complete, back to work.
  * Soft descending two-note chime.
  */
-export function playBreakCompleteTone(): void {
-  playTones([
+export async function playBreakCompleteTone(): Promise<void> {
+  await playTones([
     { freq: 783.99, duration: 0.25, delay: 0, type: 'sine' },      // G5
     { freq: 523.25, duration: 0.35, delay: 0.3, type: 'sine' },    // C5
   ], 0.1);
