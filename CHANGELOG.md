@@ -441,3 +441,40 @@ Focus: make Notes the best module in the app. Quality over breadth.
 
 ### Devvyn's Standing Instruction Update
 - **Sub-agents for coding must use Claude Opus 4-6** — not Sonnet or other models
+
+---
+
+## Session 7 — 2026-03-28 13:27–13:35 SGT (Claude Opus)
+
+**Worker:** Claude Opus 4 (main) + 2× Claude Opus sub-agents (parallel)
+**Model:** anthropic/claude-opus-4-6
+
+### 🔥 Critical: localStorage Persistence for ALL Services
+
+All 7 remaining data services now persist to localStorage (Notes was done in session 6):
+
+| Service | Storage Keys | Mutations with persist() |
+|---------|-------------|--------------------------|
+| taskService | `nexus-tasks` | create, update, delete, reorder |
+| eventService | `nexus-events` | create, update, delete |
+| habitService | `nexus-habits`, `nexus-habit-entries` | create, update, delete, checkIn, uncheckIn |
+| timerService | `nexus-timer-entries` | startTimer, stopTimer, createManualEntry, updateEntry, deleteEntry |
+| flashcardService | `nexus-decks`, `nexus-cards`, `nexus-reviews` | createDeck, updateDeck, deleteDeck, createCard, updateCard, deleteCard, reviewCard |
+| tableService | `nexus-tables`, `nexus-table-rows` | createTable, updateTable, deleteTable, addColumn, updateColumn, deleteColumn, createRow, updateRow, deleteRow, updateCell |
+| projectService | `nexus-projects` | create, update, delete |
+
+**Total: 12 localStorage keys across 8 services (including noteService).**
+
+### Verification
+- `npx tsc --noEmit --incremental false` — **zero errors**
+- Tested in browser:
+  - ✅ Created task "Test persistence task" → survived page refresh
+  - ✅ Created calendar event "Persistence test event" → survived page refresh
+  - ✅ Dashboard shows persisted data (1 event today, task count)
+  - ✅ Cross-module data flow working (events service → dashboard)
+
+### Committed
+- `9a7ab6f` — localStorage persistence for ALL services (7 files, +242/-15 lines)
+
+### Impact
+**The app is now genuinely usable as a daily tool.** Every module retains data across sessions. This was the single biggest blocker to MVP usability.

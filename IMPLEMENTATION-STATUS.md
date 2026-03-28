@@ -185,8 +185,8 @@
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Electron IPC wiring | 📋 | Main + preload + handlers |
-| localStorage persistence (Notes) | ✅ | Bridge until Electron/SQLite |
-| SQLite persistence | 📋 | Swap localStorage/in-memory → better-sqlite3 |
+| localStorage persistence (ALL services) | ✅ | 12 keys, bridge until Electron/SQLite |
+| SQLite persistence | 📋 | Swap localStorage → better-sqlite3 |
 | Auto-backup | 📋 | |
 | Auto-updater | 📋 | |
 | CI/CD | 📋 | |
