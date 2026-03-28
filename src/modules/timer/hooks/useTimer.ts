@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { timerService } from '@/shared/lib/timerService';
+import { taskService } from '@/shared/lib/taskService';
 import type { CreateTimeEntryInput } from '@/shared/types/timer';
 
 const ENTRIES_KEY = ['timeEntries'] as const;
@@ -60,6 +61,21 @@ export function useCreateManualEntry() {
       qc.invalidateQueries({ queryKey: ENTRIES_KEY });
       qc.invalidateQueries({ queryKey: TODAY_KEY });
     },
+  });
+}
+
+export function useTasks() {
+  return useQuery({
+    queryKey: ['tasks'],
+    queryFn: () => taskService.list({ status: ['inbox', 'todo', 'in_progress'] }),
+  });
+}
+
+export function useTaskById(id: string | null) {
+  return useQuery({
+    queryKey: ['tasks', id],
+    queryFn: () => (id ? taskService.get(id) : null),
+    enabled: !!id,
   });
 }
 

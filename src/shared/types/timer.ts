@@ -44,6 +44,7 @@ export interface PomodoroSettings {
   longBreakAfter: number;
   autoStartBreak: boolean;
   autoStartWork: boolean;
+  audioEnabled: boolean;
 }
 
 export type PomodoroPhase = 'work' | 'short_break' | 'long_break';

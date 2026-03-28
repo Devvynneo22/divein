@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Trash2, ListTodo } from 'lucide-react';
 import { format } from 'date-fns';
 import type { TimeEntry } from '@/shared/types/timer';
+import { useTasks } from '../hooks/useTimer';
 
 interface TimeEntryListProps {
   entries: TimeEntry[];
@@ -36,6 +37,8 @@ function formatTotalTime(sec: number): string {
 
 export function TimeEntryList({ entries, todayTotalSec, onDelete }: TimeEntryListProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const { data: tasks = [] } = useTasks();
+  const taskMap = new Map(tasks.map((t) => [t.id, t]));
 
   return (
     <div className="flex flex-col gap-2">
@@ -62,13 +65,19 @@ export function TimeEntryList({ entries, todayTotalSec, onDelete }: TimeEntryLis
               onMouseLeave={() => setHoveredId(null)}
               className="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] hover:border-[var(--color-border-hover)] transition-colors"
             >
-              {/* Left: description + time range */}
+              {/* Left: description + task + time range */}
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-[var(--color-text-primary)] truncate">
                   {entry.description ?? (
                     <span className="text-[var(--color-text-muted)] italic">No description</span>
                   )}
                 </p>
+                {entry.taskId && taskMap.get(entry.taskId) && (
+                  <p className="text-xs text-[var(--color-accent)] mt-0.5 flex items-center gap-1 truncate">
+                    <ListTodo size={11} className="shrink-0" />
+                    {taskMap.get(entry.taskId)!.title}
+                  </p>
+                )}
                 <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
                   {formatTimeRange(entry.startTime, entry.endTime)}
                 </p>

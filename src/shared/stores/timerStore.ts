@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { PomodoroPhase, PomodoroSettings } from '@/shared/types/timer';
+import { playWorkCompleteTone, playBreakCompleteTone } from '@/shared/lib/audioNotification';
 
 const DEFAULT_SETTINGS: PomodoroSettings = {
   workMin: 25,
@@ -8,6 +9,7 @@ const DEFAULT_SETTINGS: PomodoroSettings = {
   longBreakAfter: 4,
   autoStartBreak: false,
   autoStartWork: false,
+  audioEnabled: true,
 };
 
 interface TimerStore {
@@ -154,6 +156,15 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
     const shouldAutoStart =
       (nextPhase !== 'work' && settings.autoStartBreak) ||
       (nextPhase === 'work' && settings.autoStartWork);
+
+    // Play audio notification on phase transition
+    if (settings.audioEnabled) {
+      if (phase === 'work') {
+        playWorkCompleteTone();
+      } else {
+        playBreakCompleteTone();
+      }
+    }
 
     set({
       phase: nextPhase,

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Settings2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Settings2, Volume2 } from 'lucide-react';
 import type { PomodoroSettings } from '@/shared/types/timer';
 
 interface PomodoroSettingsProps {
@@ -124,6 +124,12 @@ export function PomodoroSettings({ settings, onChange }: PomodoroSettingsProps) 
             label="Auto-start work"
             checked={settings.autoStartWork}
             onChange={(v) => onChange({ autoStartWork: v })}
+          />
+          <div className="h-px bg-[var(--color-border)]" />
+          <Toggle
+            label="Audio notifications"
+            checked={settings.audioEnabled}
+            onChange={(v) => onChange({ audioEnabled: v })}
           />
         </div>
       )}
