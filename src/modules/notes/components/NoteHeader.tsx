@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { FileText } from 'lucide-react';
+import { FileText, MoreHorizontal, FileDown, FileType } from 'lucide-react';
 import { format } from 'date-fns';
 import { PageIconPicker } from './PageIconPicker';
+import { exportNoteToMarkdown, exportNoteToPDF } from '@/shared/lib/exportService';
 import type { Note } from '@/shared/types/note';
 
 interface NoteHeaderProps {
@@ -13,14 +14,28 @@ interface NoteHeaderProps {
 
 export function NoteHeader({ note, childCount, onTitleChange, onIconChange }: NoteHeaderProps) {
   const [showIconPicker, setShowIconPicker] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [localTitle, setLocalTitle] = useState(note.title);
   const iconPickerRef = useRef<HTMLDivElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Sync title when note changes
   useEffect(() => {
     setLocalTitle(note.title);
   }, [note.id, note.title]);
+
+  // Close export menu on outside click
+  useEffect(() => {
+    if (!showExportMenu) return;
+    function handler(e: MouseEvent) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showExportMenu]);
 
   function handleTitleChange(value: string) {
     setLocalTitle(value);
@@ -78,6 +93,43 @@ export function NoteHeader({ note, childCount, onTitleChange, onIconChange }: No
           placeholder="Untitled"
           className="flex-1 text-3xl font-bold bg-transparent border-none outline-none text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] min-w-0"
         />
+
+        {/* Export menu */}
+        <div className="relative mt-1" ref={exportMenuRef}>
+          <button
+            onClick={() => setShowExportMenu((v) => !v)}
+            className="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+            title="Export note"
+          >
+            <MoreHorizontal size={20} />
+          </button>
+          {showExportMenu && (
+            <div
+              className="absolute right-0 top-full mt-1 z-50 w-52 py-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] shadow-xl"
+            >
+              <button
+                onClick={() => {
+                  exportNoteToMarkdown(note);
+                  setShowExportMenu(false);
+                }}
+                className="flex items-center gap-2 w-full px-3 py-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+              >
+                <FileDown size={16} />
+                Export as Markdown
+              </button>
+              <button
+                onClick={() => {
+                  exportNoteToPDF(note);
+                  setShowExportMenu(false);
+                }}
+                className="flex items-center gap-2 w-full px-3 py-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+              >
+                <FileType size={16} />
+                Export as PDF
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Meta info */}

@@ -305,7 +305,7 @@ export function TasksPage() {
         {/* Task list */}
         <div className="flex-1 overflow-y-auto px-6 pb-6">
           {isLoading ? (
-            <div className="text-center py-12 text-[var(--color-text-muted)] text-sm">Loading...</div>
+            <LoadingSpinner text="Loading tasks…" />
           ) : tasks.length === 0 ? (
             <div className="text-center py-12 text-[var(--color-text-muted)] text-sm">
               {activeTab === 'all' ? 'No tasks yet. Add one above!' : `No ${activeTab.replace('_', ' ')} tasks.`}

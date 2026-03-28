@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { LoadingSpinner } from '@/app/LoadingSpinner';
 import { FolderKanban, Plus, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -86,7 +87,7 @@ function ProjectView({ projectId, onBack, onEdit }: ProjectViewProps) {
   if (!project) {
     return (
       <div className="flex items-center justify-center h-full">
-        <span className="text-[var(--color-text-muted)] text-sm">Loading project…</span>
+        <LoadingSpinner text="Loading project…" />
       </div>
     );
   }
@@ -264,9 +265,7 @@ export function ProjectsPage() {
         {/* Project grid */}
         <div className="flex-1 overflow-y-auto px-6 pb-6">
           {isLoading ? (
-            <div className="text-center py-12 text-[var(--color-text-muted)] text-sm">
-              Loading…
-            </div>
+            <LoadingSpinner text="Loading projects…" />
           ) : projects.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
               <div className="text-5xl">📁</div>

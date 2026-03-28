@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { LoadingSpinner } from '@/app/LoadingSpinner';
 import { ArrowLeft, Plus, Brain } from 'lucide-react';
 import {
   useDecks,
@@ -219,7 +220,7 @@ export function FlashcardsPage() {
       {/* Deck grid */}
       <div className="flex-1 overflow-y-auto px-6 pb-6">
         {isLoading ? (
-          <div className="text-center py-12 text-[var(--color-text-muted)] text-sm">Loading...</div>
+          <LoadingSpinner text="Loading flashcards…" />
         ) : decks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
             <div className="w-16 h-16 rounded-2xl bg-[var(--color-bg-secondary)] flex items-center justify-center">

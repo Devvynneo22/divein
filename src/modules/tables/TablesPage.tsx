@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { LoadingSpinner } from '@/app/LoadingSpinner';
 import { ArrowLeft, Plus, Table2, Filter, ArrowUpDown, Download, Upload, LayoutGrid, Columns3, X } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   useTables,
   useCreateTable,
@@ -176,6 +178,7 @@ function TableView({ table, onBack }: TableViewProps) {
   const addColumnRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const queryClient = useQueryClient();
   const updateTable = useUpdateTable();
   const addColumn = useAddColumn();
   const createRow = useCreateRow();
@@ -245,17 +248,14 @@ function TableView({ table, onBack }: TableViewProps) {
       for (const row of importPreview.rows) {
         await tableService.createRow({ tableId: table.id, data: row.data });
       }
-      // Invalidate rows query by creating a dummy mutation
-      createRow.reset();
-      // Force refetch by re-triggering
       setImportPreview(null);
       setIsImporting(false);
-      // Trigger a re-render of rows — simplest: toggle filters
-      setFilters((f) => [...f]);
+      // Invalidate rows cache to show newly imported data
+      void queryClient.invalidateQueries({ queryKey: ['tableRows', table.id] });
     } catch {
       setIsImporting(false);
     }
-  }, [importPreview, table.id, createRow]);
+  }, [importPreview, table.id, queryClient]);
 
   return (
     <div className="flex flex-col h-full">
@@ -349,6 +349,62 @@ function TableView({ table, onBack }: TableViewProps) {
             )}
           </button>
 
+          {/* View toggle */}
+          {selectColumns.length > 0 && (
+            <div className="flex items-center rounded-lg bg-[var(--color-bg-tertiary)] p-0.5">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  viewMode === 'grid'
+                    ? 'bg-[var(--color-bg-primary)] text-[var(--color-text-primary)] shadow-sm'
+                    : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
+                }`}
+              >
+                <LayoutGrid size={12} />
+                Grid
+              </button>
+              <button
+                onClick={() => setViewMode('board')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  viewMode === 'board'
+                    ? 'bg-[var(--color-bg-primary)] text-[var(--color-text-primary)] shadow-sm'
+                    : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
+                }`}
+              >
+                <Columns3 size={12} />
+                Board
+              </button>
+            </div>
+          )}
+
+          {/* CSV Export */}
+          <button
+            onClick={handleExport}
+            disabled={rows.length === 0}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            title="Export as CSV"
+          >
+            <Download size={13} />
+            Export
+          </button>
+
+          {/* CSV Import */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+            title="Import from CSV"
+          >
+            <Upload size={13} />
+            Import
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+
           {/* Add Column — positioned button + floating panel */}
           <div className="relative ml-auto" ref={addColumnRef}>
             <button
@@ -378,12 +434,19 @@ function TableView({ table, onBack }: TableViewProps) {
         <SortBar columns={table.columns} sorts={sorts} onChange={setSorts} />
       )}
 
-      {/* Grid */}
+      {/* Content area — Grid or Board */}
       <div className="flex-1 overflow-hidden flex flex-col min-h-0">
         {isLoading ? (
-          <div className="flex-1 flex items-center justify-center text-sm text-[var(--color-text-muted)]">
-            Loading...
+          <div className="flex-1 flex items-center justify-center">
+            <LoadingSpinner text="Loading table…" />
           </div>
+        ) : viewMode === 'board' && selectColumns.length > 0 ? (
+          <TableBoardView
+            table={table}
+            rows={rows}
+            groupByColumnId={groupByColumnId}
+            onGroupByChange={setGroupByColumnId}
+          />
         ) : (
           <TableGrid
             table={table}
@@ -395,6 +458,17 @@ function TableView({ table, onBack }: TableViewProps) {
           />
         )}
       </div>
+
+      {/* Import Preview Modal */}
+      {importPreview && (
+        <ImportPreviewModal
+          parseResult={importPreview}
+          tableName={table.name}
+          onConfirm={handleImportConfirm}
+          onCancel={() => setImportPreview(null)}
+          isImporting={isImporting}
+        />
+      )}
 
       {/* Footer */}
       <div className="flex-shrink-0 px-6 py-2 border-t border-[var(--color-border)] text-xs text-[var(--color-text-muted)]">
@@ -527,9 +601,7 @@ export function TablesPage() {
       {/* Table grid */}
       <div className="flex-1 overflow-y-auto px-6 pb-6">
         {isLoading ? (
-          <div className="text-center py-12 text-[var(--color-text-muted)] text-sm">
-            Loading...
-          </div>
+          <LoadingSpinner text="Loading tables…" />
         ) : tables.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
             <div className="w-16 h-16 rounded-2xl bg-[var(--color-bg-secondary)] flex items-center justify-center">
