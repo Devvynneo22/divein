@@ -283,13 +283,15 @@ export function exportNoteToMarkdown(note: Note): void {
 export function exportNoteToPDF(note: Note): void {
   const html = note.content ? tiptapJsonToHtml(note.content) : '';
 
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) {
-    alert('Please allow pop-ups to export as PDF.');
-    return;
-  }
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.left = '-9999px';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  document.body.appendChild(iframe);
 
-  printWindow.document.write(`<!DOCTYPE html>
+  const doc = iframe.contentDocument!;
+  doc.write(`<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -329,12 +331,12 @@ export function exportNoteToPDF(note: Note): void {
   <h1>${escapeHtml(note.title)}</h1>
   <div class="meta">Exported from Nexus · ${new Date().toLocaleDateString()}</div>
   <div>${html}</div>
-  <script>
-    window.onload = function() {
-      setTimeout(function() { window.print(); window.close(); }, 300);
-    };
-  </script>
 </body>
 </html>`);
-  printWindow.document.close();
+  doc.close();
+
+  iframe.onload = () => {
+    iframe.contentWindow!.print();
+    setTimeout(() => document.body.removeChild(iframe), 1000);
+  };
 }

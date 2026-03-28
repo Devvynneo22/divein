@@ -73,6 +73,7 @@ export function App() {
               <Route path="/tables" element={<ModuleErrorBoundary moduleName="Tables"><TablesPage /></ModuleErrorBoundary>} />
               <Route path="/projects" element={<ModuleErrorBoundary moduleName="Projects"><ProjectsPage /></ModuleErrorBoundary>} />
               <Route path="/settings" element={<ModuleErrorBoundary moduleName="Settings"><SettingsPage /></ModuleErrorBoundary>} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Route>
           </Routes>
         </BrowserRouter>

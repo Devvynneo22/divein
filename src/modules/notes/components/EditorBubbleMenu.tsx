@@ -52,22 +52,25 @@ export function EditorBubbleMenu({ editor, onCreateFlashcard }: EditorBubbleMenu
     }
 
     const menuWidth = 380; // approximate
+    // Use viewport-relative coords since menu is position:fixed
     setCoords({
-      top: rect.top + window.scrollY - 48,
-      left: Math.max(8, rect.left + window.scrollX + rect.width / 2 - menuWidth / 2),
+      top: rect.top - 48,
+      left: Math.max(8, rect.left + rect.width / 2 - menuWidth / 2),
     });
     setVisible(true);
   }, [editor]);
 
+  const handleBlur = useCallback(() => setVisible(false), []);
+
   useEffect(() => {
     editor.on('selectionUpdate', updatePosition);
-    editor.on('blur', () => setVisible(false));
+    editor.on('blur', handleBlur);
 
     return () => {
       editor.off('selectionUpdate', updatePosition);
-      editor.off('blur', () => setVisible(false));
+      editor.off('blur', handleBlur);
     };
-  }, [editor, updatePosition]);
+  }, [editor, updatePosition, handleBlur]);
 
   const handleLink = useCallback(() => {
     const prev = editor.getAttributes('link').href as string | undefined;

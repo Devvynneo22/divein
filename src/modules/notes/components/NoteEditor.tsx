@@ -151,6 +151,7 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file || !file.type.startsWith('image/')) return;
+      if (!editorInstance.current) return; // guard against null editor
       const reader = new FileReader();
       reader.onload = (ev) => {
         const src = ev.target?.result as string;
