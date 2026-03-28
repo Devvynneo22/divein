@@ -10,7 +10,8 @@ import { X, CheckCircle2, Circle, ArrowRight, Repeat } from 'lucide-react';
 import type { CalendarEvent } from '@/shared/types/event';
 import type { Task } from '@/shared/types/task';
 import type { RecurrenceRule, RecurrenceFrequency } from '@/shared/types/recurrence';
-import { FREQUENCY_OPTIONS, describeRecurrence } from '@/shared/types/recurrence';
+import { FREQUENCY_OPTIONS } from '@/shared/types/recurrence';
+import { describeRecurrence } from '@/shared/lib/recurrenceUtils';
 import { eventService } from '@/shared/lib/eventService';
 import { taskService } from '@/shared/lib/taskService';
 
@@ -375,6 +376,11 @@ export function CalendarPage() {
 
   function handleDelete() {
     if (editingId) {
+      const isRecurring = eventService.isRecurringId(editingId);
+      const message = isRecurring
+        ? 'Delete this event? This is part of a recurring series.'
+        : 'Delete this event?';
+      if (!window.confirm(message)) return;
       deleteEvent.mutate(editingId);
       setShowForm(false);
     }

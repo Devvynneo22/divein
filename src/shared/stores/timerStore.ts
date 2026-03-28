@@ -145,7 +145,12 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
       return;
     }
 
-    // Phase complete — transition
+    // Phase complete — transition guard against double-fire from background tab catch-up.
+    // Re-read _startEpoch from current state; if another tick already transitioned
+    // (resetting _startEpoch), bail out to prevent duplicate transitions.
+    const currentEpoch = get()._startEpoch;
+    if (currentEpoch !== _startEpoch) return;
+
     let nextPhase: PomodoroPhase;
     let nextPomodoroCount = pomodoroCount;
 

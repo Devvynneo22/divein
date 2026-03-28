@@ -113,6 +113,20 @@ export const projectService = {
         await taskService.update(task.id, { milestoneId: null });
       }
     }
+
+    // Clean up orphaned projectId on notes
+    const allNotes = await noteService.list({});
+    const orphanedNotes = allNotes.filter((n) => n.projectId === id);
+    for (const note of orphanedNotes) {
+      await noteService.update(note.id, { projectId: null });
+    }
+
+    // Clean up orphaned projectId on timer entries
+    const allEntries = await timerService.listEntries();
+    const orphanedEntries = allEntries.filter((e) => e.projectId === id);
+    for (const entry of orphanedEntries) {
+      await timerService.updateEntry(entry.id, { projectId: null });
+    }
   },
 
   async archive(id: string): Promise<Project> {
@@ -213,5 +227,12 @@ export const milestoneService = {
   async delete(id: string): Promise<void> {
     milestones = milestones.filter((m) => m.id !== id);
     persistMilestones();
+
+    // Clean up orphaned milestoneId references on tasks
+    const allTasks = await taskService.list({});
+    const orphanedTasks = allTasks.filter((t) => t.milestoneId === id);
+    for (const task of orphanedTasks) {
+      await taskService.update(task.id, { milestoneId: null });
+    }
   },
 };

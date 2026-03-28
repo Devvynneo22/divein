@@ -126,7 +126,10 @@ export function CardList({ deckId, cards }: CardListProps) {
 
                 {/* Delete button */}
                 <button
-                  onClick={() => deleteCard.mutate(card.id)}
+                  onClick={() => {
+                    if (!window.confirm('Delete this card?')) return;
+                    deleteCard.mutate(card.id);
+                  }}
                   className={`flex-shrink-0 p-1 rounded text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 transition-all ${
                     isHovered ? 'opacity-100' : 'opacity-0'
                   }`}

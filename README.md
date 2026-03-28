@@ -32,7 +32,7 @@ Plus: **Command Palette** (Ctrl+K, global search), **Settings** (theme, shortcut
 
 ## Tech Stack
 
-React 19, TypeScript (strict), Vite, Tailwind CSS 4, TanStack Query + Table, TipTap 2, FullCalendar, Zustand, date-fns, cmdk
+React 19, TypeScript (strict), Vite, Tailwind CSS 4, TanStack Query + Table, TipTap 2, FullCalendar, Zustand, date-fns, cmdk, lucide-react, highlight.js, lowlight
 
 ## Data Persistence
 
@@ -82,7 +82,7 @@ Each module follows: **Types** → **Service** → **Hooks** (TanStack Query) �
 
 ```bash
 npm run dev           # Vite dev server (web)
-npm run dev:full      # Vite + Electron (electron not wired yet)
+npm run dev:full      # Vite + Electron (Electron is scaffolded but not wired. Use `npm run dev` for web-only development.)
 npx tsc --noEmit --incremental false   # Type check
 ```
 

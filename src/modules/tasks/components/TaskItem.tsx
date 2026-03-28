@@ -37,20 +37,20 @@ function StatusIcon({ status, onClick }: { status: TaskStatus; onClick: () => vo
 
   if (status === 'done') {
     return (
-      <button onClick={handleClick} className="text-[var(--color-success)] hover:text-[var(--color-text-secondary)] transition-colors">
+      <button onClick={handleClick} aria-label="Mark as to do" className="text-[var(--color-success)] hover:text-[var(--color-text-secondary)] transition-colors">
         <CheckCircle2 size={18} />
       </button>
     );
   }
   if (status === 'in_progress') {
     return (
-      <button onClick={handleClick} className="text-[var(--color-accent)] hover:text-[var(--color-success)] transition-colors">
+      <button onClick={handleClick} aria-label="Mark as done" className="text-[var(--color-accent)] hover:text-[var(--color-success)] transition-colors">
         <Clock size={18} />
       </button>
     );
   }
   return (
-    <button onClick={handleClick} className="text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors">
+    <button onClick={handleClick} aria-label={`Mark as ${nextStatus[status]}`} className="text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors">
       <Circle size={18} />
     </button>
   );
@@ -227,6 +227,7 @@ export function TaskItem({
             e.stopPropagation();
             onDelete();
           }}
+          aria-label="Delete task"
           className="opacity-0 group-hover:opacity-100 text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-all"
         >
           <Trash2 size={14} />

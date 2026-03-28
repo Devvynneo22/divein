@@ -1,5 +1,5 @@
 import type { CalendarEvent, CreateEventInput, UpdateEventInput } from '@/shared/types/event';
-import { expandOccurrences } from '@/shared/types/recurrence';
+import { expandOccurrences } from '@/shared/lib/recurrenceUtils';
 import { parseISO, differenceInMilliseconds, addMilliseconds, format, subMonths, addMonths } from 'date-fns';
 
 const STORAGE_KEY = 'nexus-events';

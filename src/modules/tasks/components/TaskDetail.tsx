@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { X, Flag, Calendar, Tag, AlignLeft, CheckCircle2, Circle, ListTodo, Repeat } from 'lucide-react';
 import type { Task, UpdateTaskInput, TaskPriority, TaskStatus } from '@/shared/types/task';
 import type { RecurrenceRule, RecurrenceFrequency } from '@/shared/types/recurrence';
-import { FREQUENCY_OPTIONS, describeRecurrence } from '@/shared/types/recurrence';
+import { FREQUENCY_OPTIONS } from '@/shared/types/recurrence';
+import { describeRecurrence } from '@/shared/lib/recurrenceUtils';
 import { useSubtasks, useCreateTask, useUpdateTask, useDeleteTask } from '../hooks/useTasks';
 
 interface TaskDetailProps {

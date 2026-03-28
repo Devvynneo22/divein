@@ -84,11 +84,13 @@ export function DashboardPage() {
   const [quickAddTitle, setQuickAddTitle] = useState('');
   const createTask = useCreateTask();
 
-  const { data: tasksDue = [] } = useTasksDueToday();
-  const { data: todayEvents = [] } = useTodayEvents();
-  const { data: habitStatus = [] } = useHabitStatus();
-  const { data: dueCards = 0 } = useDueCards();
-  const { data: todayTime = 0 } = useTodayTime();
+  const { data: tasksDue = [], isError: tasksError } = useTasksDueToday();
+  const { data: todayEvents = [], isError: eventsError } = useTodayEvents();
+  const { data: habitStatus = [], isError: habitsError } = useHabitStatus();
+  const { data: dueCards = 0, isError: cardsError } = useDueCards();
+  const { data: todayTime = 0, isError: timeError } = useTodayTime();
+
+  const hasError = tasksError || eventsError || habitsError || cardsError || timeError;
 
   const habitsCompleted = habitStatus.filter((h) => h.isCompletedToday).length;
   const habitsTotal = habitStatus.length;
@@ -97,7 +99,7 @@ export function DashboardPage() {
     if (e.key === 'Enter' && quickAddTitle.trim()) {
       createTask.mutate({
         title: quickAddTitle.trim(),
-        dueDate: new Date().toISOString(),
+        dueDate: format(new Date(), 'yyyy-MM-dd'),
       });
       setQuickAddTitle('');
     }
@@ -116,6 +118,12 @@ export function DashboardPage() {
       <p className="text-[var(--color-text-muted)] mb-8 text-sm">
         {format(new Date(), 'EEEE, MMMM d, yyyy')} — Here&apos;s what&apos;s on your plate today.
       </p>
+
+      {hasError && (
+        <div className="mb-6 px-4 py-3 rounded-lg bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/30 text-sm text-[var(--color-danger)]">
+          Some data couldn&apos;t be loaded. Try refreshing the page.
+        </div>
+      )}
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">

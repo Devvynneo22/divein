@@ -31,6 +31,7 @@ export function KanbanBoard({ projectId, tasks }: KanbanBoardProps) {
         console.error('Failed to update task status on drop:', error);
       } finally {
         qc.invalidateQueries({ queryKey: ['tasks'] });
+        qc.invalidateQueries({ queryKey: ['projects'] });
       }
     },
     [tasks, projectId, qc],

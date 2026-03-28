@@ -7,7 +7,8 @@
  */
 import type { Task, CreateTaskInput, UpdateTaskInput, TaskFilter, TaskStatus } from '@/shared/types/task';
 import type { RecurrenceRule } from '@/shared/types/recurrence';
-import { getNextOccurrence } from '@/shared/types/recurrence';
+import { getNextOccurrence } from '@/shared/lib/recurrenceUtils';
+import { timerService } from './timerService';
 
 // ─── In-memory store (temporary until Electron IPC is wired) ────────────────
 
@@ -196,6 +197,13 @@ export const taskService = {
   async delete(id: string): Promise<void> {
     tasks = tasks.filter((t) => t.id !== id && t.parentId !== id);
     persist();
+
+    // Clean up dangling taskId references on timer entries
+    const allEntries = await timerService.listEntries();
+    const orphanedEntries = allEntries.filter((e) => e.taskId === id);
+    for (const entry of orphanedEntries) {
+      await timerService.updateEntry(entry.id, { taskId: null });
+    }
   },
 
   async reorder(id: string, newOrder: number): Promise<void> {

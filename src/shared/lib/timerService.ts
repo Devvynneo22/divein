@@ -39,16 +39,25 @@ function persist(): void {
 
 let entries: TimeEntry[] = loadEntries();
 
+// Maximum duration (in seconds) for orphaned timer entries recovered on startup.
+// Prevents ghost entries with 19+ hour durations when a tab is closed mid-timer.
+const MAX_ORPHAN_DURATION_SEC = 4 * 60 * 60; // 4 hours
+
 // Clean up orphaned running entries from previous sessions (e.g. tab closed mid-timer)
 (function cleanupOrphanedEntries(): void {
   const running = entries.filter((e) => e.isRunning);
   if (running.length > 0) {
     const now = nowISO();
     for (const entry of running) {
-      entry.endTime = now;
-      entry.durationSec = Math.round(
+      const elapsed = Math.round(
         (new Date(now).getTime() - new Date(entry.startTime).getTime()) / 1000,
       );
+      const cappedDuration = Math.min(elapsed, MAX_ORPHAN_DURATION_SEC);
+      entry.durationSec = cappedDuration;
+      // Recompute endTime based on capped duration
+      entry.endTime = new Date(
+        new Date(entry.startTime).getTime() + cappedDuration * 1000,
+      ).toISOString();
       entry.isRunning = false;
     }
     persist();

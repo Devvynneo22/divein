@@ -35,6 +35,7 @@ export function StatusBar() {
       {/* Left: Timer status */}
       <button
         onClick={() => navigate('/timer')}
+        aria-label={isRunning ? `Timer running: ${timerDisplay}` : 'No timer running'}
         className="flex items-center gap-2 hover:text-[var(--color-text-primary)] transition-colors"
       >
         {isRunning ? (

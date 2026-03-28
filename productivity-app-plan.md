@@ -442,14 +442,14 @@ For a data scientist who isn't a deep engineer: **Rust is an unnecessary barrier
 │  │              RENDERER PROCESS (UI)                   │ │
 │  │                                                      │ │
 │  │  React 19 + TypeScript (strict)                     │ │
-│  │  shadcn/ui + Radix UI + Tailwind CSS 4              │ │
+│  │  Tailwind CSS 4 (custom components, no shadcn/ui)    │ │
 │  │  TipTap 2 (rich text editor, ProseMirror-based)     │ │
 │  │  Zustand (local state per module)                   │ │
 │  │  TanStack Query (async state, cache)                │ │
 │  │  TanStack Table (table/grid rendering)              │ │
 │  │  FullCalendar or Schedule-X (calendar views)        │ │
-│  │  dnd-kit (drag and drop)                            │ │
-│  │  Recharts (charts/stats/heatmaps)                   │ │
+│  │  HTML5 Drag and Drop (native, no dnd-kit)            │ │
+│  │  Custom SVG charts (no Recharts)                     │ │
 │  │  cmdk (command palette)                             │ │
 │  │  Vite (bundling, HMR)                               │ │
 │  │                                                      │ │
@@ -460,9 +460,9 @@ For a data scientist who isn't a deep engineer: **Rust is an unnecessary barrier
 │  │                                                       │ │
 │  │  better-sqlite3 (SQLite database, synchronous)       │ │
 │  │  Drizzle ORM (type-safe queries, migrations)         │ │
-│  │  FlexSearch (full-text search index)                 │ │
-│  │  electron-updater (auto-updates)                     │ │
-│  │  electron-store (user preferences)                   │ │
+│  │  In-memory search (FlexSearch not used)              │ │
+│  │  electron-updater (auto-updates, not wired yet)      │ │
+│  │  Zustand + localStorage (electron-store not used)    │ │
 │  │  Node.js fs/path (file system, backups, exports)     │ │
 │  │  Window management, tray, global shortcuts           │ │
 │  │                                                       │ │

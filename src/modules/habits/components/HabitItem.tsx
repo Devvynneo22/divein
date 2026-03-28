@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useState, useCallback } from 'react';
 import { Check, ChevronDown, ChevronUp, Pencil, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import type { HabitWithStatus } from '@/shared/types/habit';
@@ -7,9 +7,9 @@ import { useCheckIn, useUncheckIn } from '../hooks/useHabits';
 interface HabitItemProps {
   habit: HabitWithStatus;
   isSelected: boolean;
-  onSelect: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
+  onSelect: (id: string) => void;
+  onEdit: (habit: HabitWithStatus) => void;
+  onDelete: (id: string) => void;
 }
 
 const FLAME = '🔥';
@@ -22,6 +22,14 @@ export const HabitItem = memo(function HabitItem({
   onDelete,
 }: HabitItemProps) {
   const today = format(new Date(), 'yyyy-MM-dd');
+  const [error, setError] = useState(false);
+  const mutationOptions = {
+    onError: (err: unknown) => {
+      console.error('Habit check-in failed:', err);
+      setError(true);
+      setTimeout(() => setError(false), 3000);
+    },
+  };
   const checkIn = useCheckIn();
   const uncheckIn = useUncheckIn();
 
@@ -34,12 +42,16 @@ export const HabitItem = memo(function HabitItem({
   const progress = isMeasurable ? Math.min(currentValue / habit.target, 1) : 0;
   const habitColor = habit.color ?? 'var(--color-accent)';
 
+  const handleSelect = useCallback(() => onSelect(habit.id), [onSelect, habit.id]);
+  const handleEdit = useCallback(() => onEdit(habit), [onEdit, habit]);
+  const handleDelete = useCallback(() => onDelete(habit.id), [onDelete, habit.id]);
+
   function handleBooleanToggle(e: React.MouseEvent) {
     e.stopPropagation();
     if (habit.isCompletedToday) {
-      uncheckIn.mutate({ habitId: habit.id, date: today });
+      uncheckIn.mutate({ habitId: habit.id, date: today }, mutationOptions);
     } else {
-      checkIn.mutate({ habitId: habit.id, date: today, value: 1 });
+      checkIn.mutate({ habitId: habit.id, date: today, value: 1 }, mutationOptions);
     }
   }
 
@@ -48,9 +60,9 @@ export const HabitItem = memo(function HabitItem({
     e.stopPropagation();
     const val = parseFloat(inputValue);
     if (!isNaN(val) && val > 0) {
-      checkIn.mutate({ habitId: habit.id, date: today, value: val });
+      checkIn.mutate({ habitId: habit.id, date: today, value: val }, mutationOptions);
     } else if (inputValue === '' || val === 0) {
-      uncheckIn.mutate({ habitId: habit.id, date: today });
+      uncheckIn.mutate({ habitId: habit.id, date: today }, mutationOptions);
     }
   }
 
@@ -65,7 +77,7 @@ export const HabitItem = memo(function HabitItem({
           ? 'bg-[var(--color-bg-elevated)] border-[var(--color-border-hover)]'
           : 'bg-[var(--color-bg-secondary)] border-[var(--color-border)] hover:border-[var(--color-border-hover)] hover:bg-[var(--color-bg-elevated)]'
       }`}
-      onClick={onSelect}
+      onClick={handleSelect}
       style={{ borderLeft: `3px solid ${habitColor}` }}
     >
       <div className="flex items-center gap-3 px-4 py-3">
@@ -171,6 +183,13 @@ export const HabitItem = memo(function HabitItem({
         </div>
       )}
 
+      {/* Error feedback */}
+      {error && (
+        <div className="px-4 pb-2 text-xs text-[var(--color-danger)]">
+          Failed to update — please try again.
+        </div>
+      )}
+
       {/* Expanded actions */}
       {isSelected && (
         <div
@@ -178,14 +197,14 @@ export const HabitItem = memo(function HabitItem({
           onClick={(e) => e.stopPropagation()}
         >
           <button
-            onClick={onEdit}
+            onClick={handleEdit}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
           >
             <Pencil size={12} />
             Edit
           </button>
           <button
-            onClick={onDelete}
+            onClick={handleDelete}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-[var(--color-danger)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
           >
             <Trash2 size={12} />

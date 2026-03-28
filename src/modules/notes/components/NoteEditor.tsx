@@ -197,7 +197,7 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
       CodeBlockLowlight.configure({ lowlight }),
       WikiLink,
     ],
-    content: content ? (JSON.parse(content) as object) : undefined,
+    content: content ? (() => { try { return JSON.parse(content) as object; } catch (e) { console.warn('NoteEditor: failed to parse initial content JSON', e); return undefined; } })() : undefined,
     editorProps: {
       attributes: {
         class:
@@ -295,7 +295,11 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
     if (editor && content) {
       const currentContent = JSON.stringify(editor.getJSON());
       if (currentContent !== content) {
-        editor.commands.setContent(JSON.parse(content) as object);
+        try {
+          editor.commands.setContent(JSON.parse(content) as object);
+        } catch (e) {
+          console.warn('NoteEditor: failed to parse content JSON on sync', e);
+        }
       }
     } else if (editor && !content) {
       editor.commands.clearContent();

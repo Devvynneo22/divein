@@ -207,6 +207,7 @@ export function ColumnHeader({
               className="flex items-center gap-2 w-full px-3 py-1.5 text-[var(--color-danger)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
               onClick={() => {
                 setMenuOpen(false);
+                if (!window.confirm(`Delete column '${column.name}'? Data in all rows will be lost.`)) return;
                 onDelete();
               }}
             >

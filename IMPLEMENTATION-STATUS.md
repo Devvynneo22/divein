@@ -27,7 +27,7 @@
 | App shell (Layout + Sidebar + StatusBar) | ✅ | Collapsible sidebar, live timer in status bar |
 | React Router setup | ✅ | All 10 routes |
 | TanStack Query client | ✅ | |
-| Drizzle schemas (all tables) | ✅ | 10 schema files |
+| Drizzle schemas (all tables) | ⚠️ | 10 schema files — partial: covers core module tables (tasks, notes, events, habits, flashcards, tables, projects, timer, milestones, settings) but missing several planned tables: tags, task_dependencies, note_folders, note_links, attachments, event_exceptions, activity_log, schema_version |
 | Command Palette (Ctrl+K) | ✅ | cmdk-powered, navigation + create + global search |
 | Error boundaries | ✅ | Top-level + per-module route wrapping |
 | Loading states | ✅ | LoadingSpinner + ModuleSkeleton across all pages |

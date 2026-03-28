@@ -86,7 +86,7 @@ export function TimerPage() {
       void refetchEntries();
       void refetchTotal();
     }
-  }, [store.isRunning]);
+  }, [store.isRunning, refetchEntries, refetchTotal]);
 
   // ─── Handlers ────────────────────────────────────────────────────────────────
 
@@ -113,6 +113,9 @@ export function TimerPage() {
               } else {
                 store.startStopwatch(entry.id);
               }
+            },
+            onError: (err) => {
+              console.error('Failed to start timer:', err);
             },
           },
         );

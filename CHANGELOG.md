@@ -425,7 +425,7 @@ Focus: make Notes the best module in the app. Quality over breadth.
 - `package.json` — 10 new TipTap extensions
 
 ### New dependencies installed
-@tiptap/extension-task-list, @tiptap/extension-task-item, @tiptap/extension-underline, @tiptap/extension-highlight, @tiptap/extension-text-style, @tiptap/extension-color, @tiptap/extension-typography, @tiptap/extension-dropcursor
+@tiptap/extension-task-list, @tiptap/extension-task-item, @tiptap/extension-underline, @tiptap/extension-highlight, @tiptap/extension-text-style, @tiptap/extension-color, @tiptap/extension-dropcursor
 
 ### Verification
 - `npx tsc --noEmit` — **zero errors** (with `--incremental false` to clear stale cache)
@@ -622,7 +622,7 @@ Only item deferred: recurring events (Calendar) — explicitly Phase 3 scope per
 
 ## Handover Notes for Next Session
 
-> ✅ All Phase 2+3 items completed in Session 10. See Session 10 entry above.
+> ✅ All Phase 2+3 items completed in Session 10. See Session 10 entry below.
 
 ### Priority: Complete Phase 2 + Phase 3
 

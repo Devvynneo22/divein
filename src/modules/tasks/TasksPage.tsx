@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { LoadingSpinner } from '@/app/LoadingSpinner';
 import { Plus, Inbox, CheckCircle2, Circle, Clock, XCircle } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTasks, useCreateTask, useUpdateTask, useDeleteTask, useReorderTask } from './hooks/useTasks';
 import { TaskItem } from './components/TaskItem';
 import { TaskDetail } from './components/TaskDetail';
+import { taskService } from '@/shared/lib/taskService';
 import type { Task, TaskStatus, TaskPriority } from '@/shared/types/task';
 
 // ─── Toast ──────────────────────────────────────────────────────────────────
@@ -11,6 +13,7 @@ import type { Task, TaskStatus, TaskPriority } from '@/shared/types/task';
 interface ToastData {
   message: string;
   task: Task;
+  subtasks: Task[];
 }
 
 function Toast({ data, onUndo, onDismiss }: { data: ToastData; onUndo: () => void; onDismiss: () => void }) {
@@ -56,6 +59,7 @@ export function TasksPage() {
 
   const filter = activeTab === 'all' ? undefined : { status: activeTab as TaskStatus };
   const { data: allTasks = [], isLoading } = useTasks(filter);
+  const queryClient = useQueryClient();
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
@@ -77,24 +81,34 @@ export function TasksPage() {
 
   // ─── Task actions ───────────────────────────────────────────────────────
 
-  function handleStatusChange(id: string, status: TaskStatus) {
-    updateTask.mutate({ id, data: { status } });
-  }
+  const handleStatusChange = useCallback(
+    (id: string, status: TaskStatus) => {
+      updateTask.mutate({ id, data: { status } });
+    },
+    [updateTask],
+  );
 
-  function handleDelete(id: string) {
-    const taskToDelete = tasks.find((t) => t.id === id);
-    if (!taskToDelete) return;
+  const handleDelete = useCallback(
+    async (id: string) => {
+      const taskToDelete = tasks.find((t) => t.id === id);
+      if (!taskToDelete) return;
 
-    if (selectedTaskId === id) setSelectedTaskId(null);
-    deleteTask.mutate(id);
+      // Capture subtasks before deletion so undo can restore them
+      const subtasks = await taskService.getSubtasks(id);
 
-    setToast({ message: 'Task deleted', task: taskToDelete });
-  }
+      if (selectedTaskId === id) setSelectedTaskId(null);
+      deleteTask.mutate(id);
 
-  const handleUndo = useCallback(() => {
+      setToast({ message: 'Task deleted', task: taskToDelete, subtasks });
+    },
+    [tasks, selectedTaskId, deleteTask],
+  );
+
+  const handleUndo = useCallback(async () => {
     if (!toast) return;
-    const { task } = toast;
-    createTask.mutate({
+    const { task, subtasks } = toast;
+    // Recreate the parent task
+    const restored = await taskService.create({
       title: task.title,
       description: task.description ?? undefined,
       status: task.status,
@@ -105,8 +119,25 @@ export function TasksPage() {
       tags: task.tags,
       estimatedMin: task.estimatedMin ?? undefined,
     });
+    // Recreate subtasks under the new parent
+    for (const sub of subtasks) {
+      await taskService.create({
+        title: sub.title,
+        description: sub.description ?? undefined,
+        status: sub.status,
+        priority: sub.priority,
+        projectId: sub.projectId ?? undefined,
+        parentId: restored.id,
+        dueDate: sub.dueDate ?? undefined,
+        startDate: sub.startDate ?? undefined,
+        tags: sub.tags,
+        estimatedMin: sub.estimatedMin ?? undefined,
+      });
+    }
+    // Invalidate queries to refresh the task list
+    await queryClient.invalidateQueries({ queryKey: ['tasks'] });
     setToast(null);
-  }, [toast, createTask]);
+  }, [toast, queryClient]);
 
   const handleDismissToast = useCallback(() => setToast(null), []);
 
@@ -252,8 +283,7 @@ export function TasksPage() {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTaskId, tasks]);
+  }, [selectedTaskId, selectedTask, tasks, updateTask, handleDelete]);
 
   return (
     <div className="flex h-full">

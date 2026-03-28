@@ -105,28 +105,40 @@ export function HabitsPage() {
 
   const groupKeys = useMemo(() => Array.from(grouped.keys()), [grouped]);
 
-  function handleSelect(id: string) {
-    const newId = selectedHabitId === id ? null : id;
-    setSelectedHabitId(newId);
-    if (newId) {
-      const habit = habitsWithStatus.find((h) => h.id === newId);
-      if (habit) setPanel({ mode: 'stats', habit });
-    } else {
-      setPanel(null);
-    }
-  }
+  const handleSelect = useCallback(
+    (id: string) => {
+      setSelectedHabitId((prev) => {
+        const newId = prev === id ? null : id;
+        if (newId) {
+          const habit = habitsWithStatus.find((h) => h.id === newId);
+          if (habit) setPanel({ mode: 'stats', habit });
+        } else {
+          setPanel(null);
+        }
+        return newId;
+      });
+    },
+    [habitsWithStatus],
+  );
 
-  function handleEdit(habit: Habit) {
+  const handleEdit = useCallback((habit: Habit) => {
     setPanel({ mode: 'edit', habit });
-  }
+  }, []);
 
-  function handleDelete(id: string) {
-    if (selectedHabitId === id) {
-      setSelectedHabitId(null);
-      setPanel(null);
-    }
-    deleteHabit.mutate(id);
-  }
+  const handleDelete = useCallback(
+    (id: string) => {
+      if (!window.confirm('Delete this habit? All check-in history will be lost.')) return;
+      setSelectedHabitId((prev) => {
+        if (prev === id) {
+          setPanel(null);
+          return null;
+        }
+        return prev;
+      });
+      deleteHabit.mutate(id);
+    },
+    [deleteHabit],
+  );
 
   const handleSave = useCallback(
     (data: CreateHabitInput | UpdateHabitInput) => {
@@ -208,9 +220,9 @@ export function HabitsPage() {
                           key={habit.id}
                           habit={habit}
                           isSelected={selectedHabitId === habit.id}
-                          onSelect={() => handleSelect(habit.id)}
-                          onEdit={() => handleEdit(habit)}
-                          onDelete={() => handleDelete(habit.id)}
+                          onSelect={handleSelect}
+                          onEdit={handleEdit}
+                          onDelete={handleDelete}
                         />
                       ))}
                     </div>
