@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { projectService } from '@/shared/lib/projectService';
+import { projectService, milestoneService } from '@/shared/lib/projectService';
 import { taskService } from '@/shared/lib/taskService';
 import { noteService } from '@/shared/lib/noteService';
-import type { CreateProjectInput, UpdateProjectInput } from '@/shared/types/project';
+import type { CreateProjectInput, UpdateProjectInput, CreateMilestoneInput, UpdateMilestoneInput } from '@/shared/types/project';
 
 const PROJECTS_KEY = ['projects'] as const;
 
@@ -97,5 +97,48 @@ export function useProjectNotes(projectId: string) {
       return all.filter((n) => n.projectId === projectId);
     },
     enabled: !!projectId,
+  });
+}
+
+// ─── Milestone hooks ─────────────────────────────────────────────────────────
+
+const MILESTONES_KEY = ['milestones'] as const;
+
+export function useMilestones(projectId: string) {
+  return useQuery({
+    queryKey: [...MILESTONES_KEY, { projectId }],
+    queryFn: () => milestoneService.list(projectId),
+    enabled: !!projectId,
+  });
+}
+
+export function useCreateMilestone() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateMilestoneInput) => milestoneService.create(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: MILESTONES_KEY });
+    },
+  });
+}
+
+export function useUpdateMilestone() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateMilestoneInput }) =>
+      milestoneService.update(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: MILESTONES_KEY });
+    },
+  });
+}
+
+export function useDeleteMilestone() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => milestoneService.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: MILESTONES_KEY });
+    },
   });
 }

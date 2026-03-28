@@ -9,6 +9,7 @@ export interface Task {
   priority: TaskPriority;
   projectId: string | null;
   parentId: string | null;
+  milestoneId: string | null;
   dueDate: string | null; // ISO 8601
   startDate: string | null;
   completedAt: string | null;
@@ -27,6 +28,7 @@ export interface CreateTaskInput {
   priority?: TaskPriority;
   projectId?: string;
   parentId?: string;
+  milestoneId?: string;
   dueDate?: string;
   startDate?: string;
   tags?: string[];
@@ -40,6 +42,7 @@ export interface UpdateTaskInput {
   priority?: TaskPriority;
   projectId?: string | null;
   parentId?: string | null;
+  milestoneId?: string | null;
   dueDate?: string | null;
   startDate?: string | null;
   completedAt?: string | null;
@@ -53,6 +56,7 @@ export interface TaskFilter {
   priority?: TaskPriority | TaskPriority[];
   projectId?: string | null;
   parentId?: string | null;
+  milestoneId?: string | null;
   dueBefore?: string;
   dueAfter?: string;
   tags?: string[];

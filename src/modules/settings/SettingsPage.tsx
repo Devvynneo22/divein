@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { Settings, Palette, Clock, BookOpen, Database, Info, RotateCcw } from 'lucide-react';
+import { Settings, Palette, Clock, BookOpen, Database, Info, RotateCcw, Keyboard, CornerDownLeft } from 'lucide-react';
 import { useTimerStore } from '@/shared/stores/timerStore';
+import { shortcutService, type ShortcutDef, type ShortcutGroup } from '@/shared/lib/shortcutService';
 import type { PomodoroSettings } from '@/shared/types/timer';
 
-type SettingsTab = 'general' | 'pomodoro' | 'flashcards' | 'data' | 'about';
+type SettingsTab = 'general' | 'pomodoro' | 'flashcards' | 'shortcuts' | 'data' | 'about';
 
 const TABS: { key: SettingsTab; label: string; icon: React.ReactNode }[] = [
   { key: 'general', label: 'General', icon: <Palette size={16} /> },
   { key: 'pomodoro', label: 'Pomodoro', icon: <Clock size={16} /> },
   { key: 'flashcards', label: 'Flashcards', icon: <BookOpen size={16} /> },
+  { key: 'shortcuts', label: 'Shortcuts', icon: <Keyboard size={16} /> },
   { key: 'data', label: 'Data', icon: <Database size={16} /> },
   { key: 'about', label: 'About', icon: <Info size={16} /> },
 ];
@@ -47,6 +49,7 @@ export function SettingsPage() {
         {activeTab === 'general' && <GeneralSettings />}
         {activeTab === 'pomodoro' && <PomodoroSettingsPanel />}
         {activeTab === 'flashcards' && <FlashcardSettings />}
+        {activeTab === 'shortcuts' && <ShortcutSettings />}
         {activeTab === 'data' && <DataSettings />}
         {activeTab === 'about' && <AboutSection />}
       </div>
@@ -299,6 +302,147 @@ function AboutSection() {
             <span className="text-[var(--color-text-primary)]">Dashboard Enter</span>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Shortcuts ──────────────────────────────────────────────────────────────
+
+function ShortcutSettings() {
+  const [shortcuts, setShortcuts] = useState<ShortcutDef[]>(() => shortcutService.getAll());
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+
+  const grouped = shortcuts.reduce<Record<ShortcutGroup, ShortcutDef[]>>(
+    (acc, s) => {
+      acc[s.group].push(s);
+      return acc;
+    },
+    { Global: [], Navigation: [], Tasks: [], Notes: [], Timer: [] }
+  );
+
+  const groupOrder: ShortcutGroup[] = ['Global', 'Navigation', 'Tasks', 'Notes', 'Timer'];
+
+  function startEditing(s: ShortcutDef) {
+    setEditingId(s.id);
+    setEditValue(s.keys);
+  }
+
+  function saveEdit(id: string) {
+    if (editValue.trim()) {
+      shortcutService.updateShortcut(id, editValue.trim());
+    }
+    setEditingId(null);
+    setShortcuts(shortcutService.getAll());
+  }
+
+  function resetSingle(id: string) {
+    shortcutService.resetShortcut(id);
+    setEditingId(null);
+    setShortcuts(shortcutService.getAll());
+  }
+
+  function resetAll() {
+    shortcutService.resetAll();
+    setEditingId(null);
+    setShortcuts(shortcutService.getAll());
+  }
+
+  return (
+    <div>
+      <SectionHeader title="Keyboard Shortcuts" description="View and customize keyboard shortcuts." />
+
+      <div className="mb-4">
+        <button
+          onClick={resetAll}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+        >
+          <RotateCcw size={12} />
+          Reset all to defaults
+        </button>
+      </div>
+
+      {groupOrder.map((group) => {
+        const items = grouped[group];
+        if (!items || items.length === 0) return null;
+        return (
+          <div key={group} className="mb-6">
+            <h3 className="text-[10px] font-medium uppercase tracking-wider text-[var(--color-text-muted)] mb-2 px-1">
+              {group}
+            </h3>
+            <div className="rounded-lg border border-[var(--color-border)] overflow-hidden">
+              {items.map((s, i) => {
+                const isEditing = editingId === s.id;
+                const isCustomized = shortcutService.isCustomized(s.id);
+                return (
+                  <div
+                    key={s.id}
+                    className={`flex items-center justify-between px-4 py-3 ${
+                      i < items.length - 1 ? 'border-b border-[var(--color-border)]' : ''
+                    } hover:bg-[var(--color-bg-tertiary)] transition-colors`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-[var(--color-text-secondary)]">{s.label}</span>
+                      {isCustomized && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--color-accent)] bg-opacity-15 text-[var(--color-accent)]">
+                          custom
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isEditing ? (
+                        <>
+                          <input
+                            type="text"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') saveEdit(s.id);
+                              if (e.key === 'Escape') setEditingId(null);
+                            }}
+                            className="w-32 px-2 py-1 text-xs rounded bg-[var(--color-bg-tertiary)] border border-[var(--color-accent)] text-[var(--color-text-primary)] outline-none text-center font-mono"
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => saveEdit(s.id)}
+                            className="p-1 rounded text-[var(--color-accent)] hover:bg-[var(--color-bg-tertiary)]"
+                            title="Save"
+                          >
+                            <CornerDownLeft size={12} />
+                          </button>
+                          {isCustomized && (
+                            <button
+                              onClick={() => resetSingle(s.id)}
+                              className="p-1 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)]"
+                              title="Reset to default"
+                            >
+                              <RotateCcw size={12} />
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => startEditing(s)}
+                          className="group"
+                          title="Click to edit"
+                        >
+                          <kbd className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-[11px] font-mono text-[var(--color-text-primary)] group-hover:border-[var(--color-accent)] transition-colors">
+                            {s.keys}
+                          </kbd>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+
+      <div className="text-xs text-[var(--color-text-muted)] mt-4">
+        Click any shortcut key to customize it. Press Enter to save or Escape to cancel.
       </div>
     </div>
   );

@@ -21,15 +21,17 @@ import { ProjectOverview } from './components/ProjectOverview';
 import { ProjectTaskList } from './components/ProjectTaskList';
 import { ProjectNoteList } from './components/ProjectNoteList';
 import { ProjectActivity } from './components/ProjectActivity';
+import { KanbanBoard } from './components/KanbanBoard';
 import type { CreateProjectInput, UpdateProjectInput, Project } from '@/shared/types/project';
 
 // ─── Tab types ────────────────────────────────────────────────────────────────
 
-type ProjectTab = 'overview' | 'tasks' | 'notes' | 'activity';
+type ProjectTab = 'overview' | 'tasks' | 'board' | 'notes' | 'activity';
 
 const TABS: { key: ProjectTab; label: string }[] = [
   { key: 'overview', label: 'Overview' },
   { key: 'tasks', label: 'Tasks' },
+  { key: 'board', label: 'Board' },
   { key: 'notes', label: 'Notes' },
   { key: 'activity', label: 'Activity' },
 ];
@@ -138,6 +140,7 @@ function ProjectView({ projectId, onBack, onEdit }: ProjectViewProps) {
       <div className="flex-1 overflow-y-auto px-6 py-6">
         {activeTab === 'overview' && stats && (
           <ProjectOverview
+            projectId={projectId}
             stats={stats}
             tasks={tasks}
             notes={notes}
@@ -147,6 +150,9 @@ function ProjectView({ projectId, onBack, onEdit }: ProjectViewProps) {
         )}
         {activeTab === 'tasks' && (
           <ProjectTaskList projectId={projectId} tasks={tasks} />
+        )}
+        {activeTab === 'board' && (
+          <KanbanBoard projectId={projectId} tasks={tasks} />
         )}
         {activeTab === 'notes' && (
           <ProjectNoteList projectId={projectId} notes={notes} />

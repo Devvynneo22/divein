@@ -60,6 +60,10 @@ function matchesFilter(task: Task, filter?: TaskFilter): boolean {
     if (task.parentId !== filter.parentId) return false;
   }
 
+  if (filter.milestoneId !== undefined) {
+    if (task.milestoneId !== filter.milestoneId) return false;
+  }
+
   if (filter.dueBefore && task.dueDate) {
     if (task.dueDate > filter.dueBefore) return false;
   }
@@ -108,6 +112,7 @@ export const taskService = {
       priority: input.priority ?? 0,
       projectId: input.projectId ?? null,
       parentId: input.parentId ?? null,
+      milestoneId: input.milestoneId ?? null,
       dueDate: input.dueDate ?? null,
       startDate: input.startDate ?? null,
       completedAt: null,

@@ -8,7 +8,7 @@
  * Projects are an organizational layer — they don't own data, they group it.
  * Stats are computed by querying other services filtered by projectId.
  */
-import type { Project, CreateProjectInput, UpdateProjectInput, ProjectStats } from '@/shared/types/project';
+import type { Project, CreateProjectInput, UpdateProjectInput, ProjectStats, Milestone, CreateMilestoneInput, UpdateMilestoneInput } from '@/shared/types/project';
 import { taskService } from './taskService';
 import { noteService } from './noteService';
 import { timerService } from './timerService';
@@ -127,5 +127,76 @@ export const projectService = {
       totalNotes: notes.length,
       totalTimeSeconds,
     };
+  },
+};
+
+// ─── Milestone Service ────────────────────────────────────────────────────────
+
+const MILESTONES_KEY = 'nexus-milestones';
+
+function loadMilestones(): Milestone[] {
+  try {
+    const raw = localStorage.getItem(MILESTONES_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as Milestone[];
+  } catch {
+    return [];
+  }
+}
+
+function persistMilestones(): void {
+  try {
+    localStorage.setItem(MILESTONES_KEY, JSON.stringify(milestones));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+let milestones: Milestone[] = loadMilestones();
+
+export const milestoneService = {
+  async list(projectId: string): Promise<Milestone[]> {
+    return milestones
+      .filter((m) => m.projectId === projectId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  },
+
+  async get(id: string): Promise<Milestone | null> {
+    return milestones.find((m) => m.id === id) ?? null;
+  },
+
+  async create(input: CreateMilestoneInput): Promise<Milestone> {
+    const milestone: Milestone = {
+      id: generateId(),
+      projectId: input.projectId,
+      name: input.name,
+      description: input.description ?? null,
+      dueDate: input.dueDate ?? null,
+      status: 'open',
+      createdAt: now(),
+      updatedAt: now(),
+    };
+    milestones.push(milestone);
+    persistMilestones();
+    return milestone;
+  },
+
+  async update(id: string, input: UpdateMilestoneInput): Promise<Milestone> {
+    const idx = milestones.findIndex((m) => m.id === id);
+    if (idx === -1) throw new Error(`Milestone ${id} not found`);
+
+    const existing = milestones[idx];
+    milestones[idx] = {
+      ...existing,
+      ...input,
+      updatedAt: now(),
+    };
+    persistMilestones();
+    return milestones[idx];
+  },
+
+  async delete(id: string): Promise<void> {
+    milestones = milestones.filter((m) => m.id !== id);
+    persistMilestones();
   },
 };

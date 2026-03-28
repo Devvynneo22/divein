@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Command } from 'cmdk';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -15,6 +15,7 @@ import {
   Plus,
   Search,
 } from 'lucide-react';
+import { globalSearch, type SearchResult, type SearchResultType } from '@/shared/lib/searchService';
 
 interface CommandItem {
   id: string;
@@ -25,9 +26,32 @@ interface CommandItem {
   keywords?: string[];
 }
 
+const TYPE_ICONS: Record<SearchResultType, React.ReactNode> = {
+  Task: <CheckSquare size={14} />,
+  Note: <FileText size={14} />,
+  Event: <Calendar size={14} />,
+  Habit: <Target size={14} />,
+  Deck: <BookOpen size={14} />,
+  Table: <Table2 size={14} />,
+  Project: <FolderKanban size={14} />,
+};
+
+const TYPE_COLORS: Record<SearchResultType, string> = {
+  Task: 'var(--color-accent)',
+  Note: '#a78bfa',
+  Event: '#f472b6',
+  Habit: '#34d399',
+  Deck: '#fbbf24',
+  Table: '#60a5fa',
+  Project: '#fb923c',
+};
+
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const navigate = useNavigate();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Toggle with Ctrl+K
   useEffect(() => {
@@ -40,6 +64,33 @@ export function CommandPalette() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // Reset on close
+  useEffect(() => {
+    if (!open) {
+      setInputValue('');
+      setSearchResults([]);
+    }
+  }, [open]);
+
+  // Debounced search
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (inputValue.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      const results = await globalSearch(inputValue);
+      setSearchResults(results);
+    }, 300);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [inputValue]);
 
   const go = useCallback(
     (path: string) => {
@@ -91,6 +142,8 @@ export function CommandPalette() {
               placeholder="Type a command or search..."
               className="w-full py-3.5 bg-transparent text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] outline-none"
               autoFocus
+              value={inputValue}
+              onValueChange={setInputValue}
             />
           </div>
 
@@ -99,6 +152,37 @@ export function CommandPalette() {
             <Command.Empty className="py-6 text-center text-sm text-[var(--color-text-muted)]">
               No results found.
             </Command.Empty>
+
+            {/* Search Results group — only when there are actual search hits */}
+            {searchResults.length > 0 && (
+              <Command.Group
+                heading="Search Results"
+                className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-[var(--color-text-muted)]"
+              >
+                {searchResults.map((result) => (
+                  <Command.Item
+                    key={`search-${result.type}-${result.id}`}
+                    value={`search ${result.title} ${result.type}`}
+                    onSelect={() => go(result.route)}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[var(--color-text-secondary)] cursor-pointer transition-colors data-[selected=true]:bg-[var(--color-accent)] data-[selected=true]:bg-opacity-15 data-[selected=true]:text-[var(--color-text-primary)]"
+                  >
+                    <span className="text-[var(--color-text-muted)]">
+                      {TYPE_ICONS[result.type]}
+                    </span>
+                    <span className="flex-1 truncate">{result.title}</span>
+                    <span
+                      className="shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded"
+                      style={{
+                        color: TYPE_COLORS[result.type],
+                        backgroundColor: `color-mix(in srgb, ${TYPE_COLORS[result.type]} 15%, transparent)`,
+                      }}
+                    >
+                      {result.type}
+                    </span>
+                  </Command.Item>
+                ))}
+              </Command.Group>
+            )}
 
             {['Navigation', 'Create'].map((group) => {
               const items = commands.filter((c) => c.group === group);

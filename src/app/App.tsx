@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Layout } from './Layout';
 import { CommandPalette } from './CommandPalette';
+import { ShortcutCheatsheet } from './ShortcutCheatsheet';
 import { DashboardPage } from '@/modules/dashboard/DashboardPage';
 import { TasksPage } from '@/modules/tasks/TasksPage';
 import { NotesPage } from '@/modules/notes/NotesPage';
@@ -55,6 +56,7 @@ export function App() {
       <BrowserRouter>
         <GlobalShortcuts />
         <CommandPalette />
+        <ShortcutCheatsheet />
         <Routes>
           <Route element={<Layout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />

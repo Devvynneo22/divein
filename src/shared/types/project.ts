@@ -35,3 +35,32 @@ export interface ProjectStats {
   totalTimeSeconds: number;
   // totalTables: number; // future: when Tables module is built
 }
+
+// ─── Milestones ──────────────────────────────────────────────────────────────
+
+export type MilestoneStatus = 'open' | 'completed';
+
+export interface Milestone {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string | null;
+  dueDate: string | null; // ISO 8601
+  status: MilestoneStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateMilestoneInput {
+  projectId: string;
+  name: string;
+  description?: string;
+  dueDate?: string;
+}
+
+export interface UpdateMilestoneInput {
+  name?: string;
+  description?: string | null;
+  dueDate?: string | null;
+  status?: MilestoneStatus;
+}
