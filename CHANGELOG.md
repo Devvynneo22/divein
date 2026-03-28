@@ -4,6 +4,55 @@ Session-by-session record of all development work. AI agents: **append to this f
 
 ---
 
+## Session 13 — Comprehensive Audit Round 3 + Fixes (2026-03-28, 15:13–15:28 SGT)
+
+**Model:** Opus × 8 sub-agents (3 audit + 4 fix + 1 verification)
+
+### Audit Phase (3 parallel agents)
+- **Functional/Logic Bugs:** 4 critical, 15+ medium found
+- **UI/UX & Components:** 6 critical, 22 medium, 19 low found
+- **Docs/Deps/Health:** 5 medium, 15+ low found
+
+### Fix Phase (4 parallel agents) — 35+ fixes
+
+**Critical Bug Fixes (8):**
+1. Ghost timer entries — orphaned timers capped at 4h max duration
+2. Milestone delete cascade — cleans up task milestoneId references
+3. Task delete cascade — clears taskId on timer entries
+4. NoteEditor JSON.parse — both locations wrapped in try/catch
+5. Project delete cascade — cleans up orphaned notes and timer entries
+6. Task undo — now captures and restores subtasks
+7. Dashboard quick-add — uses local date format instead of UTC ISO
+8. Pomodoro race condition — transition guard against double-fire from background tabs
+
+**UI/UX Fixes (12):**
+- Delete confirmations: habits, calendar events (recurring-aware), flashcards, table columns
+- Error handling: dashboard error banner, habit check-in onError, timer start onError
+- Accessibility: dialog roles on CommandPalette + ShortcutCheatsheet, aria-labels on StatusBar/TaskItem, role=switch on SettingsPage toggles
+
+**React Pattern Fixes (5):**
+- TasksPage: useCallback for handlers, proper useEffect deps, removed eslint-disable
+- KanbanBoard: invalidates ['projects'] queries on drag-drop
+- HabitItem: useCallback wrappers, React.memo now effective
+- TimerPage: fixed useEffect deps for refetch
+
+**Docs/Deps Fixes (10):**
+- Removed unused @radix-ui/react-icons
+- Moved tailwindcss to devDependencies
+- README: added lucide-react/highlight.js/lowlight, clarified Electron status
+- IMPLEMENTATION-STATUS: Drizzle schemas ⚠️ caveat
+- CHANGELOG: fixed Session 6 dep list, Session 10 reference direction
+- Plan: updated Section 3.2 to reflect actual stack (no shadcn/dnd-kit/Recharts/FlexSearch)
+- Extracted recurrenceUtils.ts from recurrence.ts (types vs logic separation)
+
+### Aftermath Verification
+**22/22 items verified ✅** — 0 regressions, 0 circular imports, 0 TS errors
+
+### Commit
+`9dc56e5` on Develop — 29 files changed, +347/-220 lines
+
+---
+
 ## Session 1 — 2026-03-28 09:42–10:50 SGT (Gemini)
 
 **Worker:** Gemini (via OpenClaw sub-agent)  
