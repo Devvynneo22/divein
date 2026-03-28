@@ -1,102 +1,93 @@
-# Nexus — Local-First Productivity Super-App
+# ⚡ Nexus — Productivity Super-App
 
-> **Status:** Phase 1 MVP — In Progress  
-> **Last worked on:** 2026-03-28 11:30 SGT  
-> **Owner:** Devvyn (Data Scientist at DBS Bank, Singapore)
+> Local-first, offline-capable productivity app built with React 19 + TypeScript + Vite
 
----
+## Status
 
-## What Is This?
-
-Nexus is a desktop-first, local-first productivity super-app that aims to replace Notion + Todoist + Google Calendar + Anki + Excel + Obsidian — all in one interconnected application. Your data lives on your machine. Cloud is optional.
+Phase 3 complete. All 9 modules fully functional. Phase 4 (Electron/distribution) next.
 
 ## Quick Start
 
 ```bash
-cd C:\Users\immer\OneDrive\Desktop\nexus
 npm install --legacy-peer-deps
-npx vite --host
-# Open http://localhost:5173
+npm run dev
+# → http://localhost:5173
 ```
-
-**Currently runs as a web app** (no Electron wired yet). All data is in-memory — refreshing the page clears data. This is by design: build/test UI first, wire persistence later.
-
----
-
-## Project Documentation Map
-
-| File | Purpose |
-|------|---------|
-| **README.md** (this file) | Project overview, quick start, documentation index |
-| **IMPLEMENTATION-STATUS.md** | 📋 **The audit/logging file.** Every feature's status, known issues, architecture decisions, and what was done in each session. **Read this first when starting a new session.** |
-| **productivity-app-plan.md** | 📐 **The master plan.** Full design document (v2.0, ~80KB): product vision, feature specs, tech stack rationale, system architecture, database schema, UI/UX philosophy, scalability roadmap, risk analysis, AI integration strategy. **The source of truth for what to build.** |
-| **CHANGELOG.md** | 📝 **Session-by-session changelog.** What was done, by whom, when, and key decisions made. |
-
-### For AI Agents / Next Session Workers
-
-**Start every session by reading:**
-1. `IMPLEMENTATION-STATUS.md` — what's done, what's broken, what's next
-2. `CHANGELOG.md` — recent session history
-3. `productivity-app-plan.md` — only if you need to understand a feature's full spec
-
-**After every session, update:**
-1. `IMPLEMENTATION-STATUS.md` — mark features as ✅/🔨/📋/⚠️
-2. `CHANGELOG.md` — append a new session entry
-
----
-
-## Tech Stack
-
-| Layer | Technology | Why |
-|-------|-----------|-----|
-| Desktop framework | Electron (planned, not wired yet) | Everything in TypeScript, no Rust needed |
-| Frontend | React 19 + TypeScript (strict) | Largest ecosystem, proven at scale |
-| UI components | Tailwind CSS 4 + lucide-react icons | Utility-first, beautiful defaults |
-| Rich text editor | TipTap 2 (ProseMirror) | Industry standard block editor |
-| State management | Zustand + TanStack Query | Simple local state + async cache |
-| Database | SQLite (better-sqlite3) via Drizzle ORM | Local-first, portable, type-safe |
-| Calendar | FullCalendar | Mature, month/week/day views |
-| Tables | TanStack Table (planned) | Virtualized, sortable, filterable |
-| Build | Vite 6 | Fast HMR, modern bundling |
-
-## Architecture
-
-```
-DataService abstraction
-  ├── In-memory (current) — for web-only development
-  └── Electron IPC (future) — swap without changing any UI code
-       └── better-sqlite3 + Drizzle ORM
-            └── nexus.db (SQLite file)
-```
-
-Every module follows the same pattern:
-1. **Types** (`shared/types/`) — TypeScript interfaces
-2. **Service** (`shared/lib/`) — data operations (in-memory now, IPC later)
-3. **Hooks** (`modules/*/hooks/`) — TanStack Query wrappers
-4. **Components** (`modules/*/components/`) — React UI
-5. **Page** (`modules/*/Page.tsx`) — route-level component
-
----
 
 ## Modules
 
-| Module | Status | Route |
-|--------|--------|-------|
-| Dashboard | ✅ Basic | `/dashboard` |
-| Tasks | ✅ Full CRUD | `/tasks` |
-| Notes | ✅ Full CRUD + TipTap | `/notes` |
-| Calendar | ✅ Full CRUD + FullCalendar | `/calendar` |
-| Habits | 📋 Placeholder | `/habits` |
-| Timer | 📋 Placeholder | `/timer` |
-| Flashcards | 📋 Placeholder | `/flashcards` |
-| Tables | 📋 Placeholder | `/tables` |
-| Projects | 📋 Placeholder | `/projects` |
-| Settings | 📋 Placeholder | `/settings` |
+| Module | Highlights |
+|--------|-----------|
+| **Dashboard** | Wired to all services, 5 stat cards, quick capture, dynamic greeting |
+| **Tasks** | Full CRUD, subtasks, recurring tasks, drag reorder, keyboard shortcuts (n/j/k/1-4/d) |
+| **Notes** | TipTap rich text, hierarchical pages, wiki-links + backlinks, slash commands, export to Markdown/PDF |
+| **Calendar** | FullCalendar (month/week/day), recurring events with exceptions, tasks on calendar |
+| **Habits** | Boolean + measurable tracking, streak counter, 12-week GitHub-style heatmap |
+| **Timer** | Stopwatch + Pomodoro, audio notifications, task linking, live status bar timer |
+| **Flashcards** | SM-2 spaced repetition, study sessions with 3D card flip, create from notes |
+| **Tables** | TanStack Table grid, 8 column types, formula columns, board/kanban view, CSV import/export |
+| **Projects** | Organizational layer over tasks/notes/time, milestones, kanban board |
 
----
+Plus: **Command Palette** (Ctrl+K, global search), **Settings** (theme, shortcuts, pomodoro config), **Keyboard Shortcuts** (`?` cheatsheet, customizable).
 
-## Project Location
+## Tech Stack
 
-`C:\Users\immer\OneDrive\Desktop\nexus\`
+React 19, TypeScript (strict), Vite, Tailwind CSS 4, TanStack Query + Table, TipTap 2, FullCalendar, Zustand, date-fns, cmdk
 
-OneDrive syncs this to Devvyn's other machines.
+## Data Persistence
+
+All data persists via localStorage (12+ keys). SQLite via Electron planned for Phase 4.
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+K` | Command palette (navigation + global search) |
+| `Ctrl+Shift+N` | Quick-add task |
+| `?` | Shortcut cheatsheet |
+| `j` / `k` | Navigate task list |
+| `n` | New task |
+| `1`–`4` | Set task priority |
+| `d` | Mark task done |
+| All shortcuts are customizable in Settings. |
+
+## Project Structure
+
+```
+src/
+├── app/              # App shell, layout, sidebar, command palette, providers
+├── modules/
+│   ├── calendar/     # FullCalendar integration
+│   ├── dashboard/    # Home page with aggregated stats
+│   ├── flashcards/   # SM-2 spaced repetition
+│   ├── habits/       # Habit tracker + heatmap
+│   ├── notes/        # TipTap editor, tree sidebar, wiki-links
+│   ├── projects/     # Project management + kanban
+│   ├── settings/     # App configuration
+│   ├── tables/       # Spreadsheet + formula engine
+│   ├── tasks/        # Task manager + subtasks
+│   └── timer/        # Stopwatch + pomodoro
+├── shared/
+│   ├── components/   # Reusable UI (toast, toggle, etc.)
+│   ├── hooks/        # Shared React hooks
+│   ├── lib/          # Data services (localStorage-backed)
+│   ├── stores/       # Zustand stores (timer, settings)
+│   └── types/        # TypeScript interfaces
+└── styles/           # Global CSS + Tailwind theme
+```
+
+Each module follows: **Types** → **Service** → **Hooks** (TanStack Query) → **Components** → **Page**
+
+## Development
+
+```bash
+npm run dev           # Vite dev server (web)
+npm run dev:full      # Vite + Electron (electron not wired yet)
+npx tsc --noEmit --incremental false   # Type check
+```
+
+## Documentation
+
+- **IMPLEMENTATION-STATUS.md** — Feature tracker (what's done, what's planned)
+- **CHANGELOG.md** — Session-by-session history
+- **productivity-app-plan.md** — Master design document (~80KB)

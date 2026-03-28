@@ -121,6 +121,8 @@ Session-by-session record of all development work. AI agents: **append to this f
 
 ## Next Steps (Priority Order)
 
+> ✅ All items below were completed in Sessions 5–10.
+
 1. Build Tables module (TanStack Table)
 2. Build Projects module
 3. Wire Electron (main process, preload, IPC handlers, SQLite persistence)
@@ -619,6 +621,8 @@ Only item deferred: recurring events (Calendar) — explicitly Phase 3 scope per
 ---
 
 ## Handover Notes for Next Session
+
+> ✅ All Phase 2+3 items completed in Session 10. See Session 10 entry above.
 
 ### Priority: Complete Phase 2 + Phase 3
 

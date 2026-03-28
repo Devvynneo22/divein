@@ -4,8 +4,6 @@ import { ArrowLeft, Plus, Brain } from 'lucide-react';
 import {
   useDecks,
   useCreateDeck,
-  useUpdateDeck,
-  useDeleteDeck,
   useCards,
   useDeckStats,
   useStudyQueue,
@@ -157,12 +155,6 @@ export function FlashcardsPage() {
 
   const { data: decks = [], isLoading } = useDecks();
   const createDeck = useCreateDeck();
-  const updateDeck = useUpdateDeck();
-  const deleteDeck = useDeleteDeck();
-
-  // suppress unused warning for updateDeck / deleteDeck (available for future use)
-  void updateDeck;
-  void deleteDeck;
 
   function handleCreateDeck(input: CreateDeckInput | UpdateDeckInput) {
     createDeck.mutate(input as CreateDeckInput, {

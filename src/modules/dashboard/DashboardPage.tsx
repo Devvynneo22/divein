@@ -8,7 +8,7 @@ import { eventService } from '@/shared/lib/eventService';
 import { habitService } from '@/shared/lib/habitService';
 import { flashcardService } from '@/shared/lib/flashcardService';
 import { timerService } from '@/shared/lib/timerService';
-import { format, startOfDay, endOfDay, isToday, isPast, isTomorrow } from 'date-fns';
+import { format, startOfDay, endOfDay } from 'date-fns';
 import type { Task } from '@/shared/types/task';
 import type { CalendarEvent } from '@/shared/types/event';
 import type { HabitWithStatus } from '@/shared/types/habit';

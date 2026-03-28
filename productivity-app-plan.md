@@ -1569,128 +1569,128 @@ Recommendation: Start with PWA, evaluate if native features are needed.
 
 **Goal:** Working app shell with navigation, theming, and database.
 
-- [ ] Initialize project: `npm create electron-vite@latest nexus`
-- [ ] Configure: TypeScript strict, Tailwind CSS 4, shadcn/ui
-- [ ] Set up Drizzle ORM + better-sqlite3 + migrations
-- [ ] Create database schema (all tables from Section 5)
-- [ ] Build IPC layer: preload.ts + typed handlers (skeleton)
-- [ ] App shell: sidebar navigation, routing (React Router), theme toggle
-- [ ] Auto-backup service (backup DB on start)
-- [ ] Logging service (structured file logging)
-- [ ] Error boundary (React)
-- [ ] Status bar (bottom of app, empty for now)
+- [x] Initialize project (Vite + React + TypeScript — adapted from plan's electron-vite)
+- [x] Configure: TypeScript strict, Tailwind CSS 4 (shadcn/ui replaced with custom components)
+- [x] Set up Drizzle ORM + better-sqlite3 schemas (not wired yet — localStorage bridge in use)
+- [x] Create database schema (all tables from Section 5)
+- [x] Build IPC layer: preload.ts + typed handlers (skeleton, not wired)
+- [x] App shell: sidebar navigation, routing (React Router), theme toggle
+- [ ] Auto-backup service (backup DB on start) — deferred to Phase 4
+- [ ] Logging service (structured file logging) — deferred to Phase 4
+- [x] Error boundary (React) — top-level + per-module
+- [x] Status bar (bottom of app, live timer display)
 
 **Deliverable:** App launches, navigates between empty module pages, DB is created and migrated, backups work.
 
-### Phase 1: MVP — Daily Driver (Weeks 3-8)
+### Phase 1: MVP — Daily Driver (Weeks 3-8) ✅
 
 Build the 4 modules you'll use every day:
 
-**1a. Dashboard (Week 3)**
-- Today's tasks (from tasks module — starts as mock data, becomes real)
-- Quick capture bar (creates tasks in Inbox)
-- Today's calendar events (stub until calendar is built)
-- Simple, clean layout
-- This is the app's home page from day one
+**1a. Dashboard (Week 3)** ✅
+- [x] Today's tasks (wired to all services)
+- [x] Quick capture bar (creates tasks with today's due date)
+- [x] Today's calendar events
+- [x] Simple, clean layout with 5 stat cards
+- [x] This is the app's home page from day one
 
-**1b. Task Manager (Weeks 3-5)**
-- Full CRUD: create, read, update, delete tasks
-- Task properties: title, description, priority (P1-P4), due date, tags, status
-- Subtasks (one level deep for MVP, unlimited later)
-- Inbox view (unsorted tasks)
-- List view with sorting (priority, date, title) and filtering (status, priority, tag)
-- Keyboard shortcuts: `N` new task, `Enter` edit, `1-4` set priority, `D` set done
-- Global quick-add hotkey (`Ctrl+Shift+N`)
-- Drag to reorder
-- Undo on delete (toast with undo button)
+**1b. Task Manager (Weeks 3-5)** ✅
+- [x] Full CRUD: create, read, update, delete tasks
+- [x] Task properties: title, description, priority (P1-P4), due date, tags, status
+- [x] Subtasks (one level deep)
+- [x] Inbox view (unsorted tasks)
+- [x] List view with sorting and filtering (status, priority, tag)
+- [x] Keyboard shortcuts: `N` new task, `Enter` edit, `1-4` set priority, `D` set done, `j/k` navigate
+- [x] Global quick-add hotkey (`Ctrl+Shift+N`)
+- [x] Drag to reorder (HTML5 DnD — switched from dnd-kit to native HTML5 drag for simplicity)
+- [x] Undo on delete (toast with 5s auto-dismiss)
 
-**1c. Notes (Weeks 5-7)**
-- TipTap editor with core blocks: headings, paragraphs, lists, code blocks, images, callouts, dividers
-- Markdown shortcuts (`# `, `- `, `> `, ``` ` ```)
-- Slash commands (`/heading`, `/code`, `/list`, `/image`)
-- Folder tree in left sidebar
-- Note list view
-- Full-text search (FTS5)
-- `[[wiki-links]]` with auto-complete
-- Backlinks panel
-- Auto-save (debounced, 1 second after last keystroke)
+**1c. Notes (Weeks 5-7)** ✅
+- [x] TipTap editor with core blocks: headings, paragraphs, lists, code blocks, images, callouts, dividers
+- [x] Markdown shortcuts (`# `, `- `, `> `, etc.)
+- [x] Slash commands (`/heading`, `/code`, `/list`, `/image`)
+- [x] Hierarchical tree sidebar (infinite depth, not flat folders)
+- [x] Search across all pages with breadcrumb context
+- [x] Full-text search (in-memory via global search, not FTS5 — SQLite not wired yet)
+- [x] `[[wiki-links]]` with auto-complete
+- [x] Backlinks panel
+- [x] Auto-save (500ms debounce)
 
-**1d. Calendar (Weeks 7-8)**
-- FullCalendar integration: month, week, day views
-- Create/edit/delete events
-- Event properties: title, time, all-day, color, description
-- Tasks with due dates shown as markers on calendar
-- Drag to reschedule events
-- Click date to create event
+**1d. Calendar (Weeks 7-8)** ✅
+- [x] FullCalendar integration: month, week, day views
+- [x] Create/edit/delete events
+- [x] Event properties: title, time, all-day, color, description
+- [x] Tasks with due dates shown as markers on calendar
+- [x] Drag to reschedule events
+- [x] Click date to create event
 
 **MVP Deliverable:** A genuinely usable daily productivity app. Tasks + Notes + Calendar + Dashboard. You can start using this as your real tool.
 
-### Phase 2: Productivity Features (Weeks 9-14)
+### Phase 2: Productivity Features (Weeks 9-14) ✅
 
-**2a. Habit Tracker (Weeks 9-10)**
-- Create habits with frequency rules
-- Daily check-in (boolean or numeric)
-- Streak counter
-- Heatmap calendar (contribution graph style)
-- Habit group labels
-- Habits shown on Dashboard
+**2a. Habit Tracker (Weeks 9-10)** ✅
+- [x] Create habits with frequency rules
+- [x] Daily check-in (boolean or numeric/measurable)
+- [x] Streak counter (current + longest)
+- [x] Heatmap calendar (12-week GitHub-style contribution graph)
+- [x] Habit group labels with autocomplete
+- [x] Habits shown on Dashboard
 
-**2b. Timer & Pomodoro (Weeks 10-11)**
-- Start/stop timer (standalone or on a task)
-- Pomodoro mode with configurable intervals
-- Timer in status bar (always visible)
-- Audio notification on interval complete
-- Daily time summary
-- Time logged against tasks
+**2b. Timer & Pomodoro (Weeks 10-11)** ✅
+- [x] Start/stop timer (standalone or on a task)
+- [x] Pomodoro mode with configurable intervals
+- [x] Timer in status bar (always visible)
+- [x] Audio notification on interval complete (Web Audio API)
+- [x] Daily time summary
+- [x] Time logged against tasks (searchable task selector)
 
-**2c. Project Management (Weeks 11-12)**
-- Create projects (name, color, icon)
-- Assign tasks to projects
-- Assign notes to projects
-- Project dashboard: task progress, time spent
-- Kanban board view (tasks by status within a project)
-- Milestones
+**2c. Project Management (Weeks 11-12)** ✅
+- [x] Create projects (name, color, emoji icon)
+- [x] Assign tasks to projects
+- [x] Assign notes to projects
+- [x] Project dashboard: task progress, time spent
+- [x] Kanban board view (5 status columns, drag to change status)
+- [x] Milestones (CRUD, progress bars, due date countdown)
 
-**2d. Command Palette + Shortcuts (Weeks 13-14)**
-- `Ctrl+K` command palette (cmdk)
-- Global search across all content types
-- Navigate to any page
-- Create any item
-- Keyboard shortcut cheatsheet (`?` key)
-- Customizable shortcuts (Settings)
+**2d. Command Palette + Shortcuts (Weeks 13-14)** ✅
+- [x] `Ctrl+K` command palette (cmdk)
+- [x] Global search across all 7 content types
+- [x] Navigate to any page
+- [x] Create any item
+- [x] Keyboard shortcut cheatsheet (`?` key)
+- [x] Customizable shortcuts (Settings, shortcutService registry)
 
-### Phase 3: Advanced Features (Weeks 15-20)
+### Phase 3: Advanced Features (Weeks 15-20) ✅
 
-**3a. Flashcards & Spaced Repetition (Weeks 15-17)**
-- Create decks and cards (rich text front/back)
-- SM-2 algorithm implementation
-- Review session mode (card-by-card, quality rating)
-- New cards per day limit
-- Create card from note text (right-click → Create flashcard)
-- Cards link back to source notes
-- Stats: retention rate, reviews per day, forecast
-- Due cards shown on Dashboard
-- CSV import/export
+**3a. Flashcards & Spaced Repetition (Weeks 15-17)** ✅
+- [x] Create decks and cards
+- [x] SM-2 algorithm implementation (pure function)
+- [x] Review session mode (card-by-card with CSS 3D flip, quality rating)
+- [ ] New cards per day limit — deferred
+- [x] Create card from note text (bubble menu + toolbar → Create flashcard)
+- [ ] Cards link back to source notes — deferred
+- [ ] Stats: retention rate, reviews per day, forecast — deferred
+- [ ] Due cards shown on Dashboard — deferred
+- [ ] CSV import/export for flashcards — deferred
 
-**3b. Tables & Structured Data (Weeks 17-19)**
-- Create tables with typed columns
-- TanStack Table for grid rendering
-- Column types: text, number, date, checkbox, select, multi-select, url
-- Inline cell editing
-- Sort, filter, group by column
-- Formula columns (SUM, AVG, COUNT, IF — basic)
-- CSV import/export
-- Multiple views: table (default), board (by select column)
+**3b. Tables & Structured Data (Weeks 17-19)** ✅
+- [x] Create tables with typed columns
+- [x] TanStack Table for grid rendering
+- [x] Column types: text, number, date, checkbox, select, multi-select, url, email
+- [x] Inline cell editing
+- [x] Sort, filter (type-aware, multi-filter AND logic)
+- [x] Formula columns (SUM, AVG, COUNT, MIN, MAX, IF, arithmetic)
+- [x] CSV import/export (RFC 4180, column mapping, preview)
+- [x] Multiple views: table (default), board/kanban (by select column)
 
-**3c. Integration & Polish (Weeks 19-20)**
-- Cross-module linking: notes ↔ tasks, notes ↔ projects
-- Embed table views inside notes (TipTap custom block)
-- Recurring tasks and events (full implementation)
-- Calendar event reminders (system notifications)
-- Export: notes to Markdown/PDF, tables to CSV, tasks to CSV
-- Import: CSV to tables
-- Settings page: all configurable options
-- Auto-updater (electron-updater with GitHub Releases)
+**3c. Integration & Polish (Weeks 19-20)** ✅
+- [x] Cross-module linking: notes ↔ tasks, notes ↔ projects
+- [ ] Embed table views inside notes (TipTap custom block) — deferred
+- [x] Recurring tasks and events (daily/weekly/monthly/yearly, exceptions, auto-create)
+- [ ] Calendar event reminders (system notifications) — deferred (needs Electron)
+- [x] Export: notes to Markdown/PDF, tables to CSV
+- [x] Import: CSV to tables
+- [x] Settings page: all configurable options
+- [ ] Auto-updater (electron-updater with GitHub Releases) — deferred to Phase 4
 
 ### Phase 4: Distribution & Sync (Weeks 21-26)
 
@@ -1700,6 +1700,28 @@ Build the 4 modules you'll use every day:
 - Cloud sync R&D: evaluate cr-sqlite or yjs
 - Basic sync implementation (optional, behind a feature flag)
 - README, docs, onboarding experience
+
+### Implementation Notes
+
+**dnd-kit → HTML5 DnD:** The plan specified `@dnd-kit/core` + `@dnd-kit/sortable` for drag-and-drop. During implementation, native HTML5 Drag and Drop was used instead for simplicity and zero-dependency overhead. The dnd-kit packages were never imported and have been removed from dependencies.
+
+### Deferred Features
+
+The following features were consciously skipped or deferred during Phases 1–3:
+
+| Feature | Reason |
+|---------|--------|
+| Task dependencies (blocked-by relationships) | Complexity; not needed for personal use |
+| Batch operations on tasks (multi-select actions) | Low priority for solo user |
+| Unlimited subtask nesting | One-level deep is sufficient; deeper nesting adds UI complexity |
+| Idle detection for timer | Needs Electron APIs (not available in web-only mode) |
+| Calendar event reminders (system notifications) | Needs Electron Notification API |
+| Flashcard CSV import/export | Deferred to Phase 4 |
+| Flashcard stats (retention rate, forecast) | Deferred to Phase 4 |
+| New cards per day limit | Deferred — simple to add later |
+| Embed table views inside notes | TipTap custom node complexity; deferred |
+| FTS5 full-text search | Using in-memory search via global search; SQLite FTS5 deferred to Phase 4 |
+| shadcn/ui component library | Custom Tailwind components used instead |
 
 ### Time Estimates
 
