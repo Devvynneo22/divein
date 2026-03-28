@@ -9,7 +9,27 @@ import type { Task, CreateTaskInput, UpdateTaskInput, TaskFilter, TaskStatus } f
 
 // ─── In-memory store (temporary until Electron IPC is wired) ────────────────
 
-let tasks: Task[] = [];
+const STORAGE_KEY = 'nexus-tasks';
+
+function loadTasks(): Task[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as Task[];
+  } catch {
+    return [];
+  }
+}
+
+function persist(): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+let tasks: Task[] = loadTasks();
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -99,6 +119,7 @@ export const taskService = {
       updatedAt: now(),
     };
     tasks.push(task);
+    persist();
     return task;
   },
 
@@ -123,11 +144,13 @@ export const taskService = {
     }
 
     tasks[idx] = updated;
+    persist();
     return updated;
   },
 
   async delete(id: string): Promise<void> {
     tasks = tasks.filter((t) => t.id !== id && t.parentId !== id);
+    persist();
   },
 
   async reorder(id: string, newOrder: number): Promise<void> {
@@ -135,6 +158,7 @@ export const taskService = {
     if (task) {
       task.sortOrder = newOrder;
       task.updatedAt = now();
+      persist();
     }
   },
 };

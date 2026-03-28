@@ -15,10 +15,42 @@ import type {
   HabitWithStatus,
 } from '@/shared/types/habit';
 
-// ─── In-memory store ─────────────────────────────────────────────────────────
+// ─── Persistent store ────────────────────────────────────────────────────────
 
-let habits: Habit[] = [];
-let entries: HabitEntry[] = [];
+const HABITS_KEY = 'nexus-habits';
+const HABIT_ENTRIES_KEY = 'nexus-habit-entries';
+
+function loadHabits(): Habit[] {
+  try {
+    const raw = localStorage.getItem(HABITS_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as Habit[];
+  } catch {
+    return [];
+  }
+}
+
+function loadHabitEntries(): HabitEntry[] {
+  try {
+    const raw = localStorage.getItem(HABIT_ENTRIES_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as HabitEntry[];
+  } catch {
+    return [];
+  }
+}
+
+function persist(): void {
+  try {
+    localStorage.setItem(HABITS_KEY, JSON.stringify(habits));
+    localStorage.setItem(HABIT_ENTRIES_KEY, JSON.stringify(entries));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+let habits: Habit[] = loadHabits();
+let entries: HabitEntry[] = loadHabitEntries();
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -100,6 +132,7 @@ export const habitService = {
       createdAt: nowIso(),
     };
     habits.push(habit);
+    persist();
     return habit;
   },
 
@@ -110,12 +143,14 @@ export const habitService = {
     const existing = habits[idx];
     const updated: Habit = { ...existing, ...input };
     habits[idx] = updated;
+    persist();
     return updated;
   },
 
   async delete(id: string): Promise<void> {
     habits = habits.filter((h) => h.id !== id);
     entries = entries.filter((e) => e.habitId !== id);
+    persist();
   },
 
   async checkIn(
@@ -139,6 +174,7 @@ export const habitService = {
         note: note ?? entries[existingIdx].note,
       };
       entries[existingIdx] = updated;
+      persist();
       return updated;
     }
 
@@ -151,6 +187,7 @@ export const habitService = {
       createdAt: nowIso(),
     };
     entries.push(entry);
+    persist();
     return entry;
   },
 
@@ -158,6 +195,7 @@ export const habitService = {
     entries = entries.filter(
       (e) => !(e.habitId === habitId && e.date === date),
     );
+    persist();
   },
 
   async getEntries(

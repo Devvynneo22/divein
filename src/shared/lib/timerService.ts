@@ -15,9 +15,29 @@ import {
 } from 'date-fns';
 import type { TimeEntry, CreateTimeEntryInput, UpdateTimeEntryInput } from '@/shared/types/timer';
 
-// ─── In-memory store ─────────────────────────────────────────────────────────
+// ─── Persistent store ────────────────────────────────────────────────────────
 
-let entries: TimeEntry[] = [];
+const STORAGE_KEY = 'nexus-timer-entries';
+
+function loadEntries(): TimeEntry[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as TimeEntry[];
+  } catch {
+    return [];
+  }
+}
+
+function persist(): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+let entries: TimeEntry[] = loadEntries();
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -54,6 +74,7 @@ export const timerService = {
         (new Date(endTime).getTime() - new Date(running.startTime).getTime()) / 1000,
       );
       Object.assign(running, { endTime, durationSec, isRunning: false });
+      persist();
     }
 
     const entry: TimeEntry = {
@@ -69,6 +90,7 @@ export const timerService = {
       createdAt: nowISO(),
     };
     entries.push(entry);
+    persist();
     return entry;
   },
 
@@ -83,6 +105,7 @@ export const timerService = {
     entry.endTime = endTime;
     entry.durationSec = durationSec;
     entry.isRunning = false;
+    persist();
     return entry;
   },
 
@@ -108,6 +131,7 @@ export const timerService = {
       createdAt: nowISO(),
     };
     entries.push(entry);
+    persist();
     return entry;
   },
 
@@ -115,11 +139,13 @@ export const timerService = {
     const entry = entries.find((e) => e.id === id);
     if (!entry) throw new Error(`TimeEntry ${id} not found`);
     Object.assign(entry, input);
+    persist();
     return entry;
   },
 
   async deleteEntry(id: string): Promise<void> {
     entries = entries.filter((e) => e.id !== id);
+    persist();
   },
 
   async getRunning(): Promise<TimeEntry | null> {

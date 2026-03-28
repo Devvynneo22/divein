@@ -15,7 +15,27 @@ import { timerService } from './timerService';
 
 // ─── In-memory store ──────────────────────────────────────────────────────────
 
-let projects: Project[] = [];
+const STORAGE_KEY = 'nexus-projects';
+
+function loadProjects(): Project[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as Project[];
+  } catch {
+    return [];
+  }
+}
+
+function persist(): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+let projects: Project[] = loadProjects();
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -54,6 +74,7 @@ export const projectService = {
       updatedAt: now(),
     };
     projects.push(project);
+    persist();
     return project;
   },
 
@@ -67,6 +88,7 @@ export const projectService = {
       ...input,
       updatedAt: now(),
     };
+    persist();
     return projects[idx];
   },
 
@@ -75,6 +97,7 @@ export const projectService = {
     // Linked tasks/notes/entries retain their projectId (they become "orphaned").
     // When moving to Electron + SQLite, implement proper FK behavior there.
     projects = projects.filter((p) => p.id !== id);
+    persist();
   },
 
   async archive(id: string): Promise<Project> {

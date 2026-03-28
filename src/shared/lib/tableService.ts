@@ -17,10 +17,42 @@ import type {
   TableSort,
 } from '@/shared/types/table';
 
-// ─── In-memory store ─────────────────────────────────────────────────────────
+// ─── Persistent store ────────────────────────────────────────────────────────
 
-let tables: TableDef[] = [];
-let rows: TableRow[] = [];
+const TABLES_KEY = 'nexus-tables';
+const ROWS_KEY = 'nexus-table-rows';
+
+function loadTables(): TableDef[] {
+  try {
+    const raw = localStorage.getItem(TABLES_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as TableDef[];
+  } catch {
+    return [];
+  }
+}
+
+function loadRows(): TableRow[] {
+  try {
+    const raw = localStorage.getItem(ROWS_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as TableRow[];
+  } catch {
+    return [];
+  }
+}
+
+function persist(): void {
+  try {
+    localStorage.setItem(TABLES_KEY, JSON.stringify(tables));
+    localStorage.setItem(ROWS_KEY, JSON.stringify(rows));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+let tables: TableDef[] = loadTables();
+let rows: TableRow[] = loadRows();
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -175,6 +207,7 @@ export const tableService = {
       updatedAt: now(),
     };
     tables.push(table);
+    persist();
     return table;
   },
 
@@ -192,12 +225,14 @@ export const tableService = {
       updatedAt: now(),
     };
     tables[idx] = updated;
+    persist();
     return updated;
   },
 
   async deleteTable(id: string): Promise<void> {
     tables = tables.filter((t) => t.id !== id);
     rows = rows.filter((r) => r.tableId !== id);
+    persist();
   },
 
   // ── Column management ────────────────────────────────────────────────────────
@@ -211,6 +246,7 @@ export const tableService = {
       columns: [...table.columns, column],
       updatedAt: now(),
     };
+    persist();
     return tables[idx];
   },
 
@@ -229,6 +265,7 @@ export const tableService = {
       ),
       updatedAt: now(),
     };
+    persist();
     return tables[idx];
   },
 
@@ -248,6 +285,7 @@ export const tableService = {
       delete newData[columnId];
       return { ...r, data: newData, updatedAt: now() };
     });
+    persist();
     return tables[idx];
   },
 
@@ -286,6 +324,7 @@ export const tableService = {
       updatedAt: now(),
     };
     rows.push(row);
+    persist();
     return row;
   },
 
@@ -299,11 +338,13 @@ export const tableService = {
       ...(input.sortOrder !== undefined && { sortOrder: input.sortOrder }),
       updatedAt: now(),
     };
+    persist();
     return rows[idx];
   },
 
   async deleteRow(id: string): Promise<void> {
     rows = rows.filter((r) => r.id !== id);
+    persist();
   },
 
   async updateCell(rowId: string, columnId: string, value: unknown): Promise<TableRow> {
@@ -314,6 +355,7 @@ export const tableService = {
       data: { ...rows[idx].data, [columnId]: value },
       updatedAt: now(),
     };
+    persist();
     return rows[idx];
   },
 

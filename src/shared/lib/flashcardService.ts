@@ -20,11 +20,55 @@ import type {
   DeckStats,
 } from '@/shared/types/flashcard';
 
-// ─── In-memory store ─────────────────────────────────────────────────────────
+// ─── Persistent store ────────────────────────────────────────────────────────
 
-let decks: Deck[] = [];
-let cards: Card[] = [];
-let reviews: CardReview[] = [];
+const DECKS_KEY = 'nexus-decks';
+const CARDS_KEY = 'nexus-cards';
+const REVIEWS_KEY = 'nexus-reviews';
+
+function loadDecks(): Deck[] {
+  try {
+    const raw = localStorage.getItem(DECKS_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as Deck[];
+  } catch {
+    return [];
+  }
+}
+
+function loadCards(): Card[] {
+  try {
+    const raw = localStorage.getItem(CARDS_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as Card[];
+  } catch {
+    return [];
+  }
+}
+
+function loadReviews(): CardReview[] {
+  try {
+    const raw = localStorage.getItem(REVIEWS_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as CardReview[];
+  } catch {
+    return [];
+  }
+}
+
+function persist(): void {
+  try {
+    localStorage.setItem(DECKS_KEY, JSON.stringify(decks));
+    localStorage.setItem(CARDS_KEY, JSON.stringify(cards));
+    localStorage.setItem(REVIEWS_KEY, JSON.stringify(reviews));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+let decks: Deck[] = loadDecks();
+let cards: Card[] = loadCards();
+let reviews: CardReview[] = loadReviews();
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -70,6 +114,7 @@ export const flashcardService = {
       updatedAt: nowIso(),
     };
     decks.push(deck);
+    persist();
     return deck;
   },
 
@@ -78,6 +123,7 @@ export const flashcardService = {
     if (idx === -1) throw new Error(`Deck ${id} not found`);
     const updated: Deck = { ...decks[idx], ...input, updatedAt: nowIso() };
     decks[idx] = updated;
+    persist();
     return updated;
   },
 
@@ -87,6 +133,7 @@ export const flashcardService = {
     const cardIds = cards.filter((c) => c.deckId === id).map((c) => c.id);
     cards = cards.filter((c) => c.deckId !== id);
     reviews = reviews.filter((r) => !cardIds.includes(r.cardId));
+    persist();
   },
 
   // ── Cards ──────────────────────────────────────────────────────────────────
@@ -117,6 +164,7 @@ export const flashcardService = {
       updatedAt: nowIso(),
     };
     cards.push(card);
+    persist();
     return card;
   },
 
@@ -125,12 +173,14 @@ export const flashcardService = {
     if (idx === -1) throw new Error(`Card ${id} not found`);
     const updated: Card = { ...cards[idx], ...input, updatedAt: nowIso() };
     cards[idx] = updated;
+    persist();
     return updated;
   },
 
   async deleteCard(id: string): Promise<void> {
     cards = cards.filter((c) => c.id !== id);
     reviews = reviews.filter((r) => r.cardId !== id);
+    persist();
   },
 
   // ── Study queue helpers ────────────────────────────────────────────────────
@@ -203,6 +253,7 @@ export const flashcardService = {
       reviewedAt: nowIso(),
     };
     reviews.push(review);
+    persist();
 
     return updated;
   },

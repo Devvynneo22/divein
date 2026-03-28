@@ -1,6 +1,26 @@
 import type { CalendarEvent, CreateEventInput, UpdateEventInput } from '@/shared/types/event';
 
-let events: CalendarEvent[] = [];
+const STORAGE_KEY = 'nexus-events';
+
+function loadEvents(): CalendarEvent[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as CalendarEvent[];
+  } catch {
+    return [];
+  }
+}
+
+function persist(): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+let events: CalendarEvent[] = loadEvents();
 
 function generateId(): string { return crypto.randomUUID(); }
 function now(): string { return new Date().toISOString(); }
@@ -33,6 +53,7 @@ export const eventService = {
       updatedAt: now(),
     };
     events.push(event);
+    persist();
     return event;
   },
 
@@ -40,10 +61,12 @@ export const eventService = {
     const idx = events.findIndex((e) => e.id === id);
     if (idx === -1) throw new Error(`Event ${id} not found`);
     events[idx] = { ...events[idx], ...input, updatedAt: now() };
+    persist();
     return events[idx];
   },
 
   async delete(id: string): Promise<void> {
     events = events.filter((e) => e.id !== id);
+    persist();
   },
 };
