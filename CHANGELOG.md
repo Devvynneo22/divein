@@ -615,3 +615,48 @@ Every single item from the Phase 1 MVP plan is now delivered:
 **Calendar:** ✅ All 6 items (FullCalendar, CRUD, tasks on calendar, drag reschedule)
 
 Only item deferred: recurring events (Calendar) — explicitly Phase 3 scope per plan.
+
+---
+
+## Handover Notes for Next Session
+
+### Priority: Complete Phase 2 + Phase 3
+
+Phase 1 (MVP) is 100% complete. Devvyn wants Phase 2 and Phase 3 finished before moving to Phase 4 (Electron/distribution).
+
+### Phase 2 — Missing Plan Items
+
+| Feature | Module | Effort |
+|---------|--------|--------|
+| Audio notification on timer/pomodoro complete | Timer | Small — use Web Audio API or `new Audio()` |
+| Time logged against tasks (link timer entries to tasks) | Timer | Medium — timerService already has taskId field, need UI for selecting task when starting timer |
+| Kanban board view (tasks by status within a project) | Projects | Medium — drag between status columns |
+| Milestones | Projects | Medium — new data model + UI |
+| Global search across ALL content types (tasks, notes, events, etc.) | Command Palette | Medium — search across all services |
+| Keyboard shortcut cheatsheet (`?` key) | Command Palette | Small |
+| Customizable shortcuts (Settings) | Command Palette | Medium |
+
+### Phase 3 — All Items
+
+| Feature | Module | Effort |
+|---------|--------|--------|
+| Notes → Flashcards (select text → create card) | Cross-module | Medium |
+| Formula columns (SUM, AVG, COUNT, IF) | Tables | Large |
+| Board/Calendar views for Tables | Tables | Medium |
+| CSV import/export (tables, tasks) | Tables/Tasks | Medium |
+| Full-text search across everything | Global | Medium |
+| Recurring events and tasks | Calendar/Tasks | Medium |
+| Calendar event reminders (system notifications) | Calendar | Small-Medium |
+| Error boundaries + loading states | Global | Small |
+| Export: notes to Markdown/PDF | Notes | Medium |
+| Auto-updater (electron-updater) | Distribution | Deferred to Phase 4 |
+
+### Standing Instructions
+- **Sub-agents for coding MUST use Claude Opus 4-6** (anthropic/claude-opus-4-6). No other models.
+- **Quality bar:** Top 1% FANG engineering standards. Test everything in browser.
+- **Documentation:** Every session MUST append to CHANGELOG.md and update IMPLEMENTATION-STATUS.md
+- **Plan changes:** Update productivity-app-plan.md for any scope changes
+- **Dependencies:** Use `npm install --legacy-peer-deps`
+- **TypeScript:** `npx tsc --noEmit --incremental false` must pass zero errors
+- Sub-agents can be spawned freely, in parallel where possible
+- Always verify sub-agent work — check TS compilation, test in browser
