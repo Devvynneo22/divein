@@ -72,42 +72,59 @@ export const HabitItem = memo(function HabitItem({
 
   return (
     <div
-      className={`rounded-lg border transition-all cursor-pointer ${
-        isSelected
-          ? 'bg-[var(--color-bg-elevated)] border-[var(--color-border-hover)]'
-          : 'bg-[var(--color-bg-secondary)] border-[var(--color-border)] hover:border-[var(--color-border-hover)] hover:bg-[var(--color-bg-elevated)]'
-      }`}
+      className="rounded-xl transition-all cursor-pointer"
       onClick={handleSelect}
-      style={{ borderLeft: `3px solid ${habitColor}` }}
+      style={{
+        backgroundColor: isSelected ? 'var(--color-bg-elevated)' : 'var(--color-bg-secondary)',
+        border: `1px solid ${isSelected ? 'var(--color-border-hover)' : 'var(--color-border)'}`,
+        borderLeft: `3px solid ${habitColor}`,
+      }}
+      onMouseEnter={(e) => {
+        if (!isSelected) {
+          e.currentTarget.style.borderColor = 'var(--color-border-hover)';
+          e.currentTarget.style.backgroundColor = 'var(--color-bg-elevated)';
+          e.currentTarget.style.borderLeftColor = habitColor;
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!isSelected) {
+          e.currentTarget.style.borderColor = 'var(--color-border)';
+          e.currentTarget.style.backgroundColor = 'var(--color-bg-secondary)';
+          e.currentTarget.style.borderLeftColor = habitColor;
+        }
+      }}
     >
-      <div className="flex items-center gap-3 px-4 py-3">
+      <div className="flex items-center gap-3 px-4 py-3.5">
         {/* Icon / color dot */}
         <div
-          className="w-8 h-8 rounded-full flex items-center justify-center text-base flex-shrink-0"
+          className="w-9 h-9 rounded-full flex items-center justify-center text-base flex-shrink-0"
           style={{ backgroundColor: `${habitColor}22` }}
         >
           {habit.icon ? (
             <span>{habit.icon}</span>
           ) : (
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: habitColor }} />
+            <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: habitColor }} />
           )}
         </div>
 
         {/* Name + group */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
+          <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
             {habit.name}
           </p>
           {habit.groupName && (
-            <p className="text-xs text-[var(--color-text-muted)] truncate">{habit.groupName}</p>
+            <p className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>{habit.groupName}</p>
           )}
         </div>
 
         {/* Streak */}
         {habit.streak > 0 && (
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--color-bg-tertiary)] flex-shrink-0">
+          <div
+            className="flex items-center gap-1 px-2.5 py-1 rounded-full flex-shrink-0"
+            style={{ backgroundColor: 'var(--color-bg-tertiary)' }}
+          >
             <span className="text-xs">{FLAME}</span>
-            <span className="text-xs font-medium text-[var(--color-text-secondary)]">
+            <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
               {habit.streak}
             </span>
           </div>
@@ -116,7 +133,7 @@ export const HabitItem = memo(function HabitItem({
         {/* Check-in control */}
         <div className="flex-shrink-0" onClick={handleInputClick}>
           {isMeasurable ? (
-            <form onSubmit={handleMeasurableSubmit} className="flex items-center gap-1">
+            <form onSubmit={handleMeasurableSubmit} className="flex items-center gap-1.5">
               <input
                 type="number"
                 min={0}
@@ -124,19 +141,26 @@ export const HabitItem = memo(function HabitItem({
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 placeholder="0"
-                className="w-16 px-2 py-1 rounded-md bg-[var(--color-bg-primary)] border border-[var(--color-border)] text-xs text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)] transition-colors text-center"
+                className="w-16 px-2 py-1.5 rounded-lg text-xs text-center transition-colors"
+                style={{
+                  backgroundColor: 'var(--color-bg-primary)',
+                  border: '1px solid var(--color-border)',
+                  color: 'var(--color-text-primary)',
+                  outline: 'none',
+                }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent)'; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
               />
-              <span className="text-xs text-[var(--color-text-muted)]">
+              <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
                 {habit.unit}
               </span>
               <button
                 type="submit"
-                className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
-                  habit.isCompletedToday
-                    ? 'text-white'
-                    : 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
-                }`}
-                style={habit.isCompletedToday ? { backgroundColor: habitColor } : undefined}
+                className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
+                style={{
+                  backgroundColor: habit.isCompletedToday ? habitColor : 'var(--color-bg-tertiary)',
+                  color: habit.isCompletedToday ? 'white' : 'var(--color-text-muted)',
+                }}
               >
                 <Check size={12} />
               </button>
@@ -145,12 +169,12 @@ export const HabitItem = memo(function HabitItem({
             <button
               type="button"
               onClick={handleBooleanToggle}
-              className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${
-                habit.isCompletedToday
-                  ? 'text-white border-transparent'
-                  : 'border-[var(--color-border)] text-transparent hover:border-[var(--color-border-hover)]'
-              }`}
-              style={habit.isCompletedToday ? { backgroundColor: habitColor, borderColor: habitColor } : undefined}
+              className="w-9 h-9 rounded-full flex items-center justify-center transition-all"
+              style={{
+                backgroundColor: habit.isCompletedToday ? habitColor : 'transparent',
+                border: `2px solid ${habit.isCompletedToday ? habitColor : 'var(--color-border)'}`,
+                color: habit.isCompletedToday ? 'white' : 'transparent',
+              }}
             >
               <Check size={14} />
             </button>
@@ -158,7 +182,7 @@ export const HabitItem = memo(function HabitItem({
         </div>
 
         {/* Expand indicator */}
-        <div className="flex-shrink-0 text-[var(--color-text-muted)]">
+        <div className="flex-shrink-0" style={{ color: 'var(--color-text-muted)' }}>
           {isSelected ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </div>
       </div>
@@ -167,14 +191,17 @@ export const HabitItem = memo(function HabitItem({
       {isMeasurable && (
         <div className="px-4 pb-3 -mt-1">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-[var(--color-text-muted)]">
+            <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
               {currentValue} / {habit.target} {habit.unit}
             </span>
-            <span className="text-xs text-[var(--color-text-muted)]">
+            <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
               {Math.round(progress * 100)}%
             </span>
           </div>
-          <div className="h-1.5 rounded-full bg-[var(--color-bg-tertiary)] overflow-hidden">
+          <div
+            className="h-1.5 rounded-full overflow-hidden"
+            style={{ backgroundColor: 'var(--color-bg-tertiary)' }}
+          >
             <div
               className="h-full rounded-full transition-all"
               style={{ width: `${progress * 100}%`, backgroundColor: habitColor }}
@@ -185,7 +212,7 @@ export const HabitItem = memo(function HabitItem({
 
       {/* Error feedback */}
       {error && (
-        <div className="px-4 pb-2 text-xs text-[var(--color-danger)]">
+        <div className="px-4 pb-2 text-xs" style={{ color: 'var(--color-danger)' }}>
           Failed to update — please try again.
         </div>
       )}
@@ -193,19 +220,32 @@ export const HabitItem = memo(function HabitItem({
       {/* Expanded actions */}
       {isSelected && (
         <div
-          className="flex items-center gap-2 px-4 pb-3 pt-1 border-t border-[var(--color-border)]"
+          className="flex items-center gap-2 px-4 pb-3 pt-2"
+          style={{ borderTop: '1px solid var(--color-border)' }}
           onClick={(e) => e.stopPropagation()}
         >
           <button
             onClick={handleEdit}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+            style={{ color: 'var(--color-text-secondary)' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+              e.currentTarget.style.color = 'var(--color-text-primary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = 'var(--color-text-secondary)';
+            }}
           >
             <Pencil size={12} />
             Edit
           </button>
           <button
             onClick={handleDelete}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-[var(--color-danger)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+            style={{ color: 'var(--color-danger)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-danger-soft)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
           >
             <Trash2 size={12} />
             Delete

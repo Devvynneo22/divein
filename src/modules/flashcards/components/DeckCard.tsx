@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { BookOpen } from 'lucide-react';
 import type { Deck, DeckStats } from '@/shared/types/flashcard';
 
@@ -10,11 +11,18 @@ interface DeckCardProps {
 export function DeckCard({ deck, stats, onClick }: DeckCardProps) {
   const accentColor = deck.color ?? '#3b82f6';
   const hasDue = (stats?.dueToday ?? 0) > 0;
+  const [hovered, setHovered] = useState(false);
 
   return (
     <button
       onClick={onClick}
-      className="group relative flex flex-col text-left rounded-xl overflow-hidden border border-[var(--color-border)] bg-[var(--color-bg-secondary)] hover:border-[var(--color-border-hover)] hover:bg-[var(--color-bg-tertiary)] transition-all duration-200 shadow-sm hover:shadow-md"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="card card-interactive group relative flex flex-col text-left rounded-xl overflow-hidden"
+      style={{
+        boxShadow: hovered ? 'var(--shadow-md)' : 'var(--shadow-sm)',
+        transition: 'box-shadow 0.2s, border-color 0.2s, background-color 0.2s',
+      }}
     >
       {/* Color stripe */}
       <div
@@ -22,21 +30,21 @@ export function DeckCard({ deck, stats, onClick }: DeckCardProps) {
         style={{ backgroundColor: accentColor }}
       />
 
-      <div className="flex flex-col gap-3 p-4 flex-1">
+      <div className="flex flex-col gap-3 p-5 flex-1">
         {/* Icon + Name */}
         <div className="flex items-start gap-3">
           <div
-            className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center"
+            className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center"
             style={{ backgroundColor: `${accentColor}20` }}
           >
-            <BookOpen size={18} style={{ color: accentColor }} />
+            <BookOpen size={20} style={{ color: accentColor }} />
           </div>
           <div className="min-w-0">
-            <h3 className="font-semibold text-[var(--color-text-primary)] text-sm leading-tight truncate">
+            <h3 className="font-semibold text-sm leading-tight truncate" style={{ color: 'var(--color-text-primary)' }}>
               {deck.name}
             </h3>
             {deck.description && (
-              <p className="text-xs text-[var(--color-text-muted)] mt-0.5 line-clamp-2">
+              <p className="text-xs mt-0.5 line-clamp-2" style={{ color: 'var(--color-text-muted)' }}>
                 {deck.description}
               </p>
             )}
@@ -45,7 +53,7 @@ export function DeckCard({ deck, stats, onClick }: DeckCardProps) {
 
         {/* Stats */}
         <div className="flex items-center justify-between mt-auto">
-          <span className="text-xs text-[var(--color-text-muted)]">
+          <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
             {stats?.totalCards ?? 0} cards
           </span>
           {hasDue ? (
@@ -59,7 +67,7 @@ export function DeckCard({ deck, stats, onClick }: DeckCardProps) {
               {stats!.dueToday} due
             </span>
           ) : (
-            <span className="text-xs text-[var(--color-text-muted)]">
+            <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
               Up to date
             </span>
           )}

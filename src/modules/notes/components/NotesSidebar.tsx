@@ -42,34 +42,58 @@ export function NotesSidebar({
 
   if (showTrash) {
     return (
-      <div className="w-[260px] shrink-0 border-r border-[var(--color-border)] bg-[var(--color-bg-secondary)] flex flex-col">
+      <div
+        className="w-[280px] shrink-0 flex flex-col"
+        style={{
+          borderRight: '1px solid var(--color-border)',
+          backgroundColor: 'var(--color-bg-secondary)',
+        }}
+      >
         <TrashPanel onBack={() => setShowTrash(false)} />
       </div>
     );
   }
 
   return (
-    <div className="w-[260px] shrink-0 border-r border-[var(--color-border)] bg-[var(--color-bg-secondary)] flex flex-col">
+    <div
+      className="w-[280px] shrink-0 flex flex-col"
+      style={{
+        borderRight: '1px solid var(--color-border)',
+        backgroundColor: 'var(--color-bg-secondary)',
+      }}
+    >
       {/* Search */}
-      <div className="p-2 border-b border-[var(--color-border)]">
+      <div
+        className="px-3 py-3"
+        style={{ borderBottom: '1px solid var(--color-border)' }}
+      >
         <div className="relative">
           <Search
-            size={13}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2"
+            style={{ color: 'var(--color-text-muted)' }}
           />
           <input
             type="text"
             value={rawQuery}
             onChange={(e) => setRawQuery(e.target.value)}
             placeholder="Search pages..."
-            className="w-full pl-7 pr-7 py-1.5 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors"
+            className="w-full pl-8 pr-8 py-2 rounded-lg text-sm focus:outline-none transition-colors"
+            style={{
+              backgroundColor: 'var(--color-bg-tertiary)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-primary)',
+            }}
           />
           {rawQuery && (
             <button
               onClick={() => setRawQuery('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 transition-colors"
+              style={{ color: 'var(--color-text-muted)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
             >
-              <X size={12} />
+              <X size={13} />
             </button>
           )}
         </div>
@@ -89,40 +113,53 @@ export function NotesSidebar({
           />
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto py-2">
           {/* Favorites */}
           {favorites.length > 0 && (
-            <div className="pt-3 pb-1">
+            <div className="mb-3">
               <SectionHeader icon={<Star size={11} />} label="Favorites" />
               {favorites.map((note) => (
                 <div
                   key={note.id}
                   onClick={() => onSelect(note.id)}
-                  className={`group flex items-center gap-1.5 h-7 px-3 mx-1 rounded-md cursor-pointer transition-colors ${
-                    note.id === selectedId
-                      ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent)]'
-                      : 'hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)]'
-                  }`}
+                  className="group flex items-center gap-2 py-2 px-2 mx-2 rounded-lg cursor-pointer transition-colors"
+                  style={{
+                    backgroundColor: note.id === selectedId ? 'var(--color-accent-soft)' : 'transparent',
+                    color: note.id === selectedId ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (note.id !== selectedId) {
+                      e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (note.id !== selectedId) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }
+                  }}
                 >
                   <span className="shrink-0 text-sm leading-none">
                     {note.icon ?? (
                       <FileText
-                        size={13}
-                        className={note.id === selectedId ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-muted)]'}
+                        size={14}
+                        style={{ color: note.id === selectedId ? 'var(--color-accent)' : 'var(--color-text-muted)' }}
                       />
                     )}
                   </span>
-                  <span className="text-xs font-medium truncate flex-1">{note.title}</span>
+                  <span className="text-sm font-medium truncate flex-1">{note.title}</span>
                 </div>
               ))}
             </div>
           )}
 
           {/* Pages tree */}
-          <div className="pt-3 pb-1">
+          <div>
             <SectionHeader icon={<FileText size={11} />} label="Pages" />
             {tree.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-[var(--color-text-muted)]">
+              <div
+                className="px-4 py-3 text-sm"
+                style={{ color: 'var(--color-text-muted)' }}
+              >
                 No pages yet
               </div>
             ) : (
@@ -146,15 +183,33 @@ export function NotesSidebar({
       )}
 
       {/* Bottom: Trash + New Page */}
-      <div className="border-t border-[var(--color-border)] p-2 space-y-1">
+      <div
+        className="p-2 space-y-0.5"
+        style={{ borderTop: '1px solid var(--color-border)' }}
+      >
         <button
           onClick={() => setShowTrash(true)}
-          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
+          style={{ color: 'var(--color-text-muted)' }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--color-text-primary)';
+            e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--color-text-muted)';
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
         >
-          <Trash2 size={13} />
+          <Trash2 size={14} />
           <span>Trash</span>
           {stats && stats.trashed > 0 && (
-            <span className="ml-auto text-[10px] bg-[var(--color-bg-elevated)] px-1.5 py-0.5 rounded-full">
+            <span
+              className="ml-auto text-xs px-1.5 py-0.5 rounded-full"
+              style={{
+                backgroundColor: 'var(--color-bg-elevated)',
+                color: 'var(--color-text-muted)',
+              }}
+            >
               {stats.trashed}
             </span>
           )}
@@ -162,9 +217,18 @@ export function NotesSidebar({
 
         <button
           onClick={onCreateRoot}
-          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 transition-colors"
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
+          style={{ color: 'var(--color-text-muted)' }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--color-accent)';
+            e.currentTarget.style.backgroundColor = 'var(--color-accent-soft)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--color-text-muted)';
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
         >
-          <Plus size={13} />
+          <Plus size={14} />
           <span>New Page</span>
         </button>
       </div>
@@ -174,9 +238,15 @@ export function NotesSidebar({
 
 function SectionHeader({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
-    <div className="flex items-center gap-1.5 px-3 mb-0.5">
-      <span className="text-[var(--color-text-muted)]">{icon}</span>
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+    <div
+      className="flex items-center gap-1.5 px-4 mb-1"
+      style={{ color: 'var(--color-text-muted)' }}
+    >
+      <span>{icon}</span>
+      <span
+        className="text-[10px] font-semibold uppercase tracking-wider"
+        style={{ color: 'var(--color-text-muted)' }}
+      >
         {label}
       </span>
     </div>

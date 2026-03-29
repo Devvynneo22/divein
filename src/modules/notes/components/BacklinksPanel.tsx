@@ -11,11 +11,14 @@ export function BacklinksPanel({ backlinks, onNavigate }: BacklinksPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
-    <div className="border-t border-[var(--color-border)] px-8 py-4">
+    <div className="px-8 py-5" style={{ borderTop: '1px solid var(--color-border)' }}>
       <div className="max-w-3xl mx-auto">
         <button
           onClick={() => setIsCollapsed((v) => !v)}
-          className="flex items-center gap-2 text-sm font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors mb-2"
+          className="flex items-center gap-2 text-sm font-medium transition-colors mb-3"
+          style={{ color: 'var(--color-text-muted)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
         >
           <ChevronRight
             size={14}
@@ -31,7 +34,7 @@ export function BacklinksPanel({ backlinks, onNavigate }: BacklinksPanelProps) {
         {!isCollapsed && (
           <div className="space-y-0.5 ml-1">
             {backlinks.length === 0 ? (
-              <p className="text-sm text-[var(--color-text-muted)] py-1 pl-5">
+              <p className="text-sm py-1 pl-5" style={{ color: 'var(--color-text-muted)' }}>
                 No pages link to this page
               </p>
             ) : (
@@ -39,12 +42,21 @@ export function BacklinksPanel({ backlinks, onNavigate }: BacklinksPanelProps) {
                 <button
                   key={note.id}
                   onClick={() => onNavigate(note.id)}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-sm transition-colors"
+                  style={{ color: 'var(--color-text-secondary)' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = 'var(--color-text-primary)';
+                    e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = 'var(--color-text-secondary)';
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
                 >
                   {note.icon ? (
                     <span className="text-sm shrink-0">{note.icon}</span>
                   ) : (
-                    <FileText size={14} className="shrink-0 text-[var(--color-text-muted)]" />
+                    <FileText size={14} className="shrink-0" style={{ color: 'var(--color-text-muted)' }} />
                   )}
                   <span className="truncate">{note.title}</span>
                 </button>

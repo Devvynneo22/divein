@@ -19,11 +19,11 @@ import { taskService } from '@/shared/lib/taskService';
 
 function getPriorityColor(priority: number): string {
   switch (priority) {
-    case 4: return '#ef4444';
-    case 3: return '#f59e0b';
-    case 2: return '#3b82f6';
-    case 1: return '#9ca3af';
-    default: return '#6366f1';
+    case 4: return 'var(--color-p4)';
+    case 3: return 'var(--color-p3)';
+    case 2: return 'var(--color-p2)';
+    case 1: return 'var(--color-p1)';
+    default: return 'var(--color-accent)';
   }
 }
 
@@ -96,7 +96,7 @@ function RecurrenceForm({ recurrence, onChange }: RecurrenceFormProps) {
           onChange={handleToggle}
           className="rounded"
         />
-        <label className="flex items-center gap-1 text-xs text-[var(--color-text-secondary)]">
+        <label className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
           <Repeat size={12} /> Recurring
         </label>
       </div>
@@ -105,11 +105,16 @@ function RecurrenceForm({ recurrence, onChange }: RecurrenceFormProps) {
         <div className="space-y-2 pl-5">
           <div className="flex gap-2">
             <div className="flex-1">
-              <label className="text-[10px] text-[var(--color-text-muted)] mb-0.5 block">Frequency</label>
+              <label className="block mb-0.5" style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Frequency</label>
               <select
                 value={recurrence.frequency}
                 onChange={(e) => handleFrequency(e.target.value as RecurrenceFrequency)}
-                className="w-full px-2 py-1.5 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-xs text-[var(--color-text-primary)] outline-none"
+                className="w-full px-2 py-1.5 rounded-md border text-xs outline-none"
+                style={{
+                  backgroundColor: 'var(--color-bg-tertiary)',
+                  borderColor: 'var(--color-border)',
+                  color: 'var(--color-text-primary)',
+                }}
               >
                 {FREQUENCY_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -117,23 +122,33 @@ function RecurrenceForm({ recurrence, onChange }: RecurrenceFormProps) {
               </select>
             </div>
             <div className="w-16">
-              <label className="text-[10px] text-[var(--color-text-muted)] mb-0.5 block">Every</label>
+              <label className="block mb-0.5" style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Every</label>
               <input
                 type="number"
                 min={1}
                 value={recurrence.interval}
                 onChange={(e) => handleInterval(e.target.value)}
-                className="w-full px-2 py-1.5 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-xs text-[var(--color-text-primary)] outline-none"
+                className="w-full px-2 py-1.5 rounded-md border text-xs outline-none"
+                style={{
+                  backgroundColor: 'var(--color-bg-tertiary)',
+                  borderColor: 'var(--color-border)',
+                  color: 'var(--color-text-primary)',
+                }}
               />
             </div>
           </div>
           <div>
-            <label className="text-[10px] text-[var(--color-text-muted)] mb-0.5 block">End Date (optional)</label>
+            <label className="block mb-0.5" style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>End Date (optional)</label>
             <input
               type="date"
               value={recurrence.endDate ?? ''}
               onChange={(e) => handleEndDate(e.target.value)}
-              className="w-full px-2 py-1.5 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-xs text-[var(--color-text-primary)] outline-none"
+              className="w-full px-2 py-1.5 rounded-md border text-xs outline-none"
+              style={{
+                backgroundColor: 'var(--color-bg-tertiary)',
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-text-primary)',
+              }}
             />
           </div>
         </div>
@@ -153,28 +168,44 @@ interface EditScopeDialogProps {
 
 function EditScopeDialog({ onSelect, onCancel }: EditScopeDialogProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg p-6 shadow-xl max-w-xs w-full">
-        <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mb-3">Edit Recurring Event</h3>
-        <p className="text-xs text-[var(--color-text-secondary)] mb-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}>
+      <div
+        className="rounded-xl p-6 max-w-xs w-full"
+        style={{
+          backgroundColor: 'var(--color-bg-elevated)',
+          border: '1px solid var(--color-border)',
+          boxShadow: 'var(--shadow-popup)',
+        }}
+      >
+        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text-primary)' }}>Edit Recurring Event</h3>
+        <p className="text-xs mb-4" style={{ color: 'var(--color-text-secondary)' }}>
           This event is part of a series. What would you like to edit?
         </p>
         <div className="flex flex-col gap-2">
           <button
             onClick={() => onSelect('this')}
-            className="px-4 py-2 rounded-md bg-[var(--color-bg-tertiary)] text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)] transition-colors"
+            className="px-4 py-2.5 rounded-lg text-sm transition-colors"
+            style={{ backgroundColor: 'var(--color-bg-tertiary)', color: 'var(--color-text-primary)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
           >
             Edit this event
           </button>
           <button
             onClick={() => onSelect('all')}
-            className="px-4 py-2 rounded-md bg-[var(--color-accent)] text-white text-sm hover:bg-[var(--color-accent-hover)] transition-colors"
+            className="px-4 py-2.5 rounded-lg text-sm text-white transition-colors"
+            style={{ backgroundColor: 'var(--color-accent)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent)'; }}
           >
             Edit all events
           </button>
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+            className="px-4 py-2 text-xs transition-colors"
+            style={{ color: 'var(--color-text-muted)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
           >
             Cancel
           </button>
@@ -235,13 +266,15 @@ export function CalendarPage() {
   // Map tasks to FullCalendar events
   const taskEvents = tasks.map((t) => {
     const hasRecurrence = !!t.recurrence;
+    const doneColor = 'var(--color-success)';
+    const taskColor = t.status === 'done' ? doneColor : getPriorityColor(t.priority);
     return {
       id: `task-${t.id}`,
       title: `✓ ${hasRecurrence ? '🔁 ' : ''}${t.title}`,
       start: t.dueDate!,
       allDay: true,
-      backgroundColor: t.status === 'done' ? '#22c55e' : getPriorityColor(t.priority),
-      borderColor: t.status === 'done' ? '#22c55e' : getPriorityColor(t.priority),
+      backgroundColor: taskColor,
+      borderColor: taskColor,
       classNames: t.status === 'done' ? ['task-done'] : [],
       extendedProps: { type: 'task' as const, task: t },
     };
@@ -387,261 +420,378 @@ export function CalendarPage() {
   }
 
   return (
-    <div className="flex h-full">
+    <div className="flex flex-col h-full" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
       {/* Scope dialog for recurring events */}
       {showScopeDialog && (
         <EditScopeDialog onSelect={handleScopeSelect} onCancel={handleScopeCancel} />
       )}
 
-      <div className="flex-1 p-4 overflow-auto">
-        <style>{`
-          .fc {
-            --fc-bg-event-opacity: 0.3;
-            --fc-border-color: var(--color-border);
-            --fc-button-bg-color: var(--color-bg-tertiary);
-            --fc-button-border-color: var(--color-border);
-            --fc-button-text-color: var(--color-text-primary);
-            --fc-button-hover-bg-color: var(--color-bg-elevated);
-            --fc-button-hover-border-color: var(--color-border-hover);
-            --fc-button-active-bg-color: var(--color-accent);
-            --fc-button-active-border-color: var(--color-accent);
-            --fc-page-bg-color: var(--color-bg-primary);
-            --fc-neutral-bg-color: var(--color-bg-secondary);
-            --fc-today-bg-color: rgba(59, 130, 246, 0.08);
-            --fc-event-bg-color: var(--color-accent);
-            --fc-event-border-color: var(--color-accent);
-            --fc-event-text-color: white;
-            --fc-list-event-hover-bg-color: var(--color-bg-tertiary);
-            color: var(--color-text-primary);
-            font-size: 13px;
-          }
-          .fc .fc-col-header-cell { background: var(--color-bg-secondary); }
-          .fc .fc-daygrid-day-number { color: var(--color-text-secondary); padding: 4px 8px; }
-          .fc .fc-scrollgrid { border-color: var(--color-border); }
-          .fc td, .fc th { border-color: var(--color-border) !important; }
-          .fc .fc-toolbar-title { font-size: 1.25rem; font-weight: 600; }
-          .fc .fc-event.task-done { opacity: 0.5; }
-          .fc .fc-event.task-done .fc-event-title { text-decoration: line-through; }
-        `}</style>
-
-        {/* Show tasks toggle */}
-        <div className="flex items-center gap-2 mb-2">
-          <label className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={showTasks}
-              onChange={(e) => setShowTasks(e.target.checked)}
-              className="rounded"
-            />
-            Show tasks
-          </label>
-        </div>
-
-        <FullCalendar
-          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-          initialView="dayGridMonth"
-          headerToolbar={{
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay',
-          }}
-          events={allFcEvents}
-          editable={true}
-          selectable={true}
-          dateClick={handleDateClick}
-          eventClick={handleEventClick}
-          eventDrop={handleEventDrop}
-          height="100%"
-        />
+      {/* Page header */}
+      <div
+        className="flex items-center justify-between px-8 py-6 flex-shrink-0"
+        style={{ borderBottom: '1px solid var(--color-border)' }}
+      >
+        <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
+          Calendar
+        </h1>
+        <label
+          className="flex items-center gap-1.5 text-sm cursor-pointer select-none"
+          style={{ color: 'var(--color-text-secondary)' }}
+        >
+          <input
+            type="checkbox"
+            checked={showTasks}
+            onChange={(e) => setShowTasks(e.target.checked)}
+            className="rounded"
+          />
+          Show tasks
+        </label>
       </div>
 
-      {/* Event form panel */}
-      {showForm && (
-        <div className="w-80 border-l border-[var(--color-border)] bg-[var(--color-bg-secondary)] flex flex-col">
-          <div className="flex items-center justify-between px-4 h-12 border-b border-[var(--color-border)]">
-            <span className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wide">
-              {editingId
-                ? editScope === 'this'
-                  ? 'Edit This Occurrence'
-                  : 'Edit Event'
-                : 'New Event'}
-            </span>
-            <button onClick={() => setShowForm(false)} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]">
-              <X size={16} />
-            </button>
-          </div>
+      {/* Content row */}
+      <div className="flex flex-1 min-h-0">
+        <div className="flex-1 px-6 py-4 overflow-auto">
+          <style>{`
+            .fc {
+              --fc-bg-event-opacity: 0.3;
+              --fc-border-color: var(--color-border);
+              --fc-button-bg-color: var(--color-bg-tertiary);
+              --fc-button-border-color: var(--color-border);
+              --fc-button-text-color: var(--color-text-primary);
+              --fc-button-hover-bg-color: var(--color-bg-elevated);
+              --fc-button-hover-border-color: var(--color-border-hover);
+              --fc-button-active-bg-color: var(--color-accent);
+              --fc-button-active-border-color: var(--color-accent);
+              --fc-page-bg-color: var(--color-bg-primary);
+              --fc-neutral-bg-color: var(--color-bg-secondary);
+              --fc-today-bg-color: var(--color-accent-soft);
+              --fc-event-bg-color: var(--color-accent);
+              --fc-event-border-color: var(--color-accent);
+              --fc-event-text-color: white;
+              --fc-list-event-hover-bg-color: var(--color-bg-tertiary);
+              color: var(--color-text-primary);
+              font-size: 13px;
+            }
+            .fc .fc-col-header-cell { background: var(--color-bg-secondary); }
+            .fc .fc-daygrid-day-number { color: var(--color-text-secondary); padding: 4px 8px; }
+            .fc .fc-scrollgrid { border-color: var(--color-border); }
+            .fc td, .fc th { border-color: var(--color-border) !important; }
+            .fc .fc-toolbar-title { font-size: 1.25rem; font-weight: 600; color: var(--color-text-primary); }
+            .fc .fc-event.task-done { opacity: 0.5; }
+            .fc .fc-event.task-done .fc-event-title { text-decoration: line-through; }
+            .fc .fc-button {
+              padding: 8px 16px !important;
+              font-size: 13px !important;
+              font-weight: 500 !important;
+              border-radius: 8px !important;
+            }
+            .fc .fc-button-group .fc-button {
+              border-radius: 0 !important;
+            }
+            .fc .fc-button-group .fc-button:first-child {
+              border-radius: 8px 0 0 8px !important;
+            }
+            .fc .fc-button-group .fc-button:last-child {
+              border-radius: 0 8px 8px 0 !important;
+            }
+            .fc .fc-toolbar { gap: 8px; }
+            .fc .fc-toolbar-chunk { display: flex; align-items: center; gap: 4px; }
+          `}</style>
 
-          <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto flex-1">
-            <div>
-              <label className="text-xs text-[var(--color-text-muted)] mb-1 block">Title</label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                className="w-full px-3 py-2 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]"
-                autoFocus
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={formData.allDay}
-                onChange={(e) => setFormData({ ...formData, allDay: e.target.checked })}
-                className="rounded"
-              />
-              <label className="text-xs text-[var(--color-text-secondary)]">All day</label>
-            </div>
-
-            <div>
-              <label className="text-xs text-[var(--color-text-muted)] mb-1 block">Start</label>
-              <input
-                type={formData.allDay ? 'date' : 'datetime-local'}
-                value={formData.startTime}
-                onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                className="w-full px-3 py-2 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] outline-none"
-              />
-            </div>
-
-            {!formData.allDay && (
-              <div>
-                <label className="text-xs text-[var(--color-text-muted)] mb-1 block">End</label>
-                <input
-                  type="datetime-local"
-                  value={formData.endTime}
-                  onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                  className="w-full px-3 py-2 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] outline-none"
-                />
-              </div>
-            )}
-
-            <div>
-              <label className="text-xs text-[var(--color-text-muted)] mb-1 block">Description</label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={3}
-                className="w-full px-3 py-2 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] outline-none resize-none"
-              />
-            </div>
-
-            {/* Recurrence section — hide when editing single occurrence */}
-            {editScope !== 'this' && (
-              <RecurrenceForm
-                recurrence={formData.recurrence}
-                onChange={(r) => setFormData({ ...formData, recurrence: r })}
-              />
-            )}
-
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                className="flex-1 px-4 py-2 rounded-md bg-[var(--color-accent)] text-white text-sm font-medium hover:bg-[var(--color-accent-hover)] transition-colors"
-              >
-                {editingId ? 'Update' : 'Create'}
-              </button>
-              {editingId && (
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  className="px-4 py-2 rounded-md bg-[var(--color-danger)] bg-opacity-10 text-[var(--color-danger)] text-sm font-medium hover:bg-opacity-20 transition-colors"
-                >
-                  Delete
-                </button>
-              )}
-            </div>
-          </form>
+          <FullCalendar
+            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+            initialView="dayGridMonth"
+            headerToolbar={{
+              left: 'prev,next today',
+              center: 'title',
+              right: 'dayGridMonth,timeGridWeek,timeGridDay',
+            }}
+            events={allFcEvents}
+            editable={true}
+            selectable={true}
+            dateClick={handleDateClick}
+            eventClick={handleEventClick}
+            eventDrop={handleEventDrop}
+            height="100%"
+          />
         </div>
-      )}
 
-      {/* Task detail panel */}
-      {selectedTask && !showForm && (
-        <div className="w-80 border-l border-[var(--color-border)] bg-[var(--color-bg-secondary)] flex flex-col">
-          <div className="flex items-center justify-between px-4 h-12 border-b border-[var(--color-border)]">
-            <span className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wide">
-              Task Details
-            </span>
-            <button onClick={() => setSelectedTask(null)} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]">
-              <X size={16} />
-            </button>
-          </div>
-
-          <div className="p-4 space-y-4">
-            {/* Title */}
-            <h3 className="text-sm font-medium text-[var(--color-text-primary)]">
-              {selectedTask.title}
-            </h3>
-
-            {/* Recurrence badge */}
-            {selectedTask.recurrence && (
-              <div className="flex items-center gap-1.5 text-xs text-[var(--color-accent)]">
-                <Repeat size={12} />
-                {(() => {
-                  try {
-                    return describeRecurrence(JSON.parse(selectedTask.recurrence));
-                  } catch {
-                    return 'Recurring';
-                  }
-                })()}
-              </div>
-            )}
-
-            {/* Status toggle */}
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-[var(--color-text-muted)]">Status</span>
+        {/* Event form panel */}
+        {showForm && (
+          <div
+            className="w-80 flex flex-col"
+            style={{
+              borderLeft: '1px solid var(--color-border)',
+              backgroundColor: 'var(--color-bg-elevated)',
+              boxShadow: 'var(--shadow-popup)',
+            }}
+          >
+            <div
+              className="flex items-center justify-between px-5 h-14 flex-shrink-0"
+              style={{ borderBottom: '1px solid var(--color-border)' }}
+            >
+              <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+                {editingId
+                  ? editScope === 'this'
+                    ? 'Edit This Occurrence'
+                    : 'Edit Event'
+                  : 'New Event'}
+              </span>
               <button
-                onClick={() => void handleToggleTaskStatus(selectedTask)}
-                className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-md hover:bg-[var(--color-bg-tertiary)] transition-colors"
-                style={{ color: selectedTask.status === 'done' ? '#22c55e' : 'var(--color-text-secondary)' }}
-              >
-                {selectedTask.status === 'done' ? <CheckCircle2 size={14} /> : <Circle size={14} />}
-                {getStatusLabel(selectedTask.status)}
-              </button>
-            </div>
-
-            {/* Priority */}
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-[var(--color-text-muted)]">Priority</span>
-              <span
-                className="text-xs font-medium px-2 py-0.5 rounded"
-                style={{
-                  color: getPriorityColor(selectedTask.priority),
-                  backgroundColor: `${getPriorityColor(selectedTask.priority)}18`,
+                onClick={() => setShowForm(false)}
+                className="p-1.5 rounded-md transition-colors"
+                style={{ color: 'var(--color-text-muted)' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+                  e.currentTarget.style.color = 'var(--color-text-primary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = 'var(--color-text-muted)';
                 }}
               >
-                {getPriorityLabel(selectedTask.priority)}
-              </span>
+                <X size={16} />
+              </button>
             </div>
 
-            {/* Due date */}
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-[var(--color-text-muted)]">Due Date</span>
-              <span className="text-xs text-[var(--color-text-secondary)]">
-                {selectedTask.dueDate ? new Date(selectedTask.dueDate).toLocaleDateString() : '—'}
-              </span>
-            </div>
-
-            {/* Description */}
-            {selectedTask.description && (
+            <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto flex-1">
               <div>
-                <span className="text-xs text-[var(--color-text-muted)] block mb-1">Description</span>
-                <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed">
-                  {selectedTask.description}
-                </p>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--color-text-muted)' }}>Title</label>
+                <input
+                  type="text"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  className="w-full px-3 py-2.5 rounded-lg border text-sm outline-none transition-colors"
+                  style={{
+                    backgroundColor: 'var(--color-bg-tertiary)',
+                    borderColor: 'var(--color-border)',
+                    color: 'var(--color-text-primary)',
+                  }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent)'; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
+                  autoFocus
+                />
               </div>
-            )}
 
-            {/* Open in Tasks button */}
-            <button
-              onClick={() => navigate('/tasks')}
-              className="flex items-center justify-center gap-1.5 w-full px-4 py-2 rounded-md bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] text-xs font-medium hover:bg-[var(--color-bg-elevated)] hover:text-[var(--color-text-primary)] transition-colors"
-            >
-              Open in Tasks
-              <ArrowRight size={12} />
-            </button>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formData.allDay}
+                  onChange={(e) => setFormData({ ...formData, allDay: e.target.checked })}
+                  className="rounded"
+                />
+                <label className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>All day</label>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--color-text-muted)' }}>Start</label>
+                <input
+                  type={formData.allDay ? 'date' : 'datetime-local'}
+                  value={formData.startTime}
+                  onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                  className="w-full px-3 py-2.5 rounded-lg border text-sm outline-none"
+                  style={{
+                    backgroundColor: 'var(--color-bg-tertiary)',
+                    borderColor: 'var(--color-border)',
+                    color: 'var(--color-text-primary)',
+                  }}
+                />
+              </div>
+
+              {!formData.allDay && (
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--color-text-muted)' }}>End</label>
+                  <input
+                    type="datetime-local"
+                    value={formData.endTime}
+                    onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                    className="w-full px-3 py-2.5 rounded-lg border text-sm outline-none"
+                    style={{
+                      backgroundColor: 'var(--color-bg-tertiary)',
+                      borderColor: 'var(--color-border)',
+                      color: 'var(--color-text-primary)',
+                    }}
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--color-text-muted)' }}>Description</label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2.5 rounded-lg border text-sm outline-none resize-none"
+                  style={{
+                    backgroundColor: 'var(--color-bg-tertiary)',
+                    borderColor: 'var(--color-border)',
+                    color: 'var(--color-text-primary)',
+                  }}
+                />
+              </div>
+
+              {/* Recurrence section — hide when editing single occurrence */}
+              {editScope !== 'this' && (
+                <RecurrenceForm
+                  recurrence={formData.recurrence}
+                  onChange={(r) => setFormData({ ...formData, recurrence: r })}
+                />
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-colors"
+                  style={{ backgroundColor: 'var(--color-accent)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent)'; }}
+                >
+                  {editingId ? 'Update' : 'Create'}
+                </button>
+                {editingId && (
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    className="px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                    style={{ color: 'var(--color-danger)', backgroundColor: 'var(--color-danger-soft)' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.8'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
+            </form>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Task detail panel */}
+        {selectedTask && !showForm && (
+          <div
+            className="w-80 flex flex-col"
+            style={{
+              borderLeft: '1px solid var(--color-border)',
+              backgroundColor: 'var(--color-bg-elevated)',
+              boxShadow: 'var(--shadow-popup)',
+            }}
+          >
+            <div
+              className="flex items-center justify-between px-5 h-14 flex-shrink-0"
+              style={{ borderBottom: '1px solid var(--color-border)' }}
+            >
+              <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+                Task Details
+              </span>
+              <button
+                onClick={() => setSelectedTask(null)}
+                className="p-1.5 rounded-md transition-colors"
+                style={{ color: 'var(--color-text-muted)' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+                  e.currentTarget.style.color = 'var(--color-text-primary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = 'var(--color-text-muted)';
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+              {/* Title */}
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                {selectedTask.title}
+              </h3>
+
+              {/* Recurrence badge */}
+              {selectedTask.recurrence && (
+                <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--color-accent)' }}>
+                  <Repeat size={12} />
+                  {(() => {
+                    try {
+                      return describeRecurrence(JSON.parse(selectedTask.recurrence));
+                    } catch {
+                      return 'Recurring';
+                    }
+                  })()}
+                </div>
+              )}
+
+              {/* Status toggle */}
+              <div className="flex items-center justify-between">
+                <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Status</span>
+                <button
+                  onClick={() => void handleToggleTaskStatus(selectedTask)}
+                  className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-colors"
+                  style={{
+                    color: selectedTask.status === 'done' ? 'var(--color-success)' : 'var(--color-text-secondary)',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                >
+                  {selectedTask.status === 'done' ? <CheckCircle2 size={14} /> : <Circle size={14} />}
+                  {getStatusLabel(selectedTask.status)}
+                </button>
+              </div>
+
+              {/* Priority */}
+              <div className="flex items-center justify-between">
+                <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Priority</span>
+                <span
+                  className="text-xs font-medium px-2.5 py-1 rounded-md"
+                  style={{
+                    color: getPriorityColor(selectedTask.priority),
+                    backgroundColor: 'var(--color-bg-tertiary)',
+                  }}
+                >
+                  {getPriorityLabel(selectedTask.priority)}
+                </span>
+              </div>
+
+              {/* Due date */}
+              <div className="flex items-center justify-between">
+                <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Due Date</span>
+                <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                  {selectedTask.dueDate ? new Date(selectedTask.dueDate).toLocaleDateString() : '—'}
+                </span>
+              </div>
+
+              {/* Description */}
+              {selectedTask.description && (
+                <div>
+                  <span className="text-xs block mb-1" style={{ color: 'var(--color-text-muted)' }}>Description</span>
+                  <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+                    {selectedTask.description}
+                  </p>
+                </div>
+              )}
+
+              {/* Open in Tasks button */}
+              <button
+                onClick={() => navigate('/tasks')}
+                className="flex items-center justify-center gap-1.5 w-full px-4 py-2.5 rounded-lg text-xs font-medium transition-colors"
+                style={{
+                  backgroundColor: 'var(--color-bg-tertiary)',
+                  color: 'var(--color-text-secondary)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+                  e.currentTarget.style.color = 'var(--color-text-primary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+                  e.currentTarget.style.color = 'var(--color-text-secondary)';
+                }}
+              >
+                Open in Tasks
+                <ArrowRight size={12} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

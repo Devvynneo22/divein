@@ -71,13 +71,12 @@ function GeneralSettings() {
       <SettingRow label="Theme" description="Color scheme for the app.">
         <select
           value={app.theme}
-          onChange={(e) => updateApp({ theme: e.target.value as 'dark' | 'light' })}
+          onChange={(e) => updateApp({ theme: e.target.value as 'dark' | 'light' | 'system' })}
           className={selectClass}
         >
+          <option value="light">Light</option>
           <option value="dark">Dark</option>
-          <option value="light" disabled>
-            Light (coming soon)
-          </option>
+          <option value="system">System</option>
         </select>
       </SettingRow>
 
@@ -290,13 +289,13 @@ function DataSettings() {
 function AboutSection() {
   return (
     <div>
-      <SectionHeader title="About Nexus" description="" />
+      <SectionHeader title="About DiveIn" description="" />
 
       <div className="space-y-4">
         <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] p-6 text-center">
-          <div className="text-3xl mb-2">⚡</div>
-          <div className="text-xl font-bold mb-1">Nexus</div>
-          <div className="text-sm text-[var(--color-text-muted)]">v0.1.0 — Development Build</div>
+          <div className="text-3xl mb-2">🚀</div>
+          <div className="text-xl font-bold mb-1">DiveIn</div>
+          <div className="text-sm text-[var(--color-text-muted)]">v0.2.0 — Development Build</div>
         </div>
 
         <div className="text-xs text-[var(--color-text-muted)] space-y-1">

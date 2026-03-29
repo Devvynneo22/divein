@@ -44,16 +44,22 @@ export function TimeEntryList({ entries, todayTotalSec, onDelete }: TimeEntryLis
     <div className="flex flex-col gap-2">
       {/* Header */}
       <div className="flex items-center justify-between mb-1">
-        <h3 className="text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
+        <h3
+          className="text-sm font-semibold uppercase tracking-wider"
+          style={{ color: 'var(--color-text-secondary)' }}
+        >
           Today
         </h3>
-        <span className="text-sm font-semibold text-[var(--color-text-primary)]">
+        <span className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
           Total: {formatTotalTime(todayTotalSec)}
         </span>
       </div>
 
       {entries.length === 0 ? (
-        <p className="text-center text-sm text-[var(--color-text-muted)] py-6">
+        <p
+          className="text-center text-sm py-6"
+          style={{ color: 'var(--color-text-muted)' }}
+        >
           No entries yet. Start the timer!
         </p>
       ) : (
@@ -63,22 +69,29 @@ export function TimeEntryList({ entries, todayTotalSec, onDelete }: TimeEntryLis
               key={entry.id}
               onMouseEnter={() => setHoveredId(entry.id)}
               onMouseLeave={() => setHoveredId(null)}
-              className="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] hover:border-[var(--color-border-hover)] transition-colors"
+              className="group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors"
+              style={{
+                backgroundColor: 'var(--color-bg-secondary)',
+                border: '1px solid var(--color-border)',
+              }}
             >
               {/* Left: description + task + time range */}
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-[var(--color-text-primary)] truncate">
+                <p className="text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>
                   {entry.description ?? (
-                    <span className="text-[var(--color-text-muted)] italic">No description</span>
+                    <span style={{ color: 'var(--color-text-muted)' }} className="italic">No description</span>
                   )}
                 </p>
                 {entry.taskId && taskMap.get(entry.taskId) && (
-                  <p className="text-xs text-[var(--color-accent)] mt-0.5 flex items-center gap-1 truncate">
+                  <p
+                    className="text-xs mt-0.5 flex items-center gap-1 truncate"
+                    style={{ color: 'var(--color-accent)' }}
+                  >
                     <ListTodo size={11} className="shrink-0" />
                     {taskMap.get(entry.taskId)!.title}
                   </p>
                 )}
-                <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                   {formatTimeRange(entry.startTime, entry.endTime)}
                 </p>
               </div>
@@ -91,17 +104,30 @@ export function TimeEntryList({ entries, todayTotalSec, onDelete }: TimeEntryLis
               )}
 
               {/* Duration */}
-              <span className="text-sm font-medium text-[var(--color-text-secondary)] shrink-0 tabular-nums">
+              <span
+                className="text-sm font-medium shrink-0 tabular-nums"
+                style={{ color: 'var(--color-text-secondary)' }}
+              >
                 {entry.isRunning ? '●' : formatDuration(entry.durationSec ?? 0)}
               </span>
 
               {/* Delete button — visible on hover */}
               <button
                 onClick={() => onDelete(entry.id)}
-                className={`shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-danger)] hover:bg-[var(--color-bg-tertiary)] transition-all ${
-                  hoveredId === entry.id ? 'opacity-100' : 'opacity-0'
-                }`}
+                className="shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition-all"
+                style={{
+                  color: 'var(--color-text-muted)',
+                  opacity: hoveredId === entry.id ? 1 : 0,
+                }}
                 title="Delete entry"
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = 'var(--color-danger)';
+                  e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--color-text-muted)';
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
               >
                 <Trash2 size={14} />
               </button>

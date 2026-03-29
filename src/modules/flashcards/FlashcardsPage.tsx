@@ -40,10 +40,13 @@ function DeckView({ deck, onBack }: DeckViewProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-6 pt-6 pb-4 flex-shrink-0">
+      <div className="px-8 pt-8 pb-4 flex-shrink-0">
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors mb-4"
+          className="flex items-center gap-1.5 text-sm mb-4 transition-colors"
+          style={{ color: 'var(--color-text-muted)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
         >
           <ArrowLeft size={16} />
           All Decks
@@ -58,11 +61,11 @@ function DeckView({ deck, onBack }: DeckViewProps) {
             <Brain size={22} style={{ color: accentColor }} />
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold text-[var(--color-text-primary)] truncate">
+            <h1 className="text-2xl font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>
               {deck.name}
             </h1>
             {deck.description && (
-              <p className="text-sm text-[var(--color-text-muted)] mt-0.5">{deck.description}</p>
+              <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{deck.description}</p>
             )}
           </div>
         </div>
@@ -85,24 +88,33 @@ function DeckView({ deck, onBack }: DeckViewProps) {
 
         {/* Tabs */}
         <div className="flex gap-1">
-          {(['cards', 'study'] as DeckViewTab[]).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium capitalize transition-colors ${
-                activeTab === tab
-                  ? 'bg-[var(--color-accent)] text-white'
-                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
+          {(['cards', 'study'] as DeckViewTab[]).map((tab) => {
+            const isActive = activeTab === tab;
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className="px-4 py-1.5 rounded-lg text-sm font-medium capitalize transition-colors"
+                style={{
+                  backgroundColor: isActive ? 'var(--color-accent)' : 'transparent',
+                  color: isActive ? 'white' : 'var(--color-text-secondary)',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                {tab}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto px-6 pb-6">
+      <div className="flex-1 overflow-y-auto px-8 pb-8">
         {activeTab === 'cards' ? (
           <CardList deckId={deck.id} cards={cards} />
         ) : (
@@ -130,13 +142,13 @@ function StatChip({
 }) {
   return (
     <div
-      className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs border ${
-        highlight
-          ? 'bg-[var(--color-bg-tertiary)] border-[var(--color-border-hover)]'
-          : 'bg-[var(--color-bg-secondary)] border-[var(--color-border)]'
-      }`}
+      className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs"
+      style={{
+        backgroundColor: highlight ? 'var(--color-bg-tertiary)' : 'var(--color-bg-secondary)',
+        border: `1px solid ${highlight ? 'var(--color-border-hover)' : 'var(--color-border)'}`,
+      }}
     >
-      <span className="text-[var(--color-text-muted)]">{label}</span>
+      <span style={{ color: 'var(--color-text-muted)' }}>{label}</span>
       <span
         className="font-semibold"
         style={{ color: color ?? 'var(--color-text-primary)' }}
@@ -177,17 +189,20 @@ export function FlashcardsPage() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-6 pt-6 pb-4 flex-shrink-0">
+      <div className="px-8 pt-8 pb-4 flex-shrink-0">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">Flashcards</h1>
-            <p className="text-sm text-[var(--color-text-muted)] mt-0.5">
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>Flashcards</h1>
+            <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
               Spaced repetition for lasting knowledge
             </p>
           </div>
           <button
             onClick={() => setShowCreateForm(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--color-accent)] text-white text-sm font-medium hover:bg-[var(--color-accent-hover)] transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent)'; }}
           >
             <Plus size={16} />
             New Deck
@@ -196,8 +211,14 @@ export function FlashcardsPage() {
 
         {/* Create deck form */}
         {showCreateForm && (
-          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-5 mb-6">
-            <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-4">
+          <div
+            className="rounded-xl p-5 mb-6"
+            style={{
+              border: '1px solid var(--color-border)',
+              backgroundColor: 'var(--color-bg-secondary)',
+            }}
+          >
+            <h2 className="text-base font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>
               Create New Deck
             </h2>
             <DeckForm
@@ -210,23 +231,38 @@ export function FlashcardsPage() {
       </div>
 
       {/* Deck grid */}
-      <div className="flex-1 overflow-y-auto px-6 pb-6">
+      <div className="flex-1 overflow-y-auto px-8 pb-8">
         {isLoading ? (
           <LoadingSpinner text="Loading flashcards…" />
         ) : decks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-[var(--color-bg-secondary)] flex items-center justify-center">
-              <Brain size={28} className="text-[var(--color-text-muted)]" />
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center"
+              style={{ backgroundColor: 'var(--color-bg-secondary)' }}
+            >
+              <Brain size={28} style={{ color: 'var(--color-text-muted)' }} />
             </div>
             <div>
-              <p className="text-[var(--color-text-secondary)] font-medium">No decks yet</p>
-              <p className="text-[var(--color-text-muted)] text-sm mt-1">
+              <p className="font-medium" style={{ color: 'var(--color-text-secondary)' }}>No decks yet</p>
+              <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
                 Create your first deck to start studying
               </p>
             </div>
             <button
               onClick={() => setShowCreateForm(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-[var(--color-border)] text-sm text-[var(--color-text-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm border border-dashed transition-colors"
+              style={{
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-text-muted)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'var(--color-accent)';
+                e.currentTarget.style.color = 'var(--color-accent)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--color-border)';
+                e.currentTarget.style.color = 'var(--color-text-muted)';
+              }}
             >
               <Plus size={14} />
               Create a Deck

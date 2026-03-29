@@ -30,9 +30,7 @@ const COMMANDS: SlashCommand[] = [
     description: 'Large section heading',
     icon: <Heading1 size={16} />,
     keywords: ['h1', 'heading', 'title', 'heading1'],
-    action: (editor) => {
-      editor.chain().focus().toggleHeading({ level: 1 }).run();
-    },
+    action: (editor) => { editor.chain().focus().toggleHeading({ level: 1 }).run(); },
   },
   {
     id: 'heading2',
@@ -40,9 +38,7 @@ const COMMANDS: SlashCommand[] = [
     description: 'Medium section heading',
     icon: <Heading2 size={16} />,
     keywords: ['h2', 'heading', 'subtitle', 'heading2'],
-    action: (editor) => {
-      editor.chain().focus().toggleHeading({ level: 2 }).run();
-    },
+    action: (editor) => { editor.chain().focus().toggleHeading({ level: 2 }).run(); },
   },
   {
     id: 'heading3',
@@ -50,9 +46,7 @@ const COMMANDS: SlashCommand[] = [
     description: 'Small section heading',
     icon: <Heading3 size={16} />,
     keywords: ['h3', 'heading', 'heading3'],
-    action: (editor) => {
-      editor.chain().focus().toggleHeading({ level: 3 }).run();
-    },
+    action: (editor) => { editor.chain().focus().toggleHeading({ level: 3 }).run(); },
   },
   {
     id: 'bullet',
@@ -60,9 +54,7 @@ const COMMANDS: SlashCommand[] = [
     description: 'Unordered list with bullet points',
     icon: <List size={16} />,
     keywords: ['bullet', 'list', 'ul', 'unordered'],
-    action: (editor) => {
-      editor.chain().focus().toggleBulletList().run();
-    },
+    action: (editor) => { editor.chain().focus().toggleBulletList().run(); },
   },
   {
     id: 'numbered',
@@ -70,9 +62,7 @@ const COMMANDS: SlashCommand[] = [
     description: 'Ordered list with numbers',
     icon: <ListOrdered size={16} />,
     keywords: ['numbered', 'ordered', 'list', 'ol', 'number'],
-    action: (editor) => {
-      editor.chain().focus().toggleOrderedList().run();
-    },
+    action: (editor) => { editor.chain().focus().toggleOrderedList().run(); },
   },
   {
     id: 'todo',
@@ -80,9 +70,7 @@ const COMMANDS: SlashCommand[] = [
     description: 'Interactive checkboxes',
     icon: <CheckSquare size={16} />,
     keywords: ['todo', 'task', 'checkbox', 'check'],
-    action: (editor) => {
-      editor.chain().focus().toggleTaskList().run();
-    },
+    action: (editor) => { editor.chain().focus().toggleTaskList().run(); },
   },
   {
     id: 'image',
@@ -90,9 +78,7 @@ const COMMANDS: SlashCommand[] = [
     description: 'Upload or insert an image',
     icon: <Image size={16} />,
     keywords: ['image', 'photo', 'picture', 'img', 'upload'],
-    action: (_editor, triggerFileInput) => {
-      triggerFileInput?.();
-    },
+    action: (_editor, triggerFileInput) => { triggerFileInput?.(); },
   },
   {
     id: 'code',
@@ -100,9 +86,7 @@ const COMMANDS: SlashCommand[] = [
     description: 'Syntax-highlighted code block',
     icon: <Code2 size={16} />,
     keywords: ['code', 'codeblock', 'snippet', 'pre'],
-    action: (editor) => {
-      editor.chain().focus().toggleCodeBlock().run();
-    },
+    action: (editor) => { editor.chain().focus().toggleCodeBlock().run(); },
   },
   {
     id: 'quote',
@@ -110,9 +94,7 @@ const COMMANDS: SlashCommand[] = [
     description: 'Blockquote callout',
     icon: <Quote size={16} />,
     keywords: ['quote', 'blockquote', 'callout'],
-    action: (editor) => {
-      editor.chain().focus().toggleBlockquote().run();
-    },
+    action: (editor) => { editor.chain().focus().toggleBlockquote().run(); },
   },
   {
     id: 'divider',
@@ -120,9 +102,7 @@ const COMMANDS: SlashCommand[] = [
     description: 'Horizontal rule / separator',
     icon: <Minus size={16} />,
     keywords: ['divider', 'hr', 'horizontal', 'rule', 'separator'],
-    action: (editor) => {
-      editor.chain().focus().setHorizontalRule().run();
-    },
+    action: (editor) => { editor.chain().focus().setHorizontalRule().run(); },
   },
   {
     id: 'callout',
@@ -130,14 +110,7 @@ const COMMANDS: SlashCommand[] = [
     description: 'Styled info/note box',
     icon: <AlertCircle size={16} />,
     keywords: ['callout', 'info', 'note', 'warning', 'alert', 'box'],
-    action: (editor) => {
-      // Insert a styled blockquote as callout
-      editor
-        .chain()
-        .focus()
-        .toggleBlockquote()
-        .run();
-    },
+    action: (editor) => { editor.chain().focus().toggleBlockquote().run(); },
   },
 ];
 
@@ -168,30 +141,19 @@ export function SlashCommandMenu({
     );
   });
 
-  // Reset selection when filter changes
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [query]);
+  useEffect(() => { setSelectedIndex(0); }, [query]);
 
   const executeCommand = useCallback(
     (cmd: SlashCommand) => {
-      // Delete the slash + query text that was typed
       const { from } = editor.state.selection;
-      const queryLength = query.length + 1; // +1 for the '/'
-      editor
-        .chain()
-        .focus()
-        .deleteRange({ from: from - queryLength, to: from })
-        .run();
-
-      // Run command action
+      const queryLength = query.length + 1;
+      editor.chain().focus().deleteRange({ from: from - queryLength, to: from }).run();
       cmd.action(editor, triggerFileInput);
       onClose();
     },
     [editor, query, onClose, triggerFileInput]
   );
 
-  // Keyboard navigation
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'ArrowDown') {
@@ -202,20 +164,16 @@ export function SlashCommandMenu({
         setSelectedIndex((i) => Math.max(i - 1, 0));
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        if (filtered[selectedIndex]) {
-          executeCommand(filtered[selectedIndex]);
-        }
+        if (filtered[selectedIndex]) executeCommand(filtered[selectedIndex]);
       } else if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
       }
     };
-
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
   }, [filtered, selectedIndex, executeCommand, onClose]);
 
-  // Scroll selected item into view
   useEffect(() => {
     const el = listRef.current?.children[selectedIndex] as HTMLElement | undefined;
     el?.scrollIntoView({ block: 'nearest' });
@@ -225,11 +183,23 @@ export function SlashCommandMenu({
 
   return (
     <div
-      className="fixed z-[100] w-64 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] shadow-2xl overflow-hidden"
-      style={{ top: position.top, left: position.left }}
+      className="fixed z-[100] w-72 rounded-xl overflow-hidden"
+      style={{
+        top: position.top,
+        left: position.left,
+        border: '1px solid var(--color-border)',
+        backgroundColor: 'var(--color-bg-elevated)',
+        boxShadow: 'var(--shadow-popup)',
+      }}
     >
-      <div className="px-2 py-1.5 border-b border-[var(--color-border)]">
-        <span className="text-xs text-[var(--color-text-muted)] font-medium uppercase tracking-wide">
+      <div
+        className="px-3 py-2"
+        style={{ borderBottom: '1px solid var(--color-border)' }}
+      >
+        <span
+          className="text-[11px] font-semibold uppercase tracking-widest"
+          style={{ color: 'var(--color-text-muted)' }}
+        >
           Commands
         </span>
       </div>
@@ -237,21 +207,18 @@ export function SlashCommandMenu({
         {filtered.map((cmd, idx) => (
           <button
             key={cmd.id}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              executeCommand(cmd);
-            }}
+            onMouseDown={(e) => { e.preventDefault(); executeCommand(cmd); }}
             onMouseEnter={() => setSelectedIndex(idx)}
-            className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${
-              idx === selectedIndex
-                ? 'bg-[var(--color-accent)]/15 text-[var(--color-text-primary)]'
-                : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]'
-            }`}
+            className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors"
+            style={{
+              backgroundColor: idx === selectedIndex ? 'var(--color-accent-soft)' : 'transparent',
+              color: idx === selectedIndex ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+            }}
           >
-            <span className="shrink-0 text-[var(--color-text-muted)]">{cmd.icon}</span>
+            <span className="shrink-0" style={{ color: 'var(--color-text-muted)' }}>{cmd.icon}</span>
             <div className="min-w-0">
               <div className="text-sm font-medium leading-tight">{cmd.label}</div>
-              <div className="text-xs text-[var(--color-text-muted)] truncate">{cmd.description}</div>
+              <div className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>{cmd.description}</div>
             </div>
           </button>
         ))}

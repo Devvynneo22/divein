@@ -9,7 +9,6 @@ export function ShortcutCheatsheet() {
 
   useEffect(() => {
     function handler(e: KeyboardEvent) {
-      // Open on '?' when not typing in an input
       if (
         e.key === '?' &&
         !e.ctrlKey &&
@@ -24,7 +23,6 @@ export function ShortcutCheatsheet() {
         setOpen((prev) => !prev);
         return;
       }
-      // Close on Escape
       if (e.key === 'Escape' && open) {
         e.preventDefault();
         setOpen(false);
@@ -42,21 +40,41 @@ export function ShortcutCheatsheet() {
     <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 backdrop-blur-sm"
+        style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
         onClick={() => setOpen(false)}
       />
 
       {/* Modal */}
-      <div className="absolute top-[10%] left-1/2 -translate-x-1/2 w-full max-w-2xl max-h-[80vh] overflow-hidden">
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+      <div className="absolute top-[10%] left-1/2 -translate-x-1/2 w-full max-w-2xl max-h-[80vh] overflow-hidden px-4">
+        <div
+          className="rounded-xl overflow-hidden flex flex-col max-h-[80vh]"
+          style={{
+            border: '1px solid var(--color-border)',
+            backgroundColor: 'var(--color-bg-elevated)',
+            boxShadow: 'var(--shadow-popup)',
+          }}
+        >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)]">
-            <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
+          <div
+            className="flex items-center justify-between px-6 py-4"
+            style={{ borderBottom: '1px solid var(--color-border)' }}
+          >
+            <h2 className="text-base font-semibold" style={{ color: 'var(--color-text-primary)' }}>
               Keyboard Shortcuts
             </h2>
             <button
               onClick={() => setOpen(false)}
-              className="p-1 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+              className="p-1.5 rounded-md transition-colors"
+              style={{ color: 'var(--color-text-muted)' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = 'var(--color-text-primary)';
+                e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'var(--color-text-muted)';
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
             >
               <X size={16} />
             </button>
@@ -69,19 +87,31 @@ export function ShortcutCheatsheet() {
               if (!shortcuts || shortcuts.length === 0) return null;
               return (
                 <div key={group}>
-                  <h3 className="text-[10px] font-medium uppercase tracking-wider text-[var(--color-text-muted)] mb-3">
+                  <h3
+                    className="text-[11px] font-semibold uppercase tracking-widest mb-3"
+                    style={{ color: 'var(--color-text-muted)' }}
+                  >
                     {group}
                   </h3>
                   <div className="space-y-1">
                     {shortcuts.map((s) => (
                       <div
                         key={s.id}
-                        className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-[var(--color-bg-tertiary)] transition-colors"
+                        className="flex items-center justify-between py-2 px-3 rounded-lg transition-colors"
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                       >
-                        <span className="text-sm text-[var(--color-text-secondary)]">
+                        <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
                           {s.label}
                         </span>
-                        <kbd className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-[11px] font-mono text-[var(--color-text-primary)]">
+                        <kbd
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono"
+                          style={{
+                            backgroundColor: 'var(--color-bg-tertiary)',
+                            border: '1px solid var(--color-border)',
+                            color: 'var(--color-text-primary)',
+                          }}
+                        >
                           {s.keys}
                         </kbd>
                       </div>
@@ -93,8 +123,24 @@ export function ShortcutCheatsheet() {
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-3 border-t border-[var(--color-border)] text-[10px] text-[var(--color-text-muted)] text-center">
-            Press <kbd className="px-1 py-0.5 rounded bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] font-mono text-[10px]">?</kbd> or <kbd className="px-1 py-0.5 rounded bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] font-mono text-[10px]">Esc</kbd> to close
+          <div
+            className="px-6 py-3 text-[11px] text-center"
+            style={{
+              borderTop: '1px solid var(--color-border)',
+              color: 'var(--color-text-muted)',
+            }}
+          >
+            Press{' '}
+            <kbd
+              className="px-1 py-0.5 rounded font-mono text-[11px]"
+              style={{ backgroundColor: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border)' }}
+            >?</kbd>{' '}
+            or{' '}
+            <kbd
+              className="px-1 py-0.5 rounded font-mono text-[11px]"
+              style={{ backgroundColor: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border)' }}
+            >Esc</kbd>{' '}
+            to close
           </div>
         </div>
       </div>

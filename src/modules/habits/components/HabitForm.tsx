@@ -101,17 +101,41 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
     (g) => g.toLowerCase().includes(groupName.toLowerCase()) && g !== groupName,
   );
 
+  const inputStyle = {
+    backgroundColor: 'var(--color-bg-tertiary)',
+    borderColor: 'var(--color-border)',
+    color: 'var(--color-text-primary)',
+  };
+
+  const inputFocusHandlers = {
+    onFocus: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+      e.currentTarget.style.borderColor = 'var(--color-accent)';
+    },
+    onBlur: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+      e.currentTarget.style.borderColor = 'var(--color-border)';
+    },
+  };
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
+        <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
           {habit ? 'Edit Habit' : 'New Habit'}
         </h2>
         <button
           type="button"
           onClick={onCancel}
-          className="p-1.5 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+          className="p-1.5 rounded-md transition-colors"
+          style={{ color: 'var(--color-text-muted)' }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+            e.currentTarget.style.color = 'var(--color-text-primary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.color = 'var(--color-text-muted)';
+          }}
         >
           <X size={18} />
         </button>
@@ -119,24 +143,26 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
 
       {/* Name */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-[var(--color-text-secondary)]">
-          Name <span className="text-[var(--color-danger)]">*</span>
+        <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+          Name <span style={{ color: 'var(--color-danger)' }}>*</span>
         </label>
         <input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. Morning run"
-          className="px-3 py-2 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors"
+          className="input-base px-3 py-2.5 rounded-lg border text-sm outline-none transition-colors"
+          style={inputStyle}
+          {...inputFocusHandlers}
         />
         {nameError && (
-          <p className="text-xs text-[var(--color-danger)]">{nameError}</p>
+          <p className="text-xs" style={{ color: 'var(--color-danger)' }}>{nameError}</p>
         )}
       </div>
 
       {/* Description */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-[var(--color-text-secondary)]">
+        <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
           Description
         </label>
         <textarea
@@ -144,7 +170,9 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Optional description..."
           rows={2}
-          className="px-3 py-2 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors resize-none"
+          className="px-3 py-2.5 rounded-lg border text-sm outline-none transition-colors resize-none"
+          style={inputStyle}
+          {...inputFocusHandlers}
         />
       </div>
 
@@ -152,15 +180,20 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
       <div className="flex gap-4">
         {/* Color picker */}
         <div className="flex flex-col gap-1.5 flex-1">
-          <label className="text-xs font-medium text-[var(--color-text-secondary)]">Color</label>
+          <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Color</label>
           <div className="flex flex-wrap gap-2">
             {PRESET_COLORS.map((c) => (
               <button
                 key={c}
                 type="button"
                 onClick={() => setColor(c)}
-                className="w-6 h-6 rounded-full transition-transform hover:scale-110 flex-shrink-0"
-                style={{ backgroundColor: c, outline: color === c ? `2px solid ${c}` : 'none', outlineOffset: '2px' }}
+                className="w-7 h-7 rounded-full transition-transform hover:scale-110 flex-shrink-0"
+                style={{
+                  backgroundColor: c,
+                  outline: color === c ? `2px solid ${c}` : 'none',
+                  outlineOffset: '2px',
+                  boxShadow: color === c ? `0 0 0 2px var(--color-bg-elevated)` : 'none',
+                }}
               />
             ))}
           </div>
@@ -168,32 +201,41 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
 
         {/* Icon (emoji) */}
         <div className="flex flex-col gap-1.5 w-24">
-          <label className="text-xs font-medium text-[var(--color-text-secondary)]">Icon</label>
+          <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Icon</label>
           <input
             type="text"
             value={icon}
             onChange={(e) => setIcon(e.target.value)}
             placeholder="🏃"
             maxLength={4}
-            className="px-3 py-2 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors text-center"
+            className="input-base px-3 py-2.5 rounded-lg border text-sm outline-none transition-colors text-center"
+            style={inputStyle}
+            {...inputFocusHandlers}
           />
         </div>
       </div>
 
       {/* Frequency */}
       <div className="flex flex-col gap-2">
-        <label className="text-xs font-medium text-[var(--color-text-secondary)]">Frequency</label>
+        <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Frequency</label>
         <div className="flex gap-2">
           {(['daily', 'weekly', 'xPerWeek'] as FrequencyType[]).map((ft) => (
             <button
               key={ft}
               type="button"
               onClick={() => setFreqType(ft)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className="px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+              style={
                 freqType === ft
-                  ? 'bg-[var(--color-accent)] text-white'
-                  : 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-              }`}
+                  ? { backgroundColor: 'var(--color-accent)', color: 'white' }
+                  : { backgroundColor: 'var(--color-bg-tertiary)', color: 'var(--color-text-secondary)' }
+              }
+              onMouseEnter={(e) => {
+                if (freqType !== ft) e.currentTarget.style.color = 'var(--color-text-primary)';
+              }}
+              onMouseLeave={(e) => {
+                if (freqType !== ft) e.currentTarget.style.color = 'var(--color-text-secondary)';
+              }}
             >
               {ft === 'daily' ? 'Daily' : ft === 'weekly' ? 'Specific days' : 'X per week'}
             </button>
@@ -207,12 +249,18 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
                 key={day}
                 type="button"
                 onClick={() => handleToggleDay(idx)}
-                className={`w-10 h-10 rounded-full text-xs font-medium transition-colors ${
+                className="w-10 h-10 rounded-full text-xs font-medium transition-colors"
+                style={
                   weeklyDays.includes(idx)
-                    ? 'text-white'
-                    : 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-                }`}
-                style={weeklyDays.includes(idx) ? { backgroundColor: color } : undefined}
+                    ? { backgroundColor: color, color: 'white' }
+                    : { backgroundColor: 'var(--color-bg-tertiary)', color: 'var(--color-text-secondary)' }
+                }
+                onMouseEnter={(e) => {
+                  if (!weeklyDays.includes(idx)) e.currentTarget.style.color = 'var(--color-text-primary)';
+                }}
+                onMouseLeave={(e) => {
+                  if (!weeklyDays.includes(idx)) e.currentTarget.style.color = 'var(--color-text-secondary)';
+                }}
               >
                 {day}
               </button>
@@ -228,27 +276,36 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
               max={7}
               value={xPerWeekTimes}
               onChange={(e) => setXPerWeekTimes(Number(e.target.value))}
-              className="w-16 px-2 py-1.5 rounded-md bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)] transition-colors text-center"
+              className="input-base w-16 px-2 py-2 rounded-lg border text-sm outline-none transition-colors text-center"
+              style={inputStyle}
+              {...inputFocusHandlers}
             />
-            <span className="text-sm text-[var(--color-text-secondary)]">times per week</span>
+            <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>times per week</span>
           </div>
         )}
       </div>
 
       {/* Type toggle */}
       <div className="flex flex-col gap-2">
-        <label className="text-xs font-medium text-[var(--color-text-secondary)]">Type</label>
+        <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Type</label>
         <div className="flex gap-2">
           {(['boolean', 'measurable'] as HabitType[]).map((ht) => (
             <button
               key={ht}
               type="button"
               onClick={() => setHabitType(ht)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className="px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+              style={
                 habitType === ht
-                  ? 'bg-[var(--color-accent)] text-white'
-                  : 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-              }`}
+                  ? { backgroundColor: 'var(--color-accent)', color: 'white' }
+                  : { backgroundColor: 'var(--color-bg-tertiary)', color: 'var(--color-text-secondary)' }
+              }
+              onMouseEnter={(e) => {
+                if (habitType !== ht) e.currentTarget.style.color = 'var(--color-text-primary)';
+              }}
+              onMouseLeave={(e) => {
+                if (habitType !== ht) e.currentTarget.style.color = 'var(--color-text-secondary)';
+              }}
             >
               {ht === 'boolean' ? '✓ Yes/No' : '📏 Measurable'}
             </button>
@@ -256,25 +313,29 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
         </div>
 
         {habitType === 'measurable' && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-[var(--color-text-muted)]">Target</label>
+              <label className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Target</label>
               <input
                 type="number"
                 min={1}
                 value={target}
                 onChange={(e) => setTarget(Number(e.target.value))}
-                className="w-20 px-2 py-1.5 rounded-md bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)] transition-colors text-center"
+                className="input-base w-20 px-2 py-2 rounded-lg border text-sm outline-none transition-colors text-center"
+                style={inputStyle}
+                {...inputFocusHandlers}
               />
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-[var(--color-text-muted)]">Unit</label>
+            <div className="flex flex-col gap-1 flex-1">
+              <label className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Unit</label>
               <input
                 type="text"
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
                 placeholder="km, pages, min..."
-                className="px-2 py-1.5 rounded-md bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors"
+                className="input-base px-2 py-2 rounded-lg border text-sm outline-none transition-colors"
+                style={inputStyle}
+                {...inputFocusHandlers}
               />
             </div>
           </div>
@@ -283,7 +344,7 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
 
       {/* Group name */}
       <div className="flex flex-col gap-1.5 relative">
-        <label className="text-xs font-medium text-[var(--color-text-secondary)]">Group</label>
+        <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Group</label>
         <input
           type="text"
           value={groupName}
@@ -291,12 +352,24 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
             setGroupName(e.target.value);
             setShowGroupSuggestions(true);
           }}
-          onBlur={() => setTimeout(() => setShowGroupSuggestions(false), 150)}
+          onBlur={(e) => {
+            inputFocusHandlers.onBlur(e as React.FocusEvent<HTMLInputElement>);
+            setTimeout(() => setShowGroupSuggestions(false), 150);
+          }}
+          onFocus={inputFocusHandlers.onFocus as React.FocusEventHandler<HTMLInputElement>}
           placeholder="e.g. Health, Work..."
-          className="px-3 py-2 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors"
+          className="input-base px-3 py-2.5 rounded-lg border text-sm outline-none transition-colors"
+          style={inputStyle}
         />
         {showGroupSuggestions && filteredGroups.length > 0 && (
-          <div className="absolute top-full mt-1 left-0 right-0 z-10 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg overflow-hidden shadow-lg">
+          <div
+            className="absolute top-full mt-1 left-0 right-0 z-10 rounded-xl overflow-hidden"
+            style={{
+              backgroundColor: 'var(--color-bg-elevated)',
+              border: '1px solid var(--color-border)',
+              boxShadow: 'var(--shadow-popup)',
+            }}
+          >
             {filteredGroups.map((g) => (
               <button
                 key={g}
@@ -305,7 +378,10 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
                   setGroupName(g);
                   setShowGroupSuggestions(false);
                 }}
-                className="w-full text-left px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+                className="w-full text-left px-3 py-2.5 text-sm transition-colors"
+                style={{ color: 'var(--color-text-primary)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
               >
                 {g}
               </button>
@@ -315,17 +391,32 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
       </div>
 
       {/* Actions */}
-      <div className="flex gap-2 pt-1">
+      <div className="flex gap-2 pt-2">
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 px-4 py-2 rounded-lg text-sm font-medium text-[var(--color-text-secondary)] bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)] transition-colors"
+          className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+          style={{
+            color: 'var(--color-text-secondary)',
+            backgroundColor: 'var(--color-bg-tertiary)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--color-text-primary)';
+            e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--color-text-secondary)';
+            e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+          }}
         >
           Cancel
         </button>
         <button
           type="submit"
-          className="flex-1 px-4 py-2 rounded-lg text-sm font-medium text-white bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] transition-colors"
+          className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-colors"
+          style={{ backgroundColor: 'var(--color-accent)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent)'; }}
         >
           {habit ? 'Save Changes' : 'Create Habit'}
         </button>

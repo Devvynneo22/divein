@@ -30,7 +30,6 @@ export function EditorBubbleMenu({ editor, onCreateFlashcard }: EditorBubbleMenu
       return;
     }
 
-    // Don't show for node selections (images, code blocks, etc.)
     const isNodeSelection = editor.state.selection.constructor.name === 'NodeSelection';
     if (isNodeSelection) {
       setVisible(false);
@@ -51,8 +50,7 @@ export function EditorBubbleMenu({ editor, onCreateFlashcard }: EditorBubbleMenu
       return;
     }
 
-    const menuWidth = 380; // approximate
-    // Use viewport-relative coords since menu is position:fixed
+    const menuWidth = 380;
     setCoords({
       top: rect.top - 48,
       left: Math.max(8, rect.left + rect.width / 2 - menuWidth / 2),
@@ -65,7 +63,6 @@ export function EditorBubbleMenu({ editor, onCreateFlashcard }: EditorBubbleMenu
   useEffect(() => {
     editor.on('selectionUpdate', updatePosition);
     editor.on('blur', handleBlur);
-
     return () => {
       editor.off('selectionUpdate', updatePosition);
       editor.off('blur', handleBlur);
@@ -88,8 +85,14 @@ export function EditorBubbleMenu({ editor, onCreateFlashcard }: EditorBubbleMenu
   return (
     <div
       ref={menuRef}
-      className="fixed z-[100] flex items-center gap-0.5 px-1.5 py-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] shadow-xl"
-      style={{ top: coords.top, left: coords.left }}
+      className="fixed z-[100] flex items-center gap-0.5 px-2 py-1.5 rounded-xl"
+      style={{
+        top: coords.top,
+        left: coords.left,
+        border: '1px solid var(--color-border)',
+        backgroundColor: 'var(--color-bg-elevated)',
+        boxShadow: 'var(--shadow-popup)',
+      }}
       onMouseDown={(e) => e.preventDefault()}
     >
       <BubbleButton
@@ -97,7 +100,7 @@ export function EditorBubbleMenu({ editor, onCreateFlashcard }: EditorBubbleMenu
         active={editor.isActive('bold')}
         title="Bold"
       >
-        <Bold size={13} />
+        <Bold size={14} />
       </BubbleButton>
 
       <BubbleButton
@@ -105,7 +108,7 @@ export function EditorBubbleMenu({ editor, onCreateFlashcard }: EditorBubbleMenu
         active={editor.isActive('italic')}
         title="Italic"
       >
-        <Italic size={13} />
+        <Italic size={14} />
       </BubbleButton>
 
       <BubbleButton
@@ -113,7 +116,7 @@ export function EditorBubbleMenu({ editor, onCreateFlashcard }: EditorBubbleMenu
         active={editor.isActive('underline')}
         title="Underline"
       >
-        <Underline size={13} />
+        <Underline size={14} />
       </BubbleButton>
 
       <BubbleButton
@@ -121,7 +124,7 @@ export function EditorBubbleMenu({ editor, onCreateFlashcard }: EditorBubbleMenu
         active={editor.isActive('strike')}
         title="Strikethrough"
       >
-        <Strikethrough size={13} />
+        <Strikethrough size={14} />
       </BubbleButton>
 
       <BubbleButton
@@ -129,7 +132,7 @@ export function EditorBubbleMenu({ editor, onCreateFlashcard }: EditorBubbleMenu
         active={editor.isActive('code')}
         title="Inline code"
       >
-        <Code size={13} />
+        <Code size={14} />
       </BubbleButton>
 
       <BubbleButton
@@ -137,7 +140,7 @@ export function EditorBubbleMenu({ editor, onCreateFlashcard }: EditorBubbleMenu
         active={editor.isActive('highlight')}
         title="Highlight"
       >
-        <Highlighter size={13} />
+        <Highlighter size={14} />
       </BubbleButton>
 
       <BubbleButton
@@ -145,12 +148,12 @@ export function EditorBubbleMenu({ editor, onCreateFlashcard }: EditorBubbleMenu
         active={editor.isActive('link')}
         title="Link"
       >
-        <Link size={13} />
+        <Link size={14} />
       </BubbleButton>
 
       {onCreateFlashcard && (
         <>
-          <div className="w-px h-4 bg-[var(--color-border)] mx-0.5" />
+          <Separator />
           <BubbleButton
             onClick={() => {
               const { from, to } = editor.state.selection;
@@ -160,12 +163,12 @@ export function EditorBubbleMenu({ editor, onCreateFlashcard }: EditorBubbleMenu
             active={false}
             title="Create Flashcard"
           >
-            <Brain size={13} />
+            <Brain size={14} />
           </BubbleButton>
         </>
       )}
 
-      <div className="w-px h-4 bg-[var(--color-border)] mx-0.5" />
+      <Separator />
 
       {/* Color palette */}
       {COLORS.map((color) => (
@@ -176,11 +179,20 @@ export function EditorBubbleMenu({ editor, onCreateFlashcard }: EditorBubbleMenu
             e.preventDefault();
             editor.chain().focus().setColor(color).run();
           }}
-          className="w-4 h-4 rounded-full border border-black/20 hover:scale-110 transition-transform shrink-0"
-          style={{ backgroundColor: color }}
+          className="w-4.5 h-4.5 rounded-full hover:scale-110 transition-transform shrink-0"
+          style={{ backgroundColor: color, border: '1px solid rgba(0,0,0,0.15)', width: 18, height: 18 }}
         />
       ))}
     </div>
+  );
+}
+
+function Separator() {
+  return (
+    <div
+      className="mx-0.5"
+      style={{ width: 1, height: 16, backgroundColor: 'var(--color-border)' }}
+    />
   );
 }
 
@@ -199,11 +211,23 @@ function BubbleButton({
     <button
       onClick={onClick}
       title={title}
-      className={`p-1.5 rounded transition-colors ${
-        active
-          ? 'bg-[var(--color-accent)]/20 text-[var(--color-accent)]'
-          : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)]'
-      }`}
+      className="p-1.5 rounded-lg transition-colors"
+      style={{
+        backgroundColor: active ? 'var(--color-accent-muted)' : 'transparent',
+        color: active ? 'var(--color-accent)' : 'var(--color-text-muted)',
+      }}
+      onMouseEnter={(e) => {
+        if (!active) {
+          e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+          e.currentTarget.style.color = 'var(--color-text-primary)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!active) {
+          e.currentTarget.style.backgroundColor = 'transparent';
+          e.currentTarget.style.color = 'var(--color-text-muted)';
+        }
+      }}
     >
       {children}
     </button>

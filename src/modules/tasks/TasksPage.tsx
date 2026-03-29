@@ -23,11 +23,26 @@ function Toast({ data, onUndo, onDismiss }: { data: ToastData; onUndo: () => voi
   }, [onDismiss]);
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-lg bg-[var(--color-bg-elevated)] border border-[var(--color-border)] shadow-lg">
-      <span className="text-sm text-[var(--color-text-primary)]">{data.message}</span>
+    <div
+      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg"
+      style={{
+        backgroundColor: 'var(--color-bg-elevated)',
+        border: '1px solid var(--color-border)',
+      }}
+    >
+      <span className="text-sm" style={{ color: 'var(--color-text-primary)' }}>
+        {data.message}
+      </span>
       <button
         onClick={onUndo}
-        className="px-3 py-1 rounded text-xs font-medium bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] transition-colors"
+        className="px-3 py-1 rounded text-xs font-medium transition-colors"
+        style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'var(--color-accent)';
+        }}
       >
         Undo
       </button>
@@ -54,6 +69,7 @@ export function TasksPage() {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [toast, setToast] = useState<ToastData | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [hoveredTab, setHoveredTab] = useState<string | null>(null);
   const draggedIdRef = useRef<string | null>(null);
   const quickAddRef = useRef<HTMLInputElement>(null);
 
@@ -290,39 +306,54 @@ export function TasksPage() {
       {/* Task list */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <div className="px-6 pt-6 pb-4">
-          <h1 className="text-2xl font-bold mb-4">Tasks</h1>
+        <div className="px-8 pt-8 pb-4">
+          <h1
+            className="text-3xl font-bold mb-6"
+            style={{ color: 'var(--color-text-primary)' }}
+          >
+            Tasks
+          </h1>
 
           {/* Quick add */}
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-5">
             <div className="flex-1 relative">
-              <Plus size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" />
+              <Plus
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                style={{ color: 'var(--color-text-muted)' }}
+              />
               <input
                 ref={quickAddRef}
                 type="text"
                 value={newTaskTitle}
                 onChange={(e) => setNewTaskTitle(e.target.value)}
                 onKeyDown={handleQuickAdd}
-                placeholder="Add a task... (press Enter)"
-                className="w-full pl-9 pr-4 py-2.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors"
+                placeholder="Add a task… (press Enter)"
+                className="input-base w-full pl-9 pr-4"
               />
             </div>
           </div>
 
           {/* Status tabs */}
-          <div className="flex gap-1 overflow-x-auto">
+          <div className="flex gap-1.5 overflow-x-auto">
             {STATUS_TABS.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.key;
+              const isHovered = hoveredTab === tab.key;
               return (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+                  onMouseEnter={() => setHoveredTab(tab.key)}
+                  onMouseLeave={() => setHoveredTab(null)}
+                  className="flex items-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+                  style={
                     isActive
-                      ? 'bg-[var(--color-accent)] text-white'
-                      : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]'
-                  }`}
+                      ? { backgroundColor: 'var(--color-accent)', color: 'white' }
+                      : isHovered
+                      ? { backgroundColor: 'var(--color-bg-tertiary)', color: 'var(--color-text-primary)' }
+                      : { backgroundColor: 'transparent', color: 'var(--color-text-secondary)' }
+                  }
                 >
                   <Icon size={14} />
                   {tab.label}
@@ -333,11 +364,14 @@ export function TasksPage() {
         </div>
 
         {/* Task list */}
-        <div className="flex-1 overflow-y-auto px-6 pb-6">
+        <div className="flex-1 overflow-y-auto px-8 pb-8">
           {isLoading ? (
             <LoadingSpinner text="Loading tasks…" />
           ) : tasks.length === 0 ? (
-            <div className="text-center py-12 text-[var(--color-text-muted)] text-sm">
+            <div
+              className="text-center py-16 text-sm"
+              style={{ color: 'var(--color-text-muted)' }}
+            >
               {activeTab === 'all' ? 'No tasks yet. Add one above!' : `No ${activeTab.replace('_', ' ')} tasks.`}
             </div>
           ) : (
@@ -345,7 +379,11 @@ export function TasksPage() {
               {tasks.map((task) => (
                 <div
                   key={task.id}
-                  className={dragOverId === task.id ? 'border-t-2 border-[var(--color-accent)]' : ''}
+                  style={
+                    dragOverId === task.id
+                      ? { borderTop: '2px solid var(--color-accent)' }
+                      : undefined
+                  }
                 >
                   <TaskItem
                     task={task}

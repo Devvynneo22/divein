@@ -98,35 +98,71 @@ export function TaskDetail({ task, onUpdate, onClose }: TaskDetailProps) {
   }
 
   return (
-    <div className="w-80 border-l border-[var(--color-border)] bg-[var(--color-bg-secondary)] flex flex-col">
+    <div
+      className="card w-96 flex flex-col"
+      style={{
+        borderLeft: '1px solid var(--color-border)',
+        borderRadius: 0,
+        boxShadow: 'none',
+      }}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 h-12 border-b border-[var(--color-border)]">
-        <span className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wide">Details</span>
-        <button onClick={onClose} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]">
+      <div
+        className="flex items-center justify-between px-6 py-4"
+        style={{ borderBottom: '1px solid var(--color-border)' }}
+      >
+        <span
+          className="text-xs font-semibold uppercase tracking-widest"
+          style={{ color: 'var(--color-text-muted)' }}
+        >
+          Details
+        </span>
+        <button
+          className="transition-colors p-1 rounded"
+          style={{ color: 'var(--color-text-muted)' }}
+          onClick={onClose}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--color-text-primary)';
+            e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--color-text-muted)';
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
+        >
           <X size={16} />
         </button>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-5">
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {/* Title */}
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={handleTitleBlur}
-          className="w-full text-lg font-semibold bg-transparent border-none outline-none text-[var(--color-text-primary)]"
+          className="w-full text-xl font-semibold bg-transparent border-none outline-none"
+          style={{ color: 'var(--color-text-primary)' }}
         />
 
         {/* Status */}
         <div>
-          <label className="flex items-center gap-2 text-xs text-[var(--color-text-muted)] mb-1.5">
+          <label
+            className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide mb-2"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
             Status
           </label>
           <select
             value={task.status}
             onChange={(e) => onUpdate({ status: e.target.value as TaskStatus })}
-            className="w-full px-3 py-2 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] outline-none"
+            className="w-full px-3 py-2.5 rounded-lg text-sm outline-none transition-colors"
+            style={{
+              backgroundColor: 'var(--color-bg-tertiary)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-primary)',
+            }}
           >
             {STATUSES.map((s) => (
               <option key={s.value} value={s.value}>{s.label}</option>
@@ -136,50 +172,93 @@ export function TaskDetail({ task, onUpdate, onClose }: TaskDetailProps) {
 
         {/* Priority */}
         <div>
-          <label className="flex items-center gap-2 text-xs text-[var(--color-text-muted)] mb-1.5">
+          <label
+            className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide mb-2"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
             <Flag size={12} /> Priority
           </label>
-          <div className="flex gap-1">
-            {PRIORITIES.map((p) => (
-              <button
-                key={p.value}
-                onClick={() => onUpdate({ priority: p.value })}
-                className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
-                  task.priority === p.value
-                    ? 'bg-[var(--color-bg-tertiary)] border border-[var(--color-border)]'
-                    : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-tertiary)]'
-                }`}
-                style={task.priority === p.value ? { color: p.color } : undefined}
-              >
-                {p.label}
-              </button>
-            ))}
+          <div className="flex gap-1.5">
+            {PRIORITIES.map((p) => {
+              const isActive = task.priority === p.value;
+              return (
+                <button
+                  key={p.value}
+                  onClick={() => onUpdate({ priority: p.value })}
+                  className="flex-1 px-2 py-2 rounded-lg text-xs font-medium transition-colors"
+                  style={
+                    isActive
+                      ? {
+                          backgroundColor: 'var(--color-bg-tertiary)',
+                          border: '1px solid var(--color-border)',
+                          color: p.color,
+                        }
+                      : {
+                          backgroundColor: 'transparent',
+                          border: '1px solid transparent',
+                          color: 'var(--color-text-muted)',
+                        }
+                  }
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+                      e.currentTarget.style.color = p.color;
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = 'var(--color-text-muted)';
+                    }
+                  }}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {/* Due date */}
         <div>
-          <label className="flex items-center gap-2 text-xs text-[var(--color-text-muted)] mb-1.5">
+          <label
+            className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide mb-2"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
             <Calendar size={12} /> Due Date
           </label>
           <input
             type="date"
             value={task.dueDate?.split('T')[0] ?? ''}
             onChange={(e) => onUpdate({ dueDate: e.target.value || null })}
-            className="w-full px-3 py-2 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] outline-none"
+            className="w-full px-3 py-2.5 rounded-lg text-sm outline-none"
+            style={{
+              backgroundColor: 'var(--color-bg-tertiary)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-primary)',
+            }}
           />
         </div>
 
         {/* Recurrence */}
         <div>
-          <label className="flex items-center gap-2 text-xs text-[var(--color-text-muted)] mb-1.5">
+          <label
+            className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide mb-2"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
             <Repeat size={12} /> Recurrence
           </label>
           {parsedRecurrence ? (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)]">
-                <Repeat size={12} className="text-[var(--color-accent)]" />
-                <span className="text-xs text-[var(--color-text-primary)]">
+              <div
+                className="flex items-center gap-2 px-3 py-2.5 rounded-lg"
+                style={{
+                  backgroundColor: 'var(--color-bg-tertiary)',
+                  border: '1px solid var(--color-border)',
+                }}
+              >
+                <Repeat size={12} style={{ color: 'var(--color-accent)' }} />
+                <span className="text-sm" style={{ color: 'var(--color-text-primary)' }}>
                   {describeRecurrence(parsedRecurrence)}
                 </span>
               </div>
@@ -190,7 +269,12 @@ export function TaskDetail({ task, onUpdate, onClose }: TaskDetailProps) {
                     const updated: RecurrenceRule = { ...parsedRecurrence, frequency: e.target.value as RecurrenceFrequency };
                     onUpdate({ recurrence: JSON.stringify(updated) });
                   }}
-                  className="flex-1 px-2 py-1.5 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-xs text-[var(--color-text-primary)] outline-none"
+                  className="flex-1 px-2 py-2 rounded-lg text-sm outline-none"
+                  style={{
+                    backgroundColor: 'var(--color-bg-tertiary)',
+                    border: '1px solid var(--color-border)',
+                    color: 'var(--color-text-primary)',
+                  }}
                 >
                   {FREQUENCY_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -207,12 +291,20 @@ export function TaskDetail({ task, onUpdate, onClose }: TaskDetailProps) {
                       onUpdate({ recurrence: JSON.stringify(updated) });
                     }
                   }}
-                  className="w-16 px-2 py-1.5 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-xs text-[var(--color-text-primary)] outline-none"
+                  className="w-16 px-2 py-2 rounded-lg text-sm outline-none"
+                  style={{
+                    backgroundColor: 'var(--color-bg-tertiary)',
+                    border: '1px solid var(--color-border)',
+                    color: 'var(--color-text-primary)',
+                  }}
                 />
               </div>
               <button
+                className="text-xs transition-colors"
+                style={{ color: 'var(--color-text-muted)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-danger)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
                 onClick={() => onUpdate({ recurrence: null })}
-                className="text-[10px] text-[var(--color-text-muted)] hover:text-[var(--color-danger)]"
               >
                 Remove recurrence
               </button>
@@ -220,7 +312,20 @@ export function TaskDetail({ task, onUpdate, onClose }: TaskDetailProps) {
           ) : (
             <button
               onClick={() => onUpdate({ recurrence: JSON.stringify({ frequency: 'weekly', interval: 1 } as RecurrenceRule) })}
-              className="w-full px-3 py-2 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-accent)] transition-colors text-left"
+              className="w-full px-3 py-2.5 rounded-lg text-sm text-left transition-colors"
+              style={{
+                backgroundColor: 'var(--color-bg-tertiary)',
+                border: '1px solid var(--color-border)',
+                color: 'var(--color-text-muted)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = 'var(--color-text-primary)';
+                e.currentTarget.style.borderColor = 'var(--color-accent)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'var(--color-text-muted)';
+                e.currentTarget.style.borderColor = 'var(--color-border)';
+              }}
             >
               + Add recurrence
             </button>
@@ -229,19 +334,29 @@ export function TaskDetail({ task, onUpdate, onClose }: TaskDetailProps) {
 
         {/* Tags */}
         <div>
-          <label className="flex items-center gap-2 text-xs text-[var(--color-text-muted)] mb-1.5">
+          <label
+            className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide mb-2"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
             <Tag size={12} /> Tags
           </label>
-          <div className="flex flex-wrap gap-1 mb-2">
+          <div className="flex flex-wrap gap-1.5 mb-2">
             {task.tags.map((tag) => (
               <span
                 key={tag}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)]"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs"
+                style={{
+                  backgroundColor: 'var(--color-bg-tertiary)',
+                  color: 'var(--color-text-secondary)',
+                }}
               >
                 {tag}
                 <button
                   onClick={() => handleRemoveTag(tag)}
-                  className="text-[var(--color-text-muted)] hover:text-[var(--color-danger)]"
+                  className="transition-colors"
+                  style={{ color: 'var(--color-text-muted)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-danger)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
                 >
                   ×
                 </button>
@@ -253,67 +368,99 @@ export function TaskDetail({ task, onUpdate, onClose }: TaskDetailProps) {
             value={tagInput}
             onChange={(e) => setTagInput(e.target.value)}
             onKeyDown={handleAddTag}
-            placeholder="Add tag..."
-            className="w-full px-3 py-1.5 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] outline-none"
+            placeholder="Add tag…"
+            className="input-base w-full text-sm"
           />
         </div>
 
         {/* Description */}
         <div>
-          <label className="flex items-center gap-2 text-xs text-[var(--color-text-muted)] mb-1.5">
+          <label
+            className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide mb-2"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
             <AlignLeft size={12} /> Description
           </label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             onBlur={handleDescriptionBlur}
-            placeholder="Add a description..."
+            placeholder="Add a description…"
             rows={4}
-            className="w-full px-3 py-2 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] outline-none resize-none"
+            className="w-full px-3 py-2.5 rounded-lg text-sm outline-none resize-none"
+            style={{
+              backgroundColor: 'var(--color-bg-tertiary)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-primary)',
+            }}
           />
         </div>
 
         {/* Subtasks section (only for root tasks) */}
         {isRootTask && (
           <div>
-            <label className="flex items-center gap-2 text-xs text-[var(--color-text-muted)] mb-1.5">
+            <label
+              className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide mb-2"
+              style={{ color: 'var(--color-text-muted)' }}
+            >
               <ListTodo size={12} /> Subtasks
               {subtasks.length > 0 && (
-                <span className="ml-auto text-[10px]">
+                <span className="ml-auto text-xs" style={{ color: 'var(--color-text-muted)' }}>
                   {doneCount}/{subtasks.length} complete
                 </span>
               )}
             </label>
 
             {/* Subtask list */}
-            <div className="space-y-1 mb-2">
+            <div className="space-y-1 mb-3">
               {subtasks.map((sub) => (
                 <div
                   key={sub.id}
-                  className="flex items-center gap-2 px-2 py-1 rounded group hover:bg-[var(--color-bg-tertiary)]"
+                  className="flex items-center gap-2 px-2 py-2 rounded-lg group transition-colors"
+                  style={{ backgroundColor: 'transparent' }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLDivElement).style.backgroundColor = 'var(--color-bg-hover)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
+                  }}
                 >
                   <button
                     onClick={() => handleSubtaskToggle(sub)}
-                    className={`flex-shrink-0 ${
-                      sub.status === 'done'
-                        ? 'text-[var(--color-success)]'
-                        : 'text-[var(--color-text-muted)] hover:text-[var(--color-accent)]'
-                    } transition-colors`}
+                    className="flex-shrink-0 transition-colors"
+                    style={{
+                      color: sub.status === 'done'
+                        ? 'var(--color-success)'
+                        : 'var(--color-text-muted)',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sub.status !== 'done') {
+                        e.currentTarget.style.color = 'var(--color-accent)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = sub.status === 'done'
+                        ? 'var(--color-success)'
+                        : 'var(--color-text-muted)';
+                    }}
                   >
-                    {sub.status === 'done' ? <CheckCircle2 size={14} /> : <Circle size={14} />}
+                    {sub.status === 'done' ? <CheckCircle2 size={15} /> : <Circle size={15} />}
                   </button>
                   <span
-                    className={`flex-1 text-xs truncate ${
-                      sub.status === 'done'
-                        ? 'line-through text-[var(--color-text-muted)]'
-                        : 'text-[var(--color-text-primary)]'
-                    }`}
+                    className="flex-1 text-sm truncate"
+                    style={{
+                      color: sub.status === 'done' ? 'var(--color-text-muted)' : 'var(--color-text-primary)',
+                      textDecoration: sub.status === 'done' ? 'line-through' : 'none',
+                    }}
                   >
                     {sub.title}
                   </span>
                   <button
                     onClick={() => handleDeleteSubtask(sub.id)}
-                    className="opacity-0 group-hover:opacity-100 text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-all"
+                    className="opacity-0 group-hover:opacity-100 transition-all"
+                    style={{ color: 'var(--color-text-muted)' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-danger)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
                   >
                     <X size={12} />
                   </button>
@@ -327,14 +474,20 @@ export function TaskDetail({ task, onUpdate, onClose }: TaskDetailProps) {
               value={subtaskInput}
               onChange={(e) => setSubtaskInput(e.target.value)}
               onKeyDown={handleAddSubtask}
-              placeholder="Add subtask..."
-              className="w-full px-3 py-1.5 rounded-md bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] outline-none"
+              placeholder="Add subtask…"
+              className="input-base w-full text-sm"
             />
           </div>
         )}
 
         {/* Metadata */}
-        <div className="text-[10px] text-[var(--color-text-muted)] space-y-0.5 pt-2 border-t border-[var(--color-border)]">
+        <div
+          className="text-xs space-y-1 pt-4"
+          style={{
+            color: 'var(--color-text-muted)',
+            borderTop: '1px solid var(--color-border)',
+          }}
+        >
           <div>Created: {new Date(task.createdAt).toLocaleString()}</div>
           <div>Updated: {new Date(task.updatedAt).toLocaleString()}</div>
           {task.completedAt && <div>Completed: {new Date(task.completedAt).toLocaleString()}</div>}

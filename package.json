@@ -1,8 +1,8 @@
 {
-  "name": "nexus",
-  "version": "0.1.0",
+  "name": "divein",
+  "version": "0.2.0",
   "private": true,
-  "description": "Local-first productivity super-app",
+  "description": "DiveIn — Local-first productivity super-app",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",

@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { CheckSquare, Calendar, Target, BookOpen, Plus, Clock, ArrowRight } from 'lucide-react';
+import { CheckSquare, Calendar, Target, BookOpen, Plus, Clock, ArrowRight, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { useTasks, useCreateTask } from '@/modules/tasks/hooks/useTasks';
+import { useCreateTask } from '@/modules/tasks/hooks/useTasks';
 import { taskService } from '@/shared/lib/taskService';
 import { eventService } from '@/shared/lib/eventService';
 import { habitService } from '@/shared/lib/habitService';
@@ -113,75 +113,94 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold mb-1">{getGreeting()}</h1>
-      <p className="text-[var(--color-text-muted)] mb-8 text-sm">
-        {format(new Date(), 'EEEE, MMMM d, yyyy')} — Here&apos;s what&apos;s on your plate today.
-      </p>
+    <div className="px-8 py-8 max-w-5xl mx-auto">
+      {/* ─── Header ─────────────────────────────────────────────────── */}
+      <div className="mb-8">
+        <div className="flex items-center gap-3 mb-2">
+          <Sparkles size={28} style={{ color: 'var(--color-warning)' }} />
+          <h1 className="text-3xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
+            {getGreeting()}
+          </h1>
+        </div>
+        <p className="text-base" style={{ color: 'var(--color-text-muted)' }}>
+          {format(new Date(), 'EEEE, MMMM d, yyyy')} — Here&apos;s what&apos;s on your plate today.
+        </p>
+      </div>
 
       {hasError && (
-        <div className="mb-6 px-4 py-3 rounded-lg bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/30 text-sm text-[var(--color-danger)]">
+        <div
+          className="mb-6 px-4 py-3 rounded-lg text-sm"
+          style={{
+            backgroundColor: 'var(--color-danger-soft)',
+            border: '1px solid var(--color-danger)',
+            color: 'var(--color-danger)',
+          }}
+        >
           Some data couldn&apos;t be loaded. Try refreshing the page.
         </div>
       )}
 
-      {/* Stat cards */}
+      {/* ─── Stat Cards ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
         <StatCard
-          icon={<CheckSquare size={18} />}
+          icon={<CheckSquare size={20} />}
           label="Tasks due"
           value={String(tasksDue.length)}
           color="var(--color-accent)"
           onClick={() => navigate('/tasks')}
         />
         <StatCard
-          icon={<Calendar size={18} />}
+          icon={<Calendar size={20} />}
           label="Events today"
           value={String(todayEvents.length)}
           color="var(--color-success)"
           onClick={() => navigate('/calendar')}
         />
         <StatCard
-          icon={<Target size={18} />}
+          icon={<Target size={20} />}
           label="Habits"
           value={`${habitsCompleted}/${habitsTotal}`}
           color="var(--color-warning)"
           onClick={() => navigate('/habits')}
         />
         <StatCard
-          icon={<BookOpen size={18} />}
+          icon={<BookOpen size={20} />}
           label="Cards to review"
           value={String(dueCards)}
-          color="var(--color-p1)"
+          color="var(--color-danger)"
           onClick={() => navigate('/flashcards')}
         />
         <StatCard
-          icon={<Clock size={18} />}
+          icon={<Clock size={20} />}
           label="Time today"
           value={formatTimeTotal(todayTime)}
-          color="var(--color-p3)"
+          color="var(--color-accent)"
           onClick={() => navigate('/timer')}
         />
       </div>
 
-      {/* Quick capture */}
+      {/* ─── Quick Capture ──────────────────────────────────────────── */}
       <div className="mb-8">
         <div className="relative">
-          <Plus size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" />
+          <Plus
+            size={18}
+            className="absolute left-4 top-1/2 -translate-y-1/2"
+            style={{ color: 'var(--color-text-muted)' }}
+          />
           <input
             type="text"
             value={quickAddTitle}
             onChange={(e) => setQuickAddTitle(e.target.value)}
             onKeyDown={handleQuickAdd}
             placeholder="Quick add a task for today... (press Enter)"
-            className="w-full pl-10 pr-4 py-3 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors"
+            className="input-base pl-11"
+            style={{ padding: '12px 16px 12px 44px', fontSize: '0.9375rem' }}
           />
         </div>
       </div>
 
-      {/* Today sections */}
+      {/* ─── Today sections ─────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Today's Tasks */}
         <Section
           title="Today's Tasks"
           count={tasksDue.length}
@@ -197,7 +216,8 @@ export function DashboardPage() {
               {tasksDue.length > 5 && (
                 <button
                   onClick={() => navigate('/tasks')}
-                  className="w-full text-xs text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] py-2 transition-colors"
+                  className="w-full text-sm py-2 transition-colors"
+                  style={{ color: 'var(--color-accent)' }}
                 >
                   +{tasksDue.length - 5} more tasks
                 </button>
@@ -206,7 +226,6 @@ export function DashboardPage() {
           )}
         </Section>
 
-        {/* Today's Events */}
         <Section
           title="Today's Events"
           count={todayEvents.length}
@@ -222,7 +241,8 @@ export function DashboardPage() {
               {todayEvents.length > 5 && (
                 <button
                   onClick={() => navigate('/calendar')}
-                  className="w-full text-xs text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] py-2 transition-colors"
+                  className="w-full text-sm py-2 transition-colors"
+                  style={{ color: 'var(--color-accent)' }}
                 >
                   +{todayEvents.length - 5} more events
                 </button>
@@ -232,7 +252,7 @@ export function DashboardPage() {
         </Section>
       </div>
 
-      {/* Habits quick view */}
+      {/* ─── Habits ─────────────────────────────────────────────────── */}
       {habitStatus.length > 0 && (
         <Section
           title="Today's Habits"
@@ -251,7 +271,9 @@ export function DashboardPage() {
   );
 }
 
-// ─── Sub-components ─────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// Sub-components
+// ═══════════════════════════════════════════════════════════════════════════
 
 function StatCard({
   icon,
@@ -269,14 +291,21 @@ function StatCard({
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-3 p-4 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] hover:border-[var(--color-border-hover)] transition-colors text-left group"
+      className="card card-interactive flex items-center gap-4 p-5 text-left w-full group"
     >
-      <div className="p-2 rounded-md" style={{ backgroundColor: color + '20', color }}>
+      <div
+        className="p-2.5 rounded-xl shrink-0"
+        style={{ backgroundColor: color + '15', color }}
+      >
         {icon}
       </div>
       <div>
-        <div className="text-lg font-semibold">{value}</div>
-        <div className="text-xs text-[var(--color-text-muted)]">{label}</div>
+        <div className="text-2xl font-bold tabular-nums" style={{ color: 'var(--color-text-primary)' }}>
+          {value}
+        </div>
+        <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+          {label}
+        </div>
       </div>
     </button>
   );
@@ -296,12 +325,17 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold text-[var(--color-text-secondary)]">{title}</h2>
+    <div className="card p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2.5">
+          <h2 className="text-base font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+            {title}
+          </h2>
           {count !== undefined && (
-            <span className="text-xs text-[var(--color-text-muted)]">
+            <span
+              className="text-sm font-medium px-2 py-0.5 rounded-full"
+              style={{ backgroundColor: 'var(--color-bg-tertiary)', color: 'var(--color-text-muted)' }}
+            >
               {total !== undefined ? `${count}/${total}` : count}
             </span>
           )}
@@ -309,9 +343,12 @@ function Section({
         {onViewAll && (
           <button
             onClick={onViewAll}
-            className="flex items-center gap-1 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors"
+            className="flex items-center gap-1 text-sm transition-colors"
+            style={{ color: 'var(--color-text-muted)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-accent)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
           >
-            View all <ArrowRight size={12} />
+            View all <ArrowRight size={14} />
           </button>
         )}
       </div>
@@ -332,17 +369,22 @@ function TaskRow({ task, onClick }: { task: Task; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-3 w-full px-3 py-2 rounded-md hover:bg-[var(--color-bg-tertiary)] transition-colors text-left"
+      className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg transition-colors text-left"
+      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
     >
       <div
-        className="w-2 h-2 rounded-full shrink-0"
+        className="w-2.5 h-2.5 rounded-full shrink-0"
         style={{ backgroundColor: priorityColors[task.priority] ?? 'var(--color-text-muted)' }}
       />
-      <span className="text-sm truncate flex-1 text-[var(--color-text-primary)]">
+      <span className="text-sm truncate flex-1" style={{ color: 'var(--color-text-primary)' }}>
         {task.title}
       </span>
       {task.tags.length > 0 && (
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)]">
+        <span
+          className="text-xs px-2 py-0.5 rounded-full"
+          style={{ backgroundColor: 'var(--color-bg-tertiary)', color: 'var(--color-text-muted)' }}
+        >
           {task.tags[0]}
         </span>
       )}
@@ -356,11 +398,14 @@ function EventRow({ event }: { event: CalendarEvent }) {
     : format(new Date(event.startTime), 'h:mm a');
 
   return (
-    <div className="flex items-center gap-3 px-3 py-2 rounded-md">
-      <span className="text-xs text-[var(--color-accent)] font-medium w-16 shrink-0">
+    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
+      <span
+        className="text-sm font-medium w-16 shrink-0"
+        style={{ color: 'var(--color-accent)' }}
+      >
         {timeStr}
       </span>
-      <span className="text-sm truncate text-[var(--color-text-primary)]">
+      <span className="text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>
         {event.title}
       </span>
     </div>
@@ -369,18 +414,18 @@ function EventRow({ event }: { event: CalendarEvent }) {
 
 function HabitRow({ habit }: { habit: HabitWithStatus }) {
   return (
-    <div className="flex items-center gap-3 px-3 py-2 rounded-md">
+    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
       <div
-        className="w-2.5 h-2.5 rounded-full shrink-0"
+        className="w-3 h-3 rounded-full shrink-0"
         style={{ backgroundColor: habit.color ?? 'var(--color-accent)' }}
       />
-      <span className="text-sm flex-1 truncate text-[var(--color-text-primary)]">
+      <span className="text-sm flex-1 truncate" style={{ color: 'var(--color-text-primary)' }}>
         {habit.name}
       </span>
       {habit.isCompletedToday ? (
-        <span className="text-xs text-[var(--color-success)]">✓</span>
+        <span className="text-sm font-medium" style={{ color: 'var(--color-success)' }}>✓</span>
       ) : (
-        <span className="text-xs text-[var(--color-text-muted)]">—</span>
+        <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>—</span>
       )}
     </div>
   );
@@ -388,7 +433,7 @@ function HabitRow({ habit }: { habit: HabitWithStatus }) {
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="py-8 text-center text-sm text-[var(--color-text-muted)]">
+    <div className="py-10 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
       {message}
     </div>
   );

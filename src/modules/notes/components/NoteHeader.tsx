@@ -52,69 +52,99 @@ export function NoteHeader({ note, childCount, onTitleChange, onIconChange }: No
   }
 
   return (
-    <div className="px-8 pt-6 pb-4">
+    <div className="px-8 pt-10 pb-6 max-w-3xl mx-auto w-full">
       {/* Cover color bar */}
       {note.coverColor && (
         <div
-          className="h-2 rounded-full mb-4 -mx-8"
+          className="h-2 rounded-full mb-6"
           style={{ backgroundColor: note.coverColor }}
         />
       )}
 
-      {/* Icon + title row */}
-      <div className="flex items-start gap-3">
-        {/* Page icon */}
-        <div className="relative mt-1" ref={iconPickerRef}>
-          <button
-            onClick={() => setShowIconPicker((v) => !v)}
-            className="text-3xl leading-none hover:opacity-80 transition-opacity w-10 h-10 flex items-center justify-center rounded-lg hover:bg-[var(--color-bg-tertiary)]"
-            title="Change icon"
-          >
-            {note.icon ? (
-              note.icon
-            ) : (
-              <FileText size={28} className="text-[var(--color-text-muted)]" />
-            )}
-          </button>
-          {showIconPicker && (
-            <PageIconPicker
-              onSelect={onIconChange}
-              onClose={() => setShowIconPicker(false)}
-            />
+      {/* Icon button */}
+      <div className="mb-4" ref={iconPickerRef} style={{ position: 'relative' }}>
+        <button
+          onClick={() => setShowIconPicker((v) => !v)}
+          className="text-4xl leading-none transition-opacity hover:opacity-70 w-14 h-14 flex items-center justify-center rounded-xl"
+          style={{ backgroundColor: showIconPicker ? 'var(--color-bg-tertiary)' : 'transparent' }}
+          title="Change icon"
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
+          onMouseLeave={(e) => {
+            if (!showIconPicker) e.currentTarget.style.backgroundColor = 'transparent';
+          }}
+        >
+          {note.icon ? (
+            note.icon
+          ) : (
+            <FileText size={32} style={{ color: 'var(--color-text-muted)' }} />
           )}
-        </div>
+        </button>
+        {showIconPicker && (
+          <PageIconPicker
+            onSelect={onIconChange}
+            onClose={() => setShowIconPicker(false)}
+          />
+        )}
+      </div>
 
-        {/* Title */}
+      {/* Title row */}
+      <div className="flex items-start gap-3">
         <input
           type="text"
           value={localTitle}
           onChange={(e) => handleTitleChange(e.target.value)}
           onKeyDown={handleTitleKeyDown}
           placeholder="Untitled"
-          className="flex-1 text-3xl font-bold bg-transparent border-none outline-none text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] min-w-0"
+          className="flex-1 text-4xl font-bold bg-transparent border-none outline-none min-w-0 leading-tight"
+          style={{
+            color: 'var(--color-text-primary)',
+          }}
         />
 
         {/* Export menu */}
-        <div className="relative mt-1" ref={exportMenuRef}>
+        <div className="relative mt-2 shrink-0" ref={exportMenuRef}>
           <button
             onClick={() => setShowExportMenu((v) => !v)}
-            className="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+            className="p-2 rounded-lg transition-colors"
+            style={{ color: 'var(--color-text-muted)' }}
             title="Export note"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = 'var(--color-text-primary)';
+              e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--color-text-muted)';
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
           >
             <MoreHorizontal size={20} />
           </button>
           {showExportMenu && (
             <div
-              className="absolute right-0 top-full mt-1 z-50 w-52 py-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] shadow-xl"
+              className="absolute right-0 top-full mt-1 z-50 w-52 py-1 rounded-xl"
+              style={{
+                backgroundColor: 'var(--color-bg-elevated)',
+                border: '1px solid var(--color-border)',
+                boxShadow: 'var(--shadow-popup)',
+              }}
             >
               <button
                 onClick={() => {
                   exportNoteToMarkdown(note);
                   setShowExportMenu(false);
                 }}
-                className="flex items-center gap-2 w-full px-3 py-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-colors"
+                style={{ color: 'var(--color-text-secondary)' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+                  e.currentTarget.style.color = 'var(--color-text-primary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = 'var(--color-text-secondary)';
+                }}
               >
-                <FileDown size={16} />
+                <FileDown size={15} />
                 Export as Markdown
               </button>
               <button
@@ -122,9 +152,18 @@ export function NoteHeader({ note, childCount, onTitleChange, onIconChange }: No
                   exportNoteToPDF(note);
                   setShowExportMenu(false);
                 }}
-                className="flex items-center gap-2 w-full px-3 py-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm transition-colors"
+                style={{ color: 'var(--color-text-secondary)' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+                  e.currentTarget.style.color = 'var(--color-text-primary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = 'var(--color-text-secondary)';
+                }}
               >
-                <FileType size={16} />
+                <FileType size={15} />
                 Export as PDF
               </button>
             </div>
@@ -133,17 +172,20 @@ export function NoteHeader({ note, childCount, onTitleChange, onIconChange }: No
       </div>
 
       {/* Meta info */}
-      <div className="flex items-center gap-2 mt-2 ml-13 text-xs text-[var(--color-text-muted)]" style={{ paddingLeft: 52 }}>
+      <div
+        className="flex items-center gap-2 mt-3 text-sm"
+        style={{ color: 'var(--color-text-muted)' }}
+      >
         <span>Created {format(new Date(note.createdAt), 'MMM d, yyyy')}</span>
         {note.wordCount > 0 && (
           <>
-            <span>·</span>
+            <span style={{ opacity: 0.4 }}>·</span>
             <span>{note.wordCount.toLocaleString()} words</span>
           </>
         )}
         {childCount > 0 && (
           <>
-            <span>·</span>
+            <span style={{ opacity: 0.4 }}>·</span>
             <span>{childCount} sub-{childCount === 1 ? 'page' : 'pages'}</span>
           </>
         )}

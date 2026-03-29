@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { format, subWeeks, startOfWeek, eachDayOfInterval, addDays, parseISO } from 'date-fns';
+import { format, subWeeks, startOfWeek, eachDayOfInterval, addDays } from 'date-fns';
 import { Flame, TrendingUp, Calendar, Target } from 'lucide-react';
 import type { Habit, HabitEntry } from '@/shared/types/habit';
 
@@ -15,7 +15,7 @@ interface HabitStatsProps {
 interface HeatmapDay {
   date: string;
   value: number;
-  level: 0 | 1 | 2 | 3; // 0=none, 1=partial, 2=complete, 3=over
+  level: 0 | 1 | 2 | 3;
 }
 
 const WEEK_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -48,15 +48,11 @@ export function HabitStats({ habit, entries, streak, longestStreak, rate7, rate3
   const habitColor = habit.color ?? '#3b82f6';
   const isMeasurable = !!habit.unit;
 
-  // Build 12-week heatmap data
   const heatmapData = useMemo(() => {
     const today = new Date();
     const weeksBack = 12;
-    // Start from beginning of the week, 12 weeks ago
     const start = startOfWeek(subWeeks(today, weeksBack - 1));
-    const allDays = eachDayOfInterval({ start, end: today });
 
-    // Pad to fill last week
     const lastDayOfWeek = addDays(startOfWeek(today), 6);
     const paddedEnd = lastDayOfWeek > today ? lastDayOfWeek : today;
     const fullRange = eachDayOfInterval({ start, end: paddedEnd });
@@ -84,7 +80,6 @@ export function HabitStats({ habit, entries, streak, longestStreak, rate7, rate3
     });
   }, [entries, habit.target, isMeasurable]);
 
-  // Group into weeks (columns)
   const weeks = useMemo(() => {
     const cols: HeatmapDay[][] = [];
     for (let i = 0; i < heatmapData.length; i += 7) {
@@ -99,46 +94,46 @@ export function HabitStats({ habit, entries, streak, longestStreak, rate7, rate3
     <div className="flex flex-col gap-6">
       {/* Stat cards */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <Flame size={14} className="text-[var(--color-warning)]" />
-            <span className="text-xs font-medium text-[var(--color-text-secondary)]">Current Streak</span>
-          </div>
-          <p className="text-2xl font-bold" style={statStyle}>{streak}</p>
-          <p className="text-xs text-[var(--color-text-muted)]">days</p>
-        </div>
-
-        <div className="rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <TrendingUp size={14} className="text-[var(--color-success)]" />
-            <span className="text-xs font-medium text-[var(--color-text-secondary)]">Longest Streak</span>
-          </div>
-          <p className="text-2xl font-bold" style={statStyle}>{longestStreak}</p>
-          <p className="text-xs text-[var(--color-text-muted)]">days</p>
-        </div>
-
-        <div className="rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <Calendar size={14} className="text-[var(--color-accent)]" />
-            <span className="text-xs font-medium text-[var(--color-text-secondary)]">Last 7 days</span>
-          </div>
-          <p className="text-2xl font-bold" style={statStyle}>{Math.round(rate7 * 100)}%</p>
-          <p className="text-xs text-[var(--color-text-muted)]">completion</p>
-        </div>
-
-        <div className="rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <Target size={14} className="text-[var(--color-accent)]" />
-            <span className="text-xs font-medium text-[var(--color-text-secondary)]">Last 30 days</span>
-          </div>
-          <p className="text-2xl font-bold" style={statStyle}>{Math.round(rate30 * 100)}%</p>
-          <p className="text-xs text-[var(--color-text-muted)]">completion</p>
-        </div>
+        <StatBox
+          icon={<Flame size={15} />}
+          iconColor="var(--color-warning)"
+          label="Current Streak"
+          value={String(streak)}
+          unit="days"
+          valueStyle={statStyle}
+        />
+        <StatBox
+          icon={<TrendingUp size={15} />}
+          iconColor="var(--color-success)"
+          label="Longest Streak"
+          value={String(longestStreak)}
+          unit="days"
+          valueStyle={statStyle}
+        />
+        <StatBox
+          icon={<Calendar size={15} />}
+          iconColor="var(--color-accent)"
+          label="Last 7 days"
+          value={`${Math.round(rate7 * 100)}%`}
+          unit="completion"
+          valueStyle={statStyle}
+        />
+        <StatBox
+          icon={<Target size={15} />}
+          iconColor="var(--color-accent)"
+          label="Last 30 days"
+          value={`${Math.round(rate30 * 100)}%`}
+          unit="completion"
+          valueStyle={statStyle}
+        />
       </div>
 
       {/* Heatmap */}
       <div>
-        <h3 className="text-xs font-medium text-[var(--color-text-secondary)] mb-3">
+        <h3
+          className="text-xs font-semibold mb-3"
+          style={{ color: 'var(--color-text-secondary)' }}
+        >
           Activity — last 12 weeks
         </h3>
         <div className="overflow-x-auto pb-1">
@@ -174,7 +169,7 @@ export function HabitStats({ habit, entries, streak, longestStreak, rate7, rate3
 
         {/* Legend */}
         <div className="flex items-center gap-1.5 mt-2">
-          <span className="text-xs text-[var(--color-text-muted)]">Less</span>
+          <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Less</span>
           {([0, 1, 2, 3] as const).map((level) => (
             <div
               key={level}
@@ -182,9 +177,38 @@ export function HabitStats({ habit, entries, streak, longestStreak, rate7, rate3
               style={{ backgroundColor: colorAtLevel(habit.color, level) }}
             />
           ))}
-          <span className="text-xs text-[var(--color-text-muted)]">More</span>
+          <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>More</span>
         </div>
       </div>
+    </div>
+  );
+}
+
+function StatBox({
+  icon,
+  iconColor,
+  label,
+  value,
+  unit,
+  valueStyle,
+}: {
+  icon: React.ReactNode;
+  iconColor: string;
+  label: string;
+  value: string;
+  unit: string;
+  valueStyle: React.CSSProperties;
+}) {
+  return (
+    <div
+      className="card p-4"
+    >
+      <div className="flex items-center gap-2 mb-1.5">
+        <span style={{ color: iconColor }}>{icon}</span>
+        <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>{label}</span>
+      </div>
+      <p className="text-2xl font-bold" style={valueStyle}>{value}</p>
+      <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{unit}</p>
     </div>
   );
 }

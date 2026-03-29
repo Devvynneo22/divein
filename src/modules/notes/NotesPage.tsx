@@ -145,7 +145,13 @@ export function NotesPage() {
         {selectedNote ? (
           <>
             {/* Breadcrumb bar */}
-            <div className="flex items-center px-8 py-2 border-b border-[var(--color-border)] bg-[var(--color-bg-primary)] shrink-0">
+            <div
+              className="flex items-center px-8 py-2 shrink-0"
+              style={{
+                borderBottom: '1px solid var(--color-border)',
+                backgroundColor: 'var(--color-bg-primary)',
+              }}
+            >
               <NoteBreadcrumb
                 ancestors={ancestors}
                 currentNote={selectedNote}
@@ -190,22 +196,34 @@ export function NotesPage() {
 function EmptyState({ onCreateRoot }: { onCreateRoot: () => void }) {
   return (
     <div className="flex-1 flex items-center justify-center h-full">
-      <div className="text-center space-y-4">
-        <FileText
-          size={56}
-          className="mx-auto text-[var(--color-text-muted)] opacity-20"
-        />
-        <div>
-          <p className="text-base font-medium text-[var(--color-text-secondary)] mb-1">
+      <div className="text-center space-y-6 py-16 px-8">
+        <div
+          className="mx-auto w-20 h-20 rounded-2xl flex items-center justify-center"
+          style={{ backgroundColor: 'var(--color-bg-tertiary)' }}
+        >
+          <FileText
+            size={40}
+            style={{ color: 'var(--color-text-muted)', opacity: 0.5 }}
+          />
+        </div>
+        <div className="space-y-2">
+          <p
+            className="text-xl font-semibold"
+            style={{ color: 'var(--color-text-primary)' }}
+          >
             No page selected
           </p>
-          <p className="text-sm text-[var(--color-text-muted)]">
-            Select a page from the sidebar or create a new one
+          <p
+            className="text-sm max-w-xs mx-auto leading-relaxed"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
+            Select a page from the sidebar to start reading or editing, or create a fresh page to get started.
           </p>
         </div>
         <button
           onClick={onCreateRoot}
-          className="px-4 py-2 rounded-lg bg-[var(--color-accent)] text-white text-sm font-medium hover:bg-[var(--color-accent-hover)] transition-colors"
+          className="px-6 py-2.5 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90"
+          style={{ backgroundColor: 'var(--color-accent)' }}
         >
           Create first page
         </button>

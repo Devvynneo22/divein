@@ -1,4 +1,4 @@
-import { Timer, Keyboard, Play, Coffee } from 'lucide-react';
+import { Timer, Keyboard } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTimerStore } from '@/shared/stores/timerStore';
 
@@ -31,22 +31,38 @@ export function StatusBar() {
   const phaseLabel = isPomodoroMode ? PHASE_LABELS[phase] ?? '' : '';
 
   return (
-    <div className="flex items-center justify-between h-8 px-4 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-xs text-[var(--color-text-muted)]">
+    <div
+      className="flex items-center justify-between px-4 text-xs shrink-0"
+      style={{
+        height: 32,
+        borderTop: '1px solid var(--color-border)',
+        backgroundColor: 'var(--color-bg-secondary)',
+        color: 'var(--color-text-muted)',
+      }}
+    >
       {/* Left: Timer status */}
       <button
         onClick={() => navigate('/timer')}
         aria-label={isRunning ? `Timer running: ${timerDisplay}` : 'No timer running'}
-        className="flex items-center gap-2 hover:text-[var(--color-text-primary)] transition-colors"
+        className="flex items-center gap-2 transition-colors"
+        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
       >
         {isRunning ? (
           <>
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--color-success)] opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--color-success)]" />
+              <span
+                className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                style={{ backgroundColor: 'var(--color-success)' }}
+              />
+              <span
+                className="relative inline-flex rounded-full h-2 w-2"
+                style={{ backgroundColor: 'var(--color-success)' }}
+              />
             </span>
             <span className="font-mono tabular-nums">{timerDisplay}</span>
             {phaseLabel && (
-              <span className="text-[var(--color-text-muted)]">{phaseLabel}</span>
+              <span style={{ color: 'var(--color-text-muted)' }}>{phaseLabel}</span>
             )}
           </>
         ) : (
@@ -60,7 +76,7 @@ export function StatusBar() {
       {/* Right: Shortcuts hint */}
       <div className="flex items-center gap-2">
         <Keyboard size={12} />
-        <span>Ctrl+K: Commands</span>
+        <span>⌘K Commands</span>
       </div>
     </div>
   );

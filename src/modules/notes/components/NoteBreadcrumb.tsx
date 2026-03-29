@@ -10,36 +10,60 @@ interface NoteBreadcrumbProps {
 
 export function NoteBreadcrumb({ ancestors, currentNote, onNavigate, onHome }: NoteBreadcrumbProps) {
   return (
-    <nav className="flex items-center gap-1 text-xs text-[var(--color-text-muted)] min-w-0">
+    <nav
+      className="flex items-center gap-0.5 text-sm min-w-0"
+      style={{ color: 'var(--color-text-muted)' }}
+    >
       <button
         onClick={onHome}
-        className="flex items-center gap-1 hover:text-[var(--color-text-primary)] transition-colors shrink-0 px-1 py-0.5 rounded hover:bg-[var(--color-bg-tertiary)]"
+        className="flex items-center gap-1.5 px-2 py-1 rounded-md shrink-0 transition-colors"
+        style={{ color: 'var(--color-text-muted)' }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = 'var(--color-text-primary)';
+          e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = 'var(--color-text-muted)';
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }}
       >
-        <Home size={12} />
+        <Home size={13} />
         <span>Notes</span>
       </button>
 
       {ancestors.map((ancestor) => (
-        <span key={ancestor.id} className="flex items-center gap-1 min-w-0">
-          <ChevronRight size={12} className="shrink-0 opacity-50" />
+        <span key={ancestor.id} className="flex items-center gap-0.5 min-w-0">
+          <ChevronRight size={13} style={{ opacity: 0.4, flexShrink: 0 }} />
           <button
             onClick={() => onNavigate(ancestor.id)}
-            className="hover:text-[var(--color-text-primary)] transition-colors truncate max-w-[120px] px-1 py-0.5 rounded hover:bg-[var(--color-bg-tertiary)]"
+            className="flex items-center gap-1 px-2 py-1 rounded-md transition-colors truncate max-w-[140px]"
+            style={{ color: 'var(--color-text-muted)' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = 'var(--color-text-primary)';
+              e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--color-text-muted)';
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
           >
             {ancestor.icon ? (
-              <span className="mr-1">{ancestor.icon}</span>
+              <span className="shrink-0">{ancestor.icon}</span>
             ) : null}
-            {ancestor.title}
+            <span className="truncate">{ancestor.title}</span>
           </button>
         </span>
       ))}
 
-      <ChevronRight size={12} className="shrink-0 opacity-50" />
-      <span className="flex items-center gap-1 text-[var(--color-text-secondary)] truncate max-w-[160px]">
+      <ChevronRight size={13} style={{ opacity: 0.4, flexShrink: 0 }} />
+      <span
+        className="flex items-center gap-1.5 px-2 py-1 truncate max-w-[200px] font-medium"
+        style={{ color: 'var(--color-text-secondary)' }}
+      >
         {currentNote.icon ? (
-          <span>{currentNote.icon}</span>
+          <span className="shrink-0">{currentNote.icon}</span>
         ) : (
-          <FileText size={12} className="shrink-0" />
+          <FileText size={13} style={{ flexShrink: 0 }} />
         )}
         <span className="truncate">{currentNote.title}</span>
       </span>

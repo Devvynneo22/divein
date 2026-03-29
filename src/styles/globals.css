@@ -1,43 +1,141 @@
 @import "tailwindcss";
 
-@theme {
-  /* Core color palette — neutral dark theme */
-  --color-bg-primary: #09090b;
-  --color-bg-secondary: #18181b;
-  --color-bg-tertiary: #27272a;
-  --color-bg-elevated: #1c1c1f;
-  --color-border: #2e2e33;
-  --color-border-hover: #3f3f46;
-  --color-text-primary: #fafafa;
-  --color-text-secondary: #a1a1aa;
-  --color-text-muted: #71717a;
-  --color-accent: #3b82f6;
-  --color-accent-hover: #2563eb;
-  --color-danger: #ef4444;
-  --color-success: #22c55e;
-  --color-warning: #f59e0b;
+/* ═══════════════════════════════════════════════════════════════════════════
+   DiveIn Design System — Light + Dark theme via CSS custom properties
+   Follows 8px grid system, Notion-inspired spacing and typography
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Light Theme (default) ────────────────────────────────────────────────── */
+:root,
+[data-theme="light"] {
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f7f7f5;
+  --color-bg-tertiary: #f0f0ee;
+  --color-bg-elevated: #ffffff;
+  --color-bg-hover: #ebebea;
+  --color-bg-active: #e3e3e2;
+  --color-bg-wash: #fafaf9;
+
+  --color-border: #e8e8e6;
+  --color-border-hover: #d4d4d2;
+  --color-border-strong: #c4c4c2;
+
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #5a5a5a;
+  --color-text-muted: #9b9b9b;
+  --color-text-inverse: #ffffff;
+
+  --color-accent: #2383e2;
+  --color-accent-hover: #1b6ec2;
+  --color-accent-soft: rgba(35, 131, 226, 0.08);
+  --color-accent-muted: rgba(35, 131, 226, 0.15);
+
+  --color-danger: #e03e3e;
+  --color-danger-soft: rgba(224, 62, 62, 0.08);
+  --color-success: #0f7b0f;
+  --color-success-soft: rgba(15, 123, 15, 0.08);
+  --color-warning: #cf8e17;
+  --color-warning-soft: rgba(207, 142, 23, 0.08);
 
   /* Priority colors */
-  --color-p1: #ef4444;
-  --color-p2: #f59e0b;
-  --color-p3: #3b82f6;
-  --color-p4: #71717a;
+  --color-p1: #e03e3e;
+  --color-p2: #cf8e17;
+  --color-p3: #2383e2;
+  --color-p4: #9b9b9b;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-popup: 0 4px 24px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
+
+  /* Sidebar specific */
+  --sidebar-bg: #f7f7f5;
+  --sidebar-hover: #ebebea;
+  --sidebar-active: #e3e3e2;
+  --sidebar-section-text: #9b9b9b;
+  --sidebar-width: 260px;
+  --sidebar-collapsed-width: 56px;
+
+  color-scheme: light;
 }
 
-/* Base resets */
+/* ─── Dark Theme ───────────────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --color-bg-primary: #191919;
+  --color-bg-secondary: #202020;
+  --color-bg-tertiary: #2a2a2a;
+  --color-bg-elevated: #252525;
+  --color-bg-hover: #2f2f2f;
+  --color-bg-active: #363636;
+  --color-bg-wash: #1c1c1c;
+
+  --color-border: #333333;
+  --color-border-hover: #444444;
+  --color-border-strong: #555555;
+
+  --color-text-primary: #ebebeb;
+  --color-text-secondary: #9b9b9b;
+  --color-text-muted: #6b6b6b;
+  --color-text-inverse: #1a1a1a;
+
+  --color-accent: #529cca;
+  --color-accent-hover: #6bb0da;
+  --color-accent-soft: rgba(82, 156, 202, 0.12);
+  --color-accent-muted: rgba(82, 156, 202, 0.2);
+
+  --color-danger: #e06c6c;
+  --color-danger-soft: rgba(224, 108, 108, 0.12);
+  --color-success: #4daa4d;
+  --color-success-soft: rgba(77, 170, 77, 0.12);
+  --color-warning: #e0b44d;
+  --color-warning-soft: rgba(224, 180, 77, 0.12);
+
+  /* Priority colors */
+  --color-p1: #e06c6c;
+  --color-p2: #e0b44d;
+  --color-p3: #529cca;
+  --color-p4: #6b6b6b;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-popup: 0 4px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.06);
+
+  /* Sidebar specific */
+  --sidebar-bg: #202020;
+  --sidebar-hover: #2f2f2f;
+  --sidebar-active: #363636;
+  --sidebar-section-text: #6b6b6b;
+  --sidebar-width: 260px;
+  --sidebar-collapsed-width: 56px;
+
+  color-scheme: dark;
+}
+
+/* ─── Base resets ──────────────────────────────────────────────────────────── */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
-    Ubuntu, Cantarell, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
   overflow: hidden;
   height: 100vh;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 #root {
@@ -45,23 +143,53 @@ body {
   display: flex;
 }
 
-/* Scrollbar styling */
+/* ─── Typography scale ─────────────────────────────────────────────────────── */
+/* Following Notion's approach: generous sizing, tighter leading for headers */
+
+h1 { font-size: 1.875rem; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em; }
+h2 { font-size: 1.5rem; line-height: 1.25; font-weight: 600; letter-spacing: -0.02em; }
+h3 { font-size: 1.25rem; line-height: 1.3; font-weight: 600; letter-spacing: -0.01em; }
+
+/* ─── Scrollbar styling ────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
   background: var(--color-border);
-  border-radius: 3px;
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-border-hover);
 }
 
-/* ─── TipTap Editor Styles ─────────────────────────────────────────────────── */
+/* ─── Focus styles ─────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ─── Selection ────────────────────────────────────────────────────────────── */
+::selection {
+  background: var(--color-accent-muted);
+  color: var(--color-text-primary);
+}
+
+/* ─── Smooth transitions for theme switching ───────────────────────────────── */
+.theme-transition,
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TipTap Editor Styles
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 /* Task lists */
 ul[data-type="taskList"] {
@@ -83,8 +211,8 @@ ul[data-type="taskList"] li > label {
 
 ul[data-type="taskList"] li > label input[type="checkbox"] {
   appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border: 2px solid var(--color-border-hover);
   border-radius: 4px;
   background: transparent;
@@ -119,8 +247,8 @@ ul[data-type="taskList"] li[data-checked="true"] > div > p {
 
 /* Code blocks with syntax highlighting */
 .ProseMirror pre {
-  background: #1e1e2e;
-  color: #cdd6f4;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
   border-radius: 8px;
   padding: 16px 20px;
   margin: 12px 0;
@@ -138,58 +266,102 @@ ul[data-type="taskList"] li[data-checked="true"] > div > p {
   font-size: inherit;
 }
 
-/* Syntax highlighting — Catppuccin-inspired */
+/* Syntax highlighting — works for both light and dark */
 .ProseMirror pre .hljs-keyword,
 .ProseMirror pre .hljs-selector-tag,
 .ProseMirror pre .hljs-built_in {
-  color: #cba6f7;
+  color: #8839ef;
 }
 
 .ProseMirror pre .hljs-string,
 .ProseMirror pre .hljs-attribute,
 .ProseMirror pre .hljs-addition {
-  color: #a6e3a1;
+  color: #40a02b;
 }
 
 .ProseMirror pre .hljs-comment,
 .ProseMirror pre .hljs-quote {
-  color: #6c7086;
+  color: var(--color-text-muted);
   font-style: italic;
 }
 
 .ProseMirror pre .hljs-number,
 .ProseMirror pre .hljs-literal {
-  color: #fab387;
+  color: #fe640b;
 }
 
 .ProseMirror pre .hljs-name,
 .ProseMirror pre .hljs-tag {
-  color: #89b4fa;
+  color: #1e66f5;
 }
 
 .ProseMirror pre .hljs-variable,
 .ProseMirror pre .hljs-template-variable {
-  color: #f38ba8;
+  color: #d20f39;
 }
 
 .ProseMirror pre .hljs-type,
 .ProseMirror pre .hljs-title {
-  color: #f9e2af;
+  color: #df8e1d;
 }
 
 .ProseMirror pre .hljs-function {
-  color: #89b4fa;
+  color: #1e66f5;
 }
 
 .ProseMirror pre .hljs-params {
-  color: #cdd6f4;
+  color: var(--color-text-primary);
 }
 
 .ProseMirror pre .hljs-meta {
-  color: #f5c2e7;
+  color: #ea76cb;
 }
 
 .ProseMirror pre .hljs-deletion {
+  color: #d20f39;
+}
+
+[data-theme="dark"] .ProseMirror pre .hljs-keyword,
+[data-theme="dark"] .ProseMirror pre .hljs-selector-tag,
+[data-theme="dark"] .ProseMirror pre .hljs-built_in {
+  color: #cba6f7;
+}
+
+[data-theme="dark"] .ProseMirror pre .hljs-string,
+[data-theme="dark"] .ProseMirror pre .hljs-attribute,
+[data-theme="dark"] .ProseMirror pre .hljs-addition {
+  color: #a6e3a1;
+}
+
+[data-theme="dark"] .ProseMirror pre .hljs-number,
+[data-theme="dark"] .ProseMirror pre .hljs-literal {
+  color: #fab387;
+}
+
+[data-theme="dark"] .ProseMirror pre .hljs-name,
+[data-theme="dark"] .ProseMirror pre .hljs-tag {
+  color: #89b4fa;
+}
+
+[data-theme="dark"] .ProseMirror pre .hljs-variable,
+[data-theme="dark"] .ProseMirror pre .hljs-template-variable {
+  color: #f38ba8;
+}
+
+[data-theme="dark"] .ProseMirror pre .hljs-type,
+[data-theme="dark"] .ProseMirror pre .hljs-title {
+  color: #f9e2af;
+}
+
+[data-theme="dark"] .ProseMirror pre .hljs-function {
+  color: #89b4fa;
+}
+
+[data-theme="dark"] .ProseMirror pre .hljs-meta {
+  color: #f5c2e7;
+}
+
+[data-theme="dark"] .ProseMirror pre .hljs-deletion {
   color: #f38ba8;
 }
 
@@ -205,7 +377,7 @@ ul[data-type="taskList"] li[data-checked="true"] > div > p {
 .ProseMirror hr {
   border: none;
   border-top: 1px solid var(--color-border);
-  margin: 20px 0;
+  margin: 24px 0;
 }
 
 /* Inline code */
@@ -215,7 +387,7 @@ ul[data-type="taskList"] li[data-checked="true"] > div > p {
   border-radius: 4px;
   font-size: 0.875em;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  color: #f38ba8;
+  color: var(--color-danger);
 }
 
 /* Links */
@@ -233,7 +405,7 @@ ul[data-type="taskList"] li[data-checked="true"] > div > p {
 /* Wiki-links */
 .ProseMirror .wiki-link {
   color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  background: var(--color-accent-soft);
   padding: 1px 4px;
   border-radius: 3px;
   cursor: pointer;
@@ -242,7 +414,7 @@ ul[data-type="taskList"] li[data-checked="true"] > div > p {
 }
 
 .ProseMirror .wiki-link:hover {
-  background: color-mix(in srgb, var(--color-accent) 20%, transparent);
+  background: var(--color-accent-muted);
   text-decoration: underline;
 }
 
@@ -258,4 +430,99 @@ ul[data-type="taskList"] li[data-checked="true"] > div > p {
 /* Drop cursor */
 .ProseMirror .ProseMirror-dropcursor {
   color: var(--color-accent);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Utility classes
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Card component — reusable across all modules */
+.card {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.card:hover {
+  border-color: var(--color-border-hover);
+  box-shadow: var(--shadow-md);
+}
+
+/* Interactive card */
+.card-interactive {
+  cursor: pointer;
+}
+
+.card-interactive:hover {
+  border-color: var(--color-accent);
+}
+
+/* Input base */
+.input-base {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.input-base::placeholder {
+  color: var(--color-text-muted);
+}
+
+.input-base:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+/* Button base */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.4;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--color-accent-hover);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+
+.btn-ghost:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.btn-danger {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.btn-danger:hover {
+  background: var(--color-danger);
+  color: white;
 }

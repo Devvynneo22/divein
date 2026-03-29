@@ -202,7 +202,7 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
       attributes: {
         class:
           'prose prose-invert prose-base max-w-none focus:outline-none px-1 leading-relaxed',
-        style: 'min-height: calc(100vh - 200px)',
+        style: 'min-height: calc(100vh - 200px); line-height: 1.75;',
       },
       handleClick(view, _pos, event) {
         const target = event.target as HTMLElement;
@@ -457,7 +457,13 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
   return (
     <div className="flex flex-col h-full relative">
       {/* ─── Toolbar ─────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-0.5 px-3 py-1.5 border-b border-[var(--color-border)] bg-[var(--color-bg-primary)] flex-wrap shrink-0">
+      <div
+        className="flex items-center gap-0.5 px-3 py-1.5 flex-wrap shrink-0"
+        style={{
+          borderBottom: '1px solid var(--color-border)',
+          backgroundColor: 'var(--color-bg-primary)',
+        }}
+      >
         {/* Undo / Redo */}
         <ToolbarButton
           onClick={() => editor.chain().focus().undo().run()}
@@ -511,7 +517,16 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
           <button
             onClick={() => setShowColorPicker((v) => !v)}
             title="Text color"
-            className="p-1.5 rounded transition-colors text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] flex items-center gap-0.5"
+            className="p-1.5 rounded transition-colors flex items-center gap-0.5"
+            style={{ color: 'var(--color-text-muted)' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = 'var(--color-text-primary)';
+              e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--color-text-muted)';
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
           >
             <span className="text-xs font-bold" style={{ color: editor.getAttributes('textStyle').color as string | undefined ?? 'inherit' }}>
               A
@@ -519,7 +534,15 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
             <span className="text-[10px] leading-none">▾</span>
           </button>
           {showColorPicker && (
-            <div className="absolute top-full left-0 mt-1 z-50 p-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] shadow-xl flex gap-1 flex-wrap" style={{ width: 120 }}>
+            <div
+              className="absolute top-full left-0 mt-1 z-50 p-2 rounded-xl flex gap-1 flex-wrap"
+              style={{
+                width: 120,
+                backgroundColor: 'var(--color-bg-elevated)',
+                border: '1px solid var(--color-border)',
+                boxShadow: 'var(--shadow-popup)',
+              }}
+            >
               {TEXT_COLORS.map(({ color, label }) => (
                 <button
                   key={color}
@@ -539,7 +562,10 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
                   editor.chain().focus().unsetColor().run();
                   setShowColorPicker(false);
                 }}
-                className="w-full text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] mt-1"
+                className="w-full text-xs mt-1 transition-colors"
+                style={{ color: 'var(--color-text-muted)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
               >
                 Reset
               </button>
@@ -660,7 +686,7 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
       {/* ─── Editor area ─────────────────────────────────────────────── */}
       <div
         ref={editorWrapRef}
-        className="flex-1 overflow-y-auto px-8 py-6"
+        className="flex-1 overflow-y-auto px-8 py-8"
         onKeyDown={handleKeyDown}
       >
         <div className="max-w-3xl mx-auto">
@@ -709,7 +735,12 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
 // ─── Toolbar helpers ──────────────────────────────────────────────────────────
 
 function Divider() {
-  return <div className="w-px h-4 bg-[var(--color-border)] mx-1" />;
+  return (
+    <div
+      className="w-px h-4 mx-1"
+      style={{ backgroundColor: 'var(--color-border)' }}
+    />
+  );
 }
 
 function ToolbarButton({
@@ -727,11 +758,23 @@ function ToolbarButton({
     <button
       onClick={onClick}
       title={title}
-      className={`p-1.5 rounded transition-colors ${
-        active
-          ? 'bg-[var(--color-accent)]/20 text-[var(--color-accent)]'
-          : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)]'
-      }`}
+      className="p-1.5 rounded transition-colors"
+      style={{
+        backgroundColor: active ? 'var(--color-accent-muted)' : 'transparent',
+        color: active ? 'var(--color-accent)' : 'var(--color-text-muted)',
+      }}
+      onMouseEnter={(e) => {
+        if (!active) {
+          e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+          e.currentTarget.style.color = 'var(--color-text-primary)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!active) {
+          e.currentTarget.style.backgroundColor = 'transparent';
+          e.currentTarget.style.color = 'var(--color-text-muted)';
+        }
+      }}
     >
       {icon}
     </button>

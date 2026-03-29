@@ -121,26 +121,40 @@ export function CommandPalette() {
 
   if (!open) return null;
 
+  const groupHeadingClass = '[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-widest';
+
   return (
     <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Command palette">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 backdrop-blur-sm"
+        style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
         onClick={() => setOpen(false)}
       />
 
       {/* Dialog */}
-      <div className="absolute top-[20%] left-1/2 -translate-x-1/2 w-full max-w-lg">
+      <div className="absolute top-[20%] left-1/2 -translate-x-1/2 w-full max-w-lg px-4">
         <Command
-          className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] shadow-2xl overflow-hidden"
+          className="rounded-xl overflow-hidden"
+          style={{
+            border: '1px solid var(--color-border)',
+            backgroundColor: 'var(--color-bg-elevated)',
+            boxShadow: 'var(--shadow-popup)',
+          }}
           loop
         >
           {/* Search input */}
-          <div className="flex items-center gap-2 px-4 border-b border-[var(--color-border)]">
-            <Search size={16} className="text-[var(--color-text-muted)] shrink-0" />
+          <div
+            className="flex items-center gap-3 px-4"
+            style={{ borderBottom: '1px solid var(--color-border)' }}
+          >
+            <Search size={18} className="shrink-0" style={{ color: 'var(--color-text-muted)' }} />
             <Command.Input
               placeholder="Type a command or search..."
-              className="w-full py-3.5 bg-transparent text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] outline-none"
+              className="w-full py-4 bg-transparent text-sm outline-none"
+              style={{
+                color: 'var(--color-text-primary)',
+              }}
               autoFocus
               value={inputValue}
               onValueChange={setInputValue}
@@ -149,29 +163,30 @@ export function CommandPalette() {
 
           {/* Results */}
           <Command.List className="max-h-80 overflow-y-auto p-2">
-            <Command.Empty className="py-6 text-center text-sm text-[var(--color-text-muted)]">
+            <Command.Empty
+              className="py-8 text-center text-sm"
+              style={{ color: 'var(--color-text-muted)' }}
+            >
               No results found.
             </Command.Empty>
 
-            {/* Search Results group — only when there are actual search hits */}
+            {/* Search Results group */}
             {searchResults.length > 0 && (
-              <Command.Group
-                heading="Search Results"
-                className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-[var(--color-text-muted)]"
-              >
+              <Command.Group heading="Search Results" className={groupHeadingClass}>
                 {searchResults.map((result) => (
                   <Command.Item
                     key={`search-${result.type}-${result.id}`}
                     value={`search ${result.title} ${result.type}`}
                     onSelect={() => go(result.route)}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[var(--color-text-secondary)] cursor-pointer transition-colors data-[selected=true]:bg-[var(--color-accent)] data-[selected=true]:bg-opacity-15 data-[selected=true]:text-[var(--color-text-primary)]"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm cursor-pointer transition-colors data-[selected=true]:bg-[var(--color-accent-soft)]"
+                    style={{ color: 'var(--color-text-secondary)' }}
                   >
-                    <span className="text-[var(--color-text-muted)]">
+                    <span style={{ color: 'var(--color-text-muted)' }}>
                       {TYPE_ICONS[result.type]}
                     </span>
                     <span className="flex-1 truncate">{result.title}</span>
                     <span
-                      className="shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded"
+                      className="shrink-0 text-[11px] font-medium px-1.5 py-0.5 rounded"
                       style={{
                         color: TYPE_COLORS[result.type],
                         backgroundColor: `color-mix(in srgb, ${TYPE_COLORS[result.type]} 15%, transparent)`,
@@ -188,19 +203,16 @@ export function CommandPalette() {
               const items = commands.filter((c) => c.group === group);
               if (items.length === 0) return null;
               return (
-                <Command.Group
-                  key={group}
-                  heading={group}
-                  className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-[var(--color-text-muted)]"
-                >
+                <Command.Group key={group} heading={group} className={groupHeadingClass}>
                   {items.map((cmd) => (
                     <Command.Item
                       key={cmd.id}
                       value={`${cmd.label} ${cmd.keywords?.join(' ') ?? ''}`}
                       onSelect={cmd.action}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[var(--color-text-secondary)] cursor-pointer transition-colors data-[selected=true]:bg-[var(--color-accent)] data-[selected=true]:bg-opacity-15 data-[selected=true]:text-[var(--color-text-primary)]"
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm cursor-pointer transition-colors data-[selected=true]:bg-[var(--color-accent-soft)]"
+                      style={{ color: 'var(--color-text-secondary)' }}
                     >
-                      <span className="text-[var(--color-text-muted)]">{cmd.icon}</span>
+                      <span style={{ color: 'var(--color-text-muted)' }}>{cmd.icon}</span>
                       {cmd.label}
                     </Command.Item>
                   ))}
@@ -210,7 +222,13 @@ export function CommandPalette() {
           </Command.List>
 
           {/* Footer hint */}
-          <div className="flex items-center justify-between px-4 py-2 border-t border-[var(--color-border)] text-[10px] text-[var(--color-text-muted)]">
+          <div
+            className="flex items-center justify-between px-4 py-2.5 text-[11px]"
+            style={{
+              borderTop: '1px solid var(--color-border)',
+              color: 'var(--color-text-muted)',
+            }}
+          >
             <span>↑↓ Navigate</span>
             <span>↵ Select</span>
             <span>Esc Close</span>

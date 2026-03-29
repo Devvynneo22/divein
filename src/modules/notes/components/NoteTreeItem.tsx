@@ -28,6 +28,7 @@ export const NoteTreeItem = memo(function NoteTreeItem({
   const isSelected = node.id === selectedId;
   const isExpanded = expandedIds.has(node.id);
   const [showMenu, setShowMenu] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const indentPx = node.depth * 16 + 8;
@@ -46,70 +47,116 @@ export const NoteTreeItem = memo(function NoteTreeItem({
   return (
     <div>
       <div
-        className={`group relative flex items-center h-7 cursor-pointer rounded-md mx-1 select-none transition-colors ${
-          isSelected
-            ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent)]'
-            : 'hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)]'
-        }`}
-        style={{ paddingLeft: indentPx }}
+        className="group relative flex items-center cursor-pointer select-none transition-colors mx-2 rounded-lg"
+        style={{
+          paddingLeft: indentPx,
+          paddingTop: '6px',
+          paddingBottom: '6px',
+          paddingRight: '4px',
+          backgroundColor: isSelected
+            ? 'var(--color-accent-soft)'
+            : isHovered
+            ? 'var(--color-bg-hover)'
+            : 'transparent',
+          color: isSelected ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+        }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
         onClick={() => onSelect(node.id)}
       >
         {/* Expand/collapse chevron */}
         <button
-          className={`shrink-0 w-4 h-4 flex items-center justify-center rounded hover:bg-[var(--color-bg-elevated)] transition-colors mr-0.5 ${
-            node.hasChildren ? 'opacity-100' : 'opacity-0 pointer-events-none'
-          }`}
+          className="shrink-0 w-5 h-5 flex items-center justify-center rounded transition-colors mr-0.5"
+          style={{
+            opacity: node.hasChildren ? 1 : 0,
+            pointerEvents: node.hasChildren ? 'auto' : 'none',
+            color: 'var(--color-text-muted)',
+          }}
           onClick={(e) => {
             e.stopPropagation();
             if (node.hasChildren) onToggleExpand(node.id);
           }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-elevated)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
         >
           {isExpanded ? (
-            <ChevronDown size={12} />
+            <ChevronDown size={13} />
           ) : (
-            <ChevronRight size={12} />
+            <ChevronRight size={13} />
           )}
         </button>
 
         {/* Icon */}
-        <span className="shrink-0 mr-1.5 text-sm leading-none">
+        <span className="shrink-0 mr-2 text-sm leading-none">
           {node.icon ? (
             node.icon
           ) : isExpanded && node.hasChildren ? (
-            <FolderOpen size={14} className={isSelected ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-muted)]'} />
+            <FolderOpen
+              size={15}
+              style={{ color: isSelected ? 'var(--color-accent)' : 'var(--color-text-muted)' }}
+            />
           ) : (
-            <FileText size={14} className={isSelected ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-muted)]'} />
+            <FileText
+              size={15}
+              style={{ color: isSelected ? 'var(--color-accent)' : 'var(--color-text-muted)' }}
+            />
           )}
         </span>
 
         {/* Title */}
-        <span className="flex-1 text-xs font-medium truncate pr-1">
+        <span className="flex-1 text-sm font-medium truncate pr-1">
           {node.title}
         </span>
 
         {/* Hover actions */}
         <div
-          className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mr-1"
+          className="flex items-center gap-0.5 shrink-0 mr-0.5 transition-opacity"
+          style={{ opacity: isHovered || showMenu ? 1 : 0 }}
           onClick={(e) => e.stopPropagation()}
         >
           <button
             onClick={() => onCreateChild(node.id)}
             title="New sub-page"
-            className="w-5 h-5 flex items-center justify-center rounded hover:bg-[var(--color-bg-elevated)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
+            className="w-6 h-6 flex items-center justify-center rounded transition-colors"
+            style={{ color: 'var(--color-text-muted)' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-bg-elevated)';
+              e.currentTarget.style.color = 'var(--color-text-primary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = 'var(--color-text-muted)';
+            }}
           >
-            <Plus size={11} />
+            <Plus size={12} />
           </button>
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setShowMenu((v) => !v)}
               title="More options"
-              className="w-5 h-5 flex items-center justify-center rounded hover:bg-[var(--color-bg-elevated)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
+              className="w-6 h-6 flex items-center justify-center rounded transition-colors"
+              style={{ color: 'var(--color-text-muted)' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--color-bg-elevated)';
+                e.currentTarget.style.color = 'var(--color-text-primary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = 'var(--color-text-muted)';
+              }}
             >
-              <MoreHorizontal size={11} />
+              <MoreHorizontal size={12} />
             </button>
 
             {showMenu && (
-              <div className="absolute right-0 top-full mt-1 w-44 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] shadow-xl z-50 py-1">
+              <div
+                className="absolute right-0 top-full mt-1 w-48 rounded-xl py-1.5 z-50"
+                style={{
+                  backgroundColor: 'var(--color-bg-elevated)',
+                  border: '1px solid var(--color-border)',
+                  boxShadow: 'var(--shadow-popup)',
+                }}
+              >
                 <MenuItem
                   onClick={() => { onRename(node.id); setShowMenu(false); }}
                   label="Rename"
@@ -124,7 +171,10 @@ export const NoteTreeItem = memo(function NoteTreeItem({
                   label="New sub-page"
                   icon={<Plus size={12} />}
                 />
-                <div className="my-1 border-t border-[var(--color-border)]" />
+                <div
+                  className="my-1"
+                  style={{ borderTop: '1px solid var(--color-border)' }}
+                />
                 <MenuItem
                   onClick={() => { onTrash(node.id); setShowMenu(false); }}
                   label="Move to Trash"
@@ -174,13 +224,18 @@ function MenuItem({
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-xs hover:bg-[var(--color-bg-tertiary)] transition-colors ${
-        danger
-          ? 'text-[var(--color-danger)]'
-          : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-      }`}
+      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors"
+      style={{ color: danger ? 'var(--color-danger)' : 'var(--color-text-secondary)' }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+        if (!danger) e.currentTarget.style.color = 'var(--color-text-primary)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = 'transparent';
+        e.currentTarget.style.color = danger ? 'var(--color-danger)' : 'var(--color-text-secondary)';
+      }}
     >
-      {icon && <span className="opacity-70">{icon}</span>}
+      {icon && <span style={{ opacity: 0.7 }}>{icon}</span>}
       {label}
     </button>
   );

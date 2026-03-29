@@ -37,31 +37,52 @@ function StatusIcon({ status, onClick }: { status: TaskStatus; onClick: () => vo
 
   if (status === 'done') {
     return (
-      <button onClick={handleClick} aria-label="Mark as to do" className="text-[var(--color-success)] hover:text-[var(--color-text-secondary)] transition-colors">
+      <button
+        onClick={handleClick}
+        aria-label="Mark as to do"
+        className="transition-colors"
+        style={{ color: 'var(--color-success)' }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-success)'; }}
+      >
         <CheckCircle2 size={18} />
       </button>
     );
   }
   if (status === 'in_progress') {
     return (
-      <button onClick={handleClick} aria-label="Mark as done" className="text-[var(--color-accent)] hover:text-[var(--color-success)] transition-colors">
+      <button
+        onClick={handleClick}
+        aria-label="Mark as done"
+        className="transition-colors"
+        style={{ color: 'var(--color-accent)' }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-success)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-accent)'; }}
+      >
         <Clock size={18} />
       </button>
     );
   }
   return (
-    <button onClick={handleClick} aria-label={`Mark as ${nextStatus[status]}`} className="text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors">
+    <button
+      onClick={handleClick}
+      aria-label={`Mark as ${nextStatus[status]}`}
+      className="transition-colors"
+      style={{ color: 'var(--color-text-muted)' }}
+      onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-accent)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+    >
       <Circle size={18} />
     </button>
   );
 }
 
-function formatDueDate(dateStr: string): { text: string; className: string } {
+function formatDueDate(dateStr: string): { text: string; color: string } {
   const date = new Date(dateStr);
-  if (isToday(date)) return { text: 'Today', className: 'text-[var(--color-accent)]' };
-  if (isTomorrow(date)) return { text: 'Tomorrow', className: 'text-[var(--color-warning)]' };
-  if (isPast(date)) return { text: format(date, 'MMM d'), className: 'text-[var(--color-danger)]' };
-  return { text: format(date, 'MMM d'), className: 'text-[var(--color-text-muted)]' };
+  if (isToday(date)) return { text: 'Today', color: 'var(--color-accent)' };
+  if (isTomorrow(date)) return { text: 'Tomorrow', color: 'var(--color-warning)' };
+  if (isPast(date)) return { text: format(date, 'MMM d'), color: 'var(--color-danger)' };
+  return { text: format(date, 'MMM d'), color: 'var(--color-text-muted)' };
 }
 
 const nextStatus: Record<TaskStatus, TaskStatus> = {
@@ -89,6 +110,7 @@ export function TaskItem({
   const [expanded, setExpanded] = useState(false);
   const [addingSubtask, setAddingSubtask] = useState(false);
   const [subtaskTitle, setSubtaskTitle] = useState('');
+  const [isHovered, setIsHovered] = useState(false);
 
   const { data: subtasks = [] } = useSubtasks(isSubtask ? null : task.id);
   const createTask = useCreateTask();
@@ -127,6 +149,18 @@ export function TaskItem({
     deleteTask.mutate(subtaskId);
   }
 
+  const rowBg = isSelected
+    ? 'var(--color-accent-soft)'
+    : isHovered
+    ? 'var(--color-bg-hover)'
+    : 'transparent';
+
+  const rowBorder = isSelected
+    ? '1px solid var(--color-accent-muted)'
+    : '1px solid transparent';
+
+  const dueDateInfo = task.dueDate ? formatDueDate(task.dueDate) : null;
+
   return (
     <div>
       <div
@@ -137,21 +171,37 @@ export function TaskItem({
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         onDragEnd={onDragEnd}
-        className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
-          isSelected
-            ? 'bg-[var(--color-accent)] bg-opacity-10 border border-[var(--color-accent)] border-opacity-30'
-            : 'hover:bg-[var(--color-bg-secondary)] border border-transparent'
-        } ${task.status === 'done' ? 'opacity-50' : ''} ${isSubtask ? 'ml-6' : ''}`}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className={`group flex items-center gap-3 py-3 px-4 rounded-lg cursor-pointer transition-colors ${
+          task.status === 'done' ? 'opacity-50' : ''
+        } ${isSubtask ? 'ml-7' : ''}`}
+        style={{ backgroundColor: rowBg, border: rowBorder }}
       >
         {/* Expand/collapse for parent tasks */}
         {!isSubtask && (
           <button
             onClick={hasSubtasks ? handleToggleExpand : handleAddSubtaskClick}
-            className={`flex-shrink-0 w-4 transition-colors ${
-              hasSubtasks
-                ? 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
-                : 'text-transparent group-hover:text-[var(--color-text-muted)] hover:!text-[var(--color-accent)]'
-            }`}
+            className="flex-shrink-0 w-4 transition-colors"
+            style={{
+              color: hasSubtasks
+                ? 'var(--color-text-muted)'
+                : isHovered
+                ? 'var(--color-text-muted)'
+                : 'transparent',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = hasSubtasks
+                ? 'var(--color-text-primary)'
+                : 'var(--color-accent)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = hasSubtasks
+                ? 'var(--color-text-muted)'
+                : isHovered
+                ? 'var(--color-text-muted)'
+                : 'transparent';
+            }}
           >
             {hasSubtasks ? (
               expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />
@@ -166,26 +216,28 @@ export function TaskItem({
 
         {/* Priority indicator */}
         {task.priority > 0 && (
-          <Flag size={14} style={{ color: PRIORITY_COLORS[task.priority] }} />
+          <Flag size={14} style={{ color: PRIORITY_COLORS[task.priority], flexShrink: 0 }} />
         )}
 
         {/* Title */}
         <span
-          className={`flex-1 text-sm truncate ${
-            task.status === 'done' ? 'line-through text-[var(--color-text-muted)]' : 'text-[var(--color-text-primary)]'
-          }`}
+          className="flex-1 text-sm truncate"
+          style={{
+            color: task.status === 'done' ? 'var(--color-text-muted)' : 'var(--color-text-primary)',
+            textDecoration: task.status === 'done' ? 'line-through' : 'none',
+          }}
         >
           {task.title}
         </span>
 
         {/* Recurrence badge */}
         {task.recurrence && (
-          <Repeat size={12} className="flex-shrink-0 text-[var(--color-accent)]" />
+          <Repeat size={12} className="flex-shrink-0" style={{ color: 'var(--color-accent)' }} />
         )}
 
         {/* Subtask count */}
         {hasSubtasks && (
-          <span className="text-[10px] text-[var(--color-text-muted)]">
+          <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
             {subtasks.filter((s) => s.status === 'done').length}/{subtasks.length}
           </span>
         )}
@@ -196,7 +248,11 @@ export function TaskItem({
             {task.tags.slice(0, 2).map((tag) => (
               <span
                 key={tag}
-                className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)]"
+                className="px-2 py-0.5 rounded-full text-xs"
+                style={{
+                  backgroundColor: 'var(--color-bg-tertiary)',
+                  color: 'var(--color-text-muted)',
+                }}
               >
                 {tag}
               </span>
@@ -205,9 +261,9 @@ export function TaskItem({
         )}
 
         {/* Due date */}
-        {task.dueDate && (
-          <span className={`text-xs ${formatDueDate(task.dueDate).className}`}>
-            {formatDueDate(task.dueDate).text}
+        {dueDateInfo && (
+          <span className="text-xs" style={{ color: dueDateInfo.color }}>
+            {dueDateInfo.text}
           </span>
         )}
 
@@ -215,7 +271,10 @@ export function TaskItem({
         {!isSubtask && hasSubtasks && (
           <button
             onClick={handleAddSubtaskClick}
-            className="opacity-0 group-hover:opacity-100 text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-all"
+            className="opacity-0 group-hover:opacity-100 transition-all"
+            style={{ color: 'var(--color-text-muted)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-accent)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
           >
             <Plus size={14} />
           </button>
@@ -228,7 +287,10 @@ export function TaskItem({
             onDelete();
           }}
           aria-label="Delete task"
-          className="opacity-0 group-hover:opacity-100 text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-all"
+          className="opacity-0 group-hover:opacity-100 transition-all"
+          style={{ color: 'var(--color-text-muted)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-danger)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
         >
           <Trash2 size={14} />
         </button>
@@ -251,7 +313,7 @@ export function TaskItem({
 
           {/* Add subtask input */}
           {addingSubtask && (
-            <div className="ml-6 px-3 py-1.5">
+            <div className="ml-7 px-4 py-2">
               <input
                 autoFocus
                 type="text"
@@ -261,8 +323,8 @@ export function TaskItem({
                 onBlur={() => {
                   if (!subtaskTitle.trim()) setAddingSubtask(false);
                 }}
-                placeholder="Add subtask... (Enter to save, Esc to cancel)"
-                className="w-full px-3 py-1.5 rounded-md bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors"
+                placeholder="Add subtask… (Enter to save, Esc to cancel)"
+                className="input-base w-full text-sm"
               />
             </div>
           )}

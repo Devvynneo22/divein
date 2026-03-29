@@ -19,8 +19,8 @@ function formatTime(seconds: number): string {
   return [m, s].map((n) => String(n).padStart(2, '0')).join(':');
 }
 
-const RADIUS = 110;
-const STROKE = 8;
+const RADIUS = 120;
+const STROKE = 10;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 export function TimerDisplay({
@@ -41,18 +41,20 @@ export function TimerDisplay({
   const dashOffset = CIRCUMFERENCE * (1 - progress);
   const displayTime = isPomodoroMode ? secondsRemaining : secondsElapsed;
 
+  const size = 2 * (RADIUS + STROKE + 6);
+
   return (
     <div className="relative flex items-center justify-center">
       {isPomodoroMode ? (
         <svg
-          width={2 * (RADIUS + STROKE + 4)}
-          height={2 * (RADIUS + STROKE + 4)}
+          width={size}
+          height={size}
           className="rotate-[-90deg]"
         >
           {/* Track */}
           <circle
-            cx={RADIUS + STROKE + 4}
-            cy={RADIUS + STROKE + 4}
+            cx={size / 2}
+            cy={size / 2}
             r={RADIUS}
             fill="none"
             stroke="var(--color-bg-tertiary)"
@@ -60,8 +62,8 @@ export function TimerDisplay({
           />
           {/* Progress */}
           <circle
-            cx={RADIUS + STROKE + 4}
-            cy={RADIUS + STROKE + 4}
+            cx={size / 2}
+            cy={size / 2}
             r={RADIUS}
             fill="none"
             stroke={accentColor}
@@ -73,27 +75,30 @@ export function TimerDisplay({
           />
         </svg>
       ) : (
-        /* Stopwatch outer glow ring */
+        /* Stopwatch outer ring */
         <div
           className="rounded-full"
           style={{
-            width: 2 * (RADIUS + STROKE + 4),
-            height: 2 * (RADIUS + STROKE + 4),
+            width: size,
+            height: size,
             border: `${STROKE}px solid var(--color-bg-tertiary)`,
           }}
         />
       )}
 
       {/* Center content */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
         <span
-          className={`text-6xl font-bold tracking-tight select-none ${isRunning ? 'opacity-100' : 'opacity-80'}`}
+          className={`font-bold tracking-tight select-none ${isRunning ? 'opacity-100' : 'opacity-80'}`}
           style={{
+            fontSize: '4rem',
             fontVariantNumeric: 'tabular-nums',
             fontFamily: 'ui-monospace, "Cascadia Code", "Fira Code", monospace',
             color: accentColor,
             transition: 'color 0.5s ease',
-            textShadow: isRunning ? `0 0 40px ${accentColor}55` : 'none',
+            textShadow: isRunning
+              ? `0 0 48px color-mix(in srgb, ${accentColor} 35%, transparent)`
+              : 'none',
           }}
         >
           {formatTime(displayTime)}

@@ -329,7 +329,7 @@ export function exportNoteToPDF(note: Note): void {
 </head>
 <body>
   <h1>${escapeHtml(note.title)}</h1>
-  <div class="meta">Exported from Nexus · ${new Date().toLocaleDateString()}</div>
+  <div class="meta">Exported from DiveIn · ${new Date().toLocaleDateString()}</div>
   <div>${html}</div>
 </body>
 </html>`);
