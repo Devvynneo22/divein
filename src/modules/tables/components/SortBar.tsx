@@ -7,8 +7,15 @@ interface SortBarProps {
   onChange: (sorts: TableSort[]) => void;
 }
 
-const selectClass =
-  'bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded px-2 py-1 text-xs text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)] transition-colors';
+const selectStyle: React.CSSProperties = {
+  backgroundColor: 'var(--color-bg-primary)',
+  border: '1px solid var(--color-border)',
+  borderRadius: '4px',
+  padding: '2px 8px',
+  fontSize: '12px',
+  color: 'var(--color-text-primary)',
+  outline: 'none',
+};
 
 export function SortBar({ columns, sorts, onChange }: SortBarProps) {
   function addSort() {
@@ -32,22 +39,32 @@ export function SortBar({ columns, sorts, onChange }: SortBarProps) {
   }
 
   return (
-    <div className="flex flex-col gap-2 p-3 bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)]">
+    <div
+      className="flex flex-col gap-2 p-3"
+      style={{
+        backgroundColor: 'var(--color-bg-secondary)',
+        borderBottom: '1px solid var(--color-border)',
+      }}
+    >
       <div className="flex items-center gap-2 flex-wrap">
         {sorts.map((sort, i) => (
           <div
             key={i}
-            className="flex items-center gap-1 bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] rounded-lg px-2 py-1 text-xs"
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs"
+            style={{
+              backgroundColor: 'var(--color-bg-tertiary)',
+              border: '1px solid var(--color-border)',
+            }}
           >
             {/* Priority indicator */}
             {sorts.length > 1 && (
-              <span className="text-[var(--color-text-muted)] mr-0.5">{i + 1}.</span>
+              <span className="mr-0.5" style={{ color: 'var(--color-text-muted)' }}>{i + 1}.</span>
             )}
 
             {/* Column */}
             <select
               value={sort.columnId}
-              className={selectClass}
+              style={selectStyle}
               onChange={(e) => updateSort(i, { columnId: e.target.value })}
             >
               {columns.map((c) => (
@@ -64,7 +81,14 @@ export function SortBar({ columns, sorts, onChange }: SortBarProps) {
                   direction: sort.direction === 'asc' ? 'desc' : 'asc',
                 })
               }
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--color-bg-primary)] border border-[var(--color-border)] hover:border-[var(--color-accent)] transition-colors text-[var(--color-text-secondary)]"
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors"
+              style={{
+                backgroundColor: 'var(--color-bg-primary)',
+                border: '1px solid var(--color-border)',
+                color: 'var(--color-text-secondary)',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
             >
               {sort.direction === 'asc' ? (
                 <>
@@ -80,7 +104,10 @@ export function SortBar({ columns, sorts, onChange }: SortBarProps) {
             {/* Remove */}
             <button
               onClick={() => removeSort(i)}
-              className="text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-colors ml-0.5"
+              className="ml-0.5 transition-colors"
+              style={{ color: 'var(--color-text-muted)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-danger)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
             >
               <X size={12} />
             </button>
@@ -90,7 +117,16 @@ export function SortBar({ columns, sorts, onChange }: SortBarProps) {
         {/* Add sort */}
         <button
           onClick={addSort}
-          className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] border border-dashed border-[var(--color-border)] transition-colors"
+          className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs border border-dashed transition-colors"
+          style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--color-text-primary)';
+            e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--color-text-muted)';
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
         >
           <Plus size={12} /> Add sort
         </button>
@@ -98,7 +134,10 @@ export function SortBar({ columns, sorts, onChange }: SortBarProps) {
         {sorts.length > 0 && (
           <button
             onClick={clearAll}
-            className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-colors ml-auto"
+            className="text-xs ml-auto transition-colors"
+            style={{ color: 'var(--color-text-muted)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-danger)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
           >
             Clear sorts
           </button>

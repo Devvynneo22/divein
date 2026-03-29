@@ -39,12 +39,19 @@ export function ProjectHeader({
           )}
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-2xl font-bold text-[var(--color-text-primary)] break-words">
+              <h1
+                className="text-2xl font-bold break-words"
+                style={{ color: 'var(--color-text-primary)' }}
+              >
                 {project.name}
               </h1>
               {isArchived && (
                 <span
-                  className="flex items-center gap-1 text-xs text-[var(--color-text-muted)] border border-[var(--color-border)] px-2 py-0.5 rounded-full"
+                  className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
+                  style={{
+                    color: 'var(--color-text-muted)',
+                    border: '1px solid var(--color-border)',
+                  }}
                 >
                   <Archive size={10} />
                   Archived
@@ -52,7 +59,7 @@ export function ProjectHeader({
               )}
             </div>
             {project.description && (
-              <p className="text-sm text-[var(--color-text-muted)] mt-1">
+              <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
                 {project.description}
               </p>
             )}
@@ -61,44 +68,44 @@ export function ProjectHeader({
 
         {/* Right: action buttons */}
         <div className="flex items-center gap-1 flex-shrink-0">
-          <button
-            onClick={onEdit}
-            title="Edit project"
-            className="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
-          >
+          <HeaderButton onClick={onEdit} title="Edit project">
             <Edit size={16} />
-          </button>
+          </HeaderButton>
 
           {isArchived ? (
-            <button
-              onClick={onUnarchive}
-              title="Unarchive project"
-              className="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
-            >
+            <HeaderButton onClick={onUnarchive} title="Unarchive project">
               <ArchiveRestore size={16} />
-            </button>
+            </HeaderButton>
           ) : (
-            <button
-              onClick={onArchive}
-              title="Archive project"
-              className="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
-            >
+            <HeaderButton onClick={onArchive} title="Archive project">
               <Archive size={16} />
-            </button>
+            </HeaderButton>
           )}
 
           {confirmDelete ? (
             <div className="flex items-center gap-1">
-              <span className="text-xs text-[var(--color-danger)] mr-1">Delete?</span>
+              <span className="text-xs mr-1" style={{ color: 'var(--color-danger)' }}>Delete?</span>
               <button
                 onClick={onDelete}
-                className="px-2.5 py-1 rounded-lg bg-[var(--color-danger)] text-white text-xs font-medium transition-colors hover:opacity-90"
+                className="px-2.5 py-1 rounded-lg text-xs font-medium transition-colors"
+                style={{
+                  backgroundColor: 'var(--color-danger)',
+                  color: 'var(--color-text-primary)',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.85'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
               >
                 Yes
               </button>
               <button
                 onClick={() => setConfirmDelete(false)}
-                className="px-2.5 py-1 rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] text-xs transition-colors hover:bg-[var(--color-bg-tertiary)]"
+                className="px-2.5 py-1 rounded-lg text-xs transition-colors"
+                style={{
+                  border: '1px solid var(--color-border)',
+                  color: 'var(--color-text-secondary)',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
               >
                 No
               </button>
@@ -107,7 +114,16 @@ export function ProjectHeader({
             <button
               onClick={() => setConfirmDelete(true)}
               title="Delete project"
-              className="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-danger)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+              className="p-2 rounded-lg transition-colors"
+              style={{ color: 'var(--color-text-muted)' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = 'var(--color-danger)';
+                e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'var(--color-text-muted)';
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
             >
               <Trash2 size={16} />
             </button>
@@ -115,5 +131,34 @@ export function ProjectHeader({
         </div>
       </div>
     </div>
+  );
+}
+
+function HeaderButton({
+  onClick,
+  title,
+  children,
+}: {
+  onClick: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="p-2 rounded-lg transition-colors"
+      style={{ color: 'var(--color-text-muted)' }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.color = 'var(--color-text-primary)';
+        e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.color = 'var(--color-text-muted)';
+        e.currentTarget.style.backgroundColor = 'transparent';
+      }}
+    >
+      {children}
+    </button>
   );
 }

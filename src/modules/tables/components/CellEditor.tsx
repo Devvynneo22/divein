@@ -53,8 +53,15 @@ export function CellEditor({
     }
   }
 
-  const baseInputClass =
-    'w-full h-full bg-transparent text-[var(--color-text-primary)] text-sm outline-none px-2 py-1';
+  const baseInputStyle: React.CSSProperties = {
+    width: '100%',
+    height: '100%',
+    background: 'transparent',
+    color: 'var(--color-text-primary)',
+    fontSize: '13px',
+    outline: 'none',
+    padding: '4px 8px',
+  };
 
   // ── Text / URL / Email ────────────────────────────────────────────────────
   if (column.type === 'text' || column.type === 'url' || column.type === 'email') {
@@ -64,7 +71,7 @@ export function CellEditor({
         ref={inputRef}
         type={column.type === 'email' ? 'email' : column.type === 'url' ? 'url' : 'text'}
         value={local}
-        className={baseInputClass}
+        style={baseInputStyle}
         onChange={(e) => setLocal(e.target.value)}
         onBlur={() => onSave(local || null)}
         onKeyDown={handleKey}
@@ -80,7 +87,7 @@ export function CellEditor({
         ref={inputRef}
         type="number"
         value={local}
-        className={baseInputClass}
+        style={baseInputStyle}
         onChange={(e) => setLocal(e.target.value)}
         onBlur={() => {
           const n = parseFloat(local);
@@ -93,7 +100,6 @@ export function CellEditor({
 
   // ── Date ──────────────────────────────────────────────────────────────────
   if (column.type === 'date') {
-    // value is ISO string or null
     const dateStr = toStringValue(value).slice(0, 10); // YYYY-MM-DD
     const [local, setLocal] = useState(dateStr);
     return (
@@ -101,7 +107,7 @@ export function CellEditor({
         ref={inputRef}
         type="date"
         value={local}
-        className={`${baseInputClass} [color-scheme:dark]`}
+        style={{ ...baseInputStyle, colorScheme: 'dark' }}
         onChange={(e) => setLocal(e.target.value)}
         onBlur={() => onSave(local || null)}
         onKeyDown={handleKey}
@@ -116,7 +122,7 @@ export function CellEditor({
     return (
       <select
         value={local}
-        className={`${baseInputClass} cursor-pointer`}
+        style={{ ...baseInputStyle, cursor: 'pointer', backgroundColor: 'var(--color-bg-tertiary)' }}
         autoFocus
         onChange={(e) => {
           setLocal(e.target.value);
@@ -124,7 +130,6 @@ export function CellEditor({
         }}
         onBlur={() => onSave(local || null)}
         onKeyDown={handleKey}
-        style={{ background: 'var(--color-bg-tertiary)' }}
       >
         <option value="">—</option>
         {options.map((opt) => (
@@ -166,11 +171,17 @@ export function CellEditor({
             key={opt}
             type="button"
             onClick={() => toggleOption(opt)}
-            className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
-              selected.includes(opt)
-                ? 'bg-[var(--color-accent)] text-white'
-                : 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border-hover)]'
-            }`}
+            className="px-2 py-0.5 rounded text-xs font-medium transition-colors"
+            style={{
+              backgroundColor: selected.includes(opt) ? 'var(--color-accent)' : 'var(--color-bg-tertiary)',
+              color: selected.includes(opt) ? 'white' : 'var(--color-text-secondary)',
+            }}
+            onMouseEnter={(e) => {
+              if (!selected.includes(opt)) e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+            }}
+            onMouseLeave={(e) => {
+              if (!selected.includes(opt)) e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+            }}
           >
             {opt}
           </button>

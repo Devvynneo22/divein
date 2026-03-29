@@ -85,12 +85,26 @@ export function ProjectTaskList({ projectId, tasks }: ProjectTaskListProps) {
           value={quickAddTitle}
           onChange={(e) => setQuickAddTitle(e.target.value)}
           placeholder="Add a task…"
-          className="flex-1 px-3 py-2 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors"
+          className="flex-1 px-3 py-2 rounded-lg text-sm focus:outline-none transition-colors"
+          style={{
+            backgroundColor: 'var(--color-bg-secondary)',
+            border: '1px solid var(--color-border)',
+            color: 'var(--color-text-primary)',
+          }}
+          onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent)'; }}
+          onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
         />
         <button
           type="submit"
           disabled={!quickAddTitle.trim()}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          style={{ backgroundColor: 'var(--color-accent)', color: '#fff' }}
+          onMouseEnter={(e) => {
+            if (!e.currentTarget.disabled) {
+              e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)';
+            }
+          }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent)'; }}
         >
           <Plus size={16} />
           Add
@@ -98,16 +112,26 @@ export function ProjectTaskList({ projectId, tasks }: ProjectTaskListProps) {
       </form>
 
       {/* Status filter tabs */}
-      <div className="flex gap-1 border-b border-[var(--color-border)]">
+      <div className="flex gap-1 border-b" style={{ borderColor: 'var(--color-border)' }}>
         {STATUS_TABS.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setStatusFilter(tab.key)}
-            className={`px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              statusFilter === tab.key
-                ? 'text-[var(--color-text-primary)] border-[var(--color-accent)]'
-                : 'text-[var(--color-text-muted)] border-transparent hover:text-[var(--color-text-secondary)]'
-            }`}
+            className="px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px"
+            style={{
+              color: statusFilter === tab.key ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+              borderBottomColor: statusFilter === tab.key ? 'var(--color-accent)' : 'transparent',
+            }}
+            onMouseEnter={(e) => {
+              if (statusFilter !== tab.key) {
+                e.currentTarget.style.color = 'var(--color-text-secondary)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (statusFilter !== tab.key) {
+                e.currentTarget.style.color = 'var(--color-text-muted)';
+              }
+            }}
           >
             {tab.label}
             {tab.key !== 'all' && (
@@ -126,8 +150,8 @@ export function ProjectTaskList({ projectId, tasks }: ProjectTaskListProps) {
       {/* Task list */}
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
-          <CheckSquare size={32} className="text-[var(--color-text-muted)] opacity-40" />
-          <p className="text-sm text-[var(--color-text-muted)]">
+          <CheckSquare size={32} style={{ color: 'var(--color-text-muted)', opacity: 0.4 }} />
+          <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
             {statusFilter === 'all'
               ? 'No tasks in this project yet'
               : `No ${statusFilter.replace('_', ' ')} tasks`}
@@ -155,19 +179,31 @@ interface ProjectTaskItemProps {
 
 function ProjectTaskItem({ task, onToggle }: ProjectTaskItemProps) {
   const isDone = task.status === 'done';
+  const [hovered, setHovered] = useState(false);
 
   return (
-    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] hover:border-[var(--color-border-hover)] transition-colors group">
+    <div
+      className="flex items-center gap-3 px-3 py-2.5 rounded-lg group transition-colors"
+      style={{
+        backgroundColor: 'var(--color-bg-secondary)',
+        border: `1px solid ${hovered ? 'var(--color-border-hover)' : 'var(--color-border)'}`,
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       {/* Status toggle */}
       <button
         onClick={onToggle}
-        className="flex-shrink-0 text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors"
+        className="flex-shrink-0 transition-colors"
         title="Toggle status"
+        style={{ color: 'var(--color-text-muted)' }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-accent)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
       >
         {isDone ? (
-          <CheckSquare size={16} className="text-[var(--color-success)]" />
+          <CheckSquare size={16} style={{ color: 'var(--color-success)' }} />
         ) : task.status === 'in_progress' ? (
-          <Clock size={16} className="text-[var(--color-warning)]" />
+          <Clock size={16} style={{ color: 'var(--color-warning)' }} />
         ) : (
           <Circle size={16} />
         )}
@@ -184,22 +220,26 @@ function ProjectTaskItem({ task, onToggle }: ProjectTaskItemProps) {
 
       {/* Title */}
       <span
-        className={`flex-1 min-w-0 text-sm truncate ${
-          isDone
-            ? 'line-through text-[var(--color-text-muted)]'
-            : 'text-[var(--color-text-primary)]'
-        }`}
+        className="flex-1 min-w-0 text-sm truncate"
+        style={{
+          textDecoration: isDone ? 'line-through' : 'none',
+          color: isDone ? 'var(--color-text-muted)' : 'var(--color-text-primary)',
+        }}
       >
         {task.title}
       </span>
 
       {/* Tags */}
       {task.tags.length > 0 && (
-        <div className="hidden group-hover:flex items-center gap-1">
+        <div className={`items-center gap-1 ${hovered ? 'flex' : 'hidden'}`}>
           {task.tags.slice(0, 2).map((tag) => (
             <span
               key={tag}
-              className="text-xs px-1.5 py-0.5 rounded bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)]"
+              className="text-xs px-1.5 py-0.5 rounded"
+              style={{
+                backgroundColor: 'var(--color-bg-tertiary)',
+                color: 'var(--color-text-muted)',
+              }}
             >
               {tag}
             </span>
@@ -209,7 +249,7 @@ function ProjectTaskItem({ task, onToggle }: ProjectTaskItemProps) {
 
       {/* Due date */}
       {task.dueDate && (
-        <span className="text-xs text-[var(--color-text-muted)] flex-shrink-0">
+        <span className="text-xs flex-shrink-0" style={{ color: 'var(--color-text-muted)' }}>
           {format(parseISO(task.dueDate), 'MMM d')}
         </span>
       )}

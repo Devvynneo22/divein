@@ -58,8 +58,8 @@ export function CardForm({ deckId, initialData, onSave, onCancel, isLoading }: C
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       {/* Front */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-[var(--color-text-secondary)]">
-          Front (Question) <span className="text-[var(--color-danger)]">*</span>
+        <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+          Front (Question) <span style={{ color: 'var(--color-danger)' }}>*</span>
         </label>
         <textarea
           value={front}
@@ -67,40 +67,54 @@ export function CardForm({ deckId, initialData, onSave, onCancel, isLoading }: C
           placeholder="Enter the question or prompt..."
           rows={4}
           autoFocus
-          className="px-3 py-2 rounded-lg bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors resize-none"
+          className="input-base px-3 py-2 rounded-lg text-sm resize-none"
         />
       </div>
 
       {/* Back */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-[var(--color-text-secondary)]">
-          Back (Answer) <span className="text-[var(--color-danger)]">*</span>
+        <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+          Back (Answer) <span style={{ color: 'var(--color-danger)' }}>*</span>
         </label>
         <textarea
           value={back}
           onChange={(e) => setBack(e.target.value)}
           placeholder="Enter the answer..."
           rows={4}
-          className="px-3 py-2 rounded-lg bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors resize-none"
+          className="input-base px-3 py-2 rounded-lg text-sm resize-none"
         />
       </div>
 
       {/* Tags */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-[var(--color-text-secondary)]">
+        <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
           Tags
         </label>
-        <div className="flex flex-wrap gap-1.5 px-3 py-2 rounded-lg bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] focus-within:border-[var(--color-accent)] transition-colors min-h-[42px]">
+        <div
+          className="flex flex-wrap gap-1.5 px-3 py-2 rounded-lg min-h-[42px]"
+          style={{
+            backgroundColor: 'var(--color-bg-tertiary)',
+            border: '1px solid var(--color-border)',
+          }}
+        >
           {tags.map((tag) => (
             <span
               key={tag}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-[var(--color-bg-elevated)] text-[var(--color-text-secondary)] border border-[var(--color-border)]"
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
+              style={{
+                backgroundColor: 'var(--color-bg-elevated)',
+                color: 'var(--color-text-secondary)',
+                border: '1px solid var(--color-border)',
+              }}
             >
               {tag}
               <button
                 type="button"
                 onClick={() => removeTag(tag)}
-                className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
+                className="transition-colors"
+                style={{ color: 'var(--color-text-muted)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
               >
                 <X size={10} />
               </button>
@@ -112,7 +126,10 @@ export function CardForm({ deckId, initialData, onSave, onCancel, isLoading }: C
             onChange={(e) => setTagInput(e.target.value)}
             onKeyDown={handleTagKeyDown}
             placeholder={tags.length === 0 ? 'Add tags (press Enter or comma)...' : ''}
-            className="flex-1 min-w-[120px] bg-transparent text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] outline-none"
+            className="flex-1 min-w-[120px] bg-transparent text-sm outline-none"
+            style={{
+              color: 'var(--color-text-primary)',
+            }}
           />
         </div>
       </div>
@@ -122,14 +139,23 @@ export function CardForm({ deckId, initialData, onSave, onCancel, isLoading }: C
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 rounded-lg text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+          className="px-4 py-2 rounded-lg text-sm transition-colors"
+          style={{ color: 'var(--color-text-secondary)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={!front.trim() || !back.trim() || isLoading}
-          className="px-4 py-2 rounded-lg text-sm font-medium bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
+          onMouseEnter={(e) => {
+            if (front.trim() && back.trim() && !isLoading)
+              e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)';
+          }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent)'; }}
         >
           {isLoading ? 'Saving...' : initialData ? 'Save Changes' : 'Add Card'}
         </button>

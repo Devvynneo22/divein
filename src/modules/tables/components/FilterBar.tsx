@@ -53,8 +53,15 @@ function getOperators(colType: ColumnDef['type']): { value: Operator; label: str
   }
 }
 
-const selectClass =
-  'bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded px-2 py-1 text-xs text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)] transition-colors';
+const selectStyle: React.CSSProperties = {
+  backgroundColor: 'var(--color-bg-primary)',
+  border: '1px solid var(--color-border)',
+  borderRadius: '4px',
+  padding: '2px 8px',
+  fontSize: '12px',
+  color: 'var(--color-text-primary)',
+  outline: 'none',
+};
 
 export function FilterBar({ columns, filters, onChange }: FilterBarProps) {
   function addFilter() {
@@ -85,7 +92,13 @@ export function FilterBar({ columns, filters, onChange }: FilterBarProps) {
   const noValueOps: Operator[] = ['empty', 'notEmpty'];
 
   return (
-    <div className="flex flex-col gap-2 p-3 bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)]">
+    <div
+      className="flex flex-col gap-2 p-3"
+      style={{
+        backgroundColor: 'var(--color-bg-secondary)',
+        borderBottom: '1px solid var(--color-border)',
+      }}
+    >
       <div className="flex items-center gap-2 flex-wrap">
         {filters.map((filter, i) => {
           const col = columns.find((c) => c.id === filter.columnId);
@@ -95,12 +108,16 @@ export function FilterBar({ columns, filters, onChange }: FilterBarProps) {
           return (
             <div
               key={i}
-              className="flex items-center gap-1 bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] rounded-lg px-2 py-1 text-xs"
+              className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs"
+              style={{
+                backgroundColor: 'var(--color-bg-tertiary)',
+                border: '1px solid var(--color-border)',
+              }}
             >
               {/* Column */}
               <select
                 value={filter.columnId}
-                className={selectClass}
+                style={selectStyle}
                 onChange={(e) => {
                   const newCol = columns.find((c) => c.id === e.target.value);
                   if (!newCol) return;
@@ -122,7 +139,7 @@ export function FilterBar({ columns, filters, onChange }: FilterBarProps) {
               {/* Operator */}
               <select
                 value={filter.operator}
-                className={selectClass}
+                style={selectStyle}
                 onChange={(e) =>
                   updateFilter(i, { operator: e.target.value as Operator, value: '' })
                 }
@@ -140,7 +157,7 @@ export function FilterBar({ columns, filters, onChange }: FilterBarProps) {
                   {col?.type === 'checkbox' ? (
                     <select
                       value={String(filter.value)}
-                      className={selectClass}
+                      style={selectStyle}
                       onChange={(e) =>
                         updateFilter(i, { value: e.target.value === 'true' })
                       }
@@ -151,7 +168,7 @@ export function FilterBar({ columns, filters, onChange }: FilterBarProps) {
                   ) : col?.type === 'select' && col.options ? (
                     <select
                       value={String(filter.value ?? '')}
-                      className={selectClass}
+                      style={selectStyle}
                       onChange={(e) => updateFilter(i, { value: e.target.value })}
                     >
                       <option value="">Any</option>
@@ -165,7 +182,7 @@ export function FilterBar({ columns, filters, onChange }: FilterBarProps) {
                     <input
                       value={String(filter.value ?? '')}
                       type={col?.type === 'number' ? 'number' : col?.type === 'date' ? 'date' : 'text'}
-                      className={`${selectClass} w-28`}
+                      style={{ ...selectStyle, width: '112px' }}
                       placeholder="Value..."
                       onChange={(e) => updateFilter(i, { value: e.target.value })}
                     />
@@ -176,7 +193,10 @@ export function FilterBar({ columns, filters, onChange }: FilterBarProps) {
               {/* Remove */}
               <button
                 onClick={() => removeFilter(i)}
-                className="text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-colors ml-1"
+                className="ml-1 transition-colors"
+                style={{ color: 'var(--color-text-muted)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-danger)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
               >
                 <X size={12} />
               </button>
@@ -187,7 +207,16 @@ export function FilterBar({ columns, filters, onChange }: FilterBarProps) {
         {/* Add filter */}
         <button
           onClick={addFilter}
-          className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] border border-dashed border-[var(--color-border)] transition-colors"
+          className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs border border-dashed transition-colors"
+          style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--color-text-primary)';
+            e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--color-text-muted)';
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
         >
           <Plus size={12} /> Add filter
         </button>
@@ -195,7 +224,10 @@ export function FilterBar({ columns, filters, onChange }: FilterBarProps) {
         {filters.length > 0 && (
           <button
             onClick={clearAll}
-            className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-colors ml-auto"
+            className="text-xs ml-auto transition-colors"
+            style={{ color: 'var(--color-text-muted)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-danger)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
           >
             Clear all
           </button>

@@ -21,37 +21,42 @@ interface SessionStats {
 const RATING_CONFIG: {
   rating: UIRating;
   label: string;
-  bgClass: string;
-  hoverClass: string;
-  textColor: string;
+  bgColor: string;
+  textColorVar: string;
+  borderColorVar: string;
+  hoverBg: string;
 }[] = [
   {
     rating: 'again',
     label: 'Again',
-    bgClass: 'bg-[var(--color-danger)]/10 border-[var(--color-danger)]/30',
-    hoverClass: 'hover:bg-[var(--color-danger)]/20 hover:border-[var(--color-danger)]/60',
-    textColor: 'text-[var(--color-danger)]',
+    bgColor: 'var(--color-danger-soft)',
+    textColorVar: 'var(--color-danger)',
+    borderColorVar: 'var(--color-danger)',
+    hoverBg: 'var(--color-danger-soft)',
   },
   {
     rating: 'hard',
     label: 'Hard',
-    bgClass: 'bg-[var(--color-warning)]/10 border-[var(--color-warning)]/30',
-    hoverClass: 'hover:bg-[var(--color-warning)]/20 hover:border-[var(--color-warning)]/60',
-    textColor: 'text-[var(--color-warning)]',
+    bgColor: 'var(--color-warning-soft)',
+    textColorVar: 'var(--color-warning)',
+    borderColorVar: 'var(--color-warning)',
+    hoverBg: 'var(--color-warning-soft)',
   },
   {
     rating: 'good',
     label: 'Good',
-    bgClass: 'bg-[var(--color-success)]/10 border-[var(--color-success)]/30',
-    hoverClass: 'hover:bg-[var(--color-success)]/20 hover:border-[var(--color-success)]/60',
-    textColor: 'text-[var(--color-success)]',
+    bgColor: 'var(--color-success-soft)',
+    textColorVar: 'var(--color-success)',
+    borderColorVar: 'var(--color-success)',
+    hoverBg: 'var(--color-success-soft)',
   },
   {
     rating: 'easy',
     label: 'Easy',
-    bgClass: 'bg-[var(--color-accent)]/10 border-[var(--color-accent)]/30',
-    hoverClass: 'hover:bg-[var(--color-accent)]/20 hover:border-[var(--color-accent)]/60',
-    textColor: 'text-[var(--color-accent)]',
+    bgColor: 'var(--color-accent-soft)',
+    textColorVar: 'var(--color-accent)',
+    borderColorVar: 'var(--color-accent)',
+    hoverBg: 'var(--color-accent-muted)',
   },
 ];
 
@@ -117,14 +122,17 @@ export function StudySession({ queue, onExit }: StudySessionProps) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 gap-8 py-12">
         <div className="flex flex-col items-center gap-4 text-center">
-          <div className="w-20 h-20 rounded-full bg-[var(--color-success)]/15 flex items-center justify-center">
-            <CheckCircle2 size={40} className="text-[var(--color-success)]" />
+          <div
+            className="w-20 h-20 rounded-full flex items-center justify-center"
+            style={{ backgroundColor: 'var(--color-success-soft)' }}
+          >
+            <CheckCircle2 size={40} style={{ color: 'var(--color-success)' }} />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
+            <h2 className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
               Session Complete! 🎉
             </h2>
-            <p className="text-[var(--color-text-muted)] text-sm mt-1">
+            <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
               Great work — you reviewed {total} cards
             </p>
           </div>
@@ -132,35 +140,74 @@ export function StudySession({ queue, onExit }: StudySessionProps) {
 
         {/* Stats */}
         <div className="grid grid-cols-2 gap-3 w-full max-w-xs">
-          <div className="rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border)] p-4 text-center">
-            <div className="text-2xl font-bold text-[var(--color-text-primary)]">{pct}%</div>
-            <div className="text-xs text-[var(--color-text-muted)] mt-1">Correct</div>
+          <div
+            className="rounded-xl p-4 text-center"
+            style={{
+              backgroundColor: 'var(--color-bg-secondary)',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            <div className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>{pct}%</div>
+            <div className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>Correct</div>
           </div>
-          <div className="rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border)] p-4 text-center">
-            <div className="text-2xl font-bold text-[var(--color-text-primary)]">{total}</div>
-            <div className="text-xs text-[var(--color-text-muted)] mt-1">Cards Reviewed</div>
+          <div
+            className="rounded-xl p-4 text-center"
+            style={{
+              backgroundColor: 'var(--color-bg-secondary)',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            <div className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>{total}</div>
+            <div className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>Cards Reviewed</div>
           </div>
-          <div className="rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border)] p-3 text-center">
-            <div className="text-lg font-semibold text-[var(--color-danger)]">{sessionStats.again}</div>
-            <div className="text-xs text-[var(--color-text-muted)] mt-0.5">Again</div>
+          <div
+            className="rounded-xl p-3 text-center"
+            style={{
+              backgroundColor: 'var(--color-bg-secondary)',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            <div className="text-lg font-semibold" style={{ color: 'var(--color-danger)' }}>{sessionStats.again}</div>
+            <div className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Again</div>
           </div>
-          <div className="rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border)] p-3 text-center">
-            <div className="text-lg font-semibold text-[var(--color-warning)]">{sessionStats.hard}</div>
-            <div className="text-xs text-[var(--color-text-muted)] mt-0.5">Hard</div>
+          <div
+            className="rounded-xl p-3 text-center"
+            style={{
+              backgroundColor: 'var(--color-bg-secondary)',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            <div className="text-lg font-semibold" style={{ color: 'var(--color-warning)' }}>{sessionStats.hard}</div>
+            <div className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Hard</div>
           </div>
-          <div className="rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border)] p-3 text-center">
-            <div className="text-lg font-semibold text-[var(--color-success)]">{sessionStats.good}</div>
-            <div className="text-xs text-[var(--color-text-muted)] mt-0.5">Good</div>
+          <div
+            className="rounded-xl p-3 text-center"
+            style={{
+              backgroundColor: 'var(--color-bg-secondary)',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            <div className="text-lg font-semibold" style={{ color: 'var(--color-success)' }}>{sessionStats.good}</div>
+            <div className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Good</div>
           </div>
-          <div className="rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border)] p-3 text-center">
-            <div className="text-lg font-semibold text-[var(--color-accent)]">{sessionStats.easy}</div>
-            <div className="text-xs text-[var(--color-text-muted)] mt-0.5">Easy</div>
+          <div
+            className="rounded-xl p-3 text-center"
+            style={{
+              backgroundColor: 'var(--color-bg-secondary)',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            <div className="text-lg font-semibold" style={{ color: 'var(--color-accent)' }}>{sessionStats.easy}</div>
+            <div className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Easy</div>
           </div>
         </div>
 
         <button
           onClick={onExit}
-          className="px-6 py-3 rounded-xl bg-[var(--color-accent)] text-white text-sm font-medium hover:bg-[var(--color-accent-hover)] transition-colors"
+          className="px-6 py-3 rounded-xl text-sm font-medium transition-colors"
+          style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent)'; }}
         >
           Back to Deck
         </button>
@@ -172,20 +219,30 @@ export function StudySession({ queue, onExit }: StudySessionProps) {
   if (!currentCard || totalCards === 0) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 gap-6 py-12 text-center">
-        <div className="w-16 h-16 rounded-full bg-[var(--color-success)]/15 flex items-center justify-center">
-          <CheckCircle2 size={32} className="text-[var(--color-success)]" />
+        <div
+          className="w-16 h-16 rounded-full flex items-center justify-center"
+          style={{ backgroundColor: 'var(--color-success-soft)' }}
+        >
+          <CheckCircle2 size={32} style={{ color: 'var(--color-success)' }} />
         </div>
         <div>
-          <h2 className="text-xl font-bold text-[var(--color-text-primary)]">
+          <h2 className="text-xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
             Nothing due today! 🎉
           </h2>
-          <p className="text-[var(--color-text-muted)] text-sm mt-1">
+          <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
             You're all caught up. Come back tomorrow.
           </p>
         </div>
         <button
           onClick={onExit}
-          className="px-5 py-2.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+          className="px-5 py-2.5 rounded-lg text-sm transition-colors"
+          style={{
+            backgroundColor: 'var(--color-bg-secondary)',
+            border: '1px solid var(--color-border)',
+            color: 'var(--color-text-secondary)',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-secondary)'; }}
         >
           Back to Deck
         </button>
@@ -197,13 +254,19 @@ export function StudySession({ queue, onExit }: StudySessionProps) {
     <div className="flex flex-col flex-1 min-h-0">
       {/* Progress bar */}
       <div className="flex items-center gap-3 mb-6">
-        <div className="flex-1 h-1.5 rounded-full bg-[var(--color-bg-tertiary)] overflow-hidden">
+        <div
+          className="flex-1 h-1.5 rounded-full overflow-hidden"
+          style={{ backgroundColor: 'var(--color-bg-tertiary)' }}
+        >
           <div
-            className="h-full rounded-full bg-[var(--color-accent)] transition-all duration-500"
-            style={{ width: `${progress}%` }}
+            className="h-full rounded-full transition-all duration-500"
+            style={{
+              width: `${progress}%`,
+              backgroundColor: 'var(--color-accent)',
+            }}
           />
         </div>
-        <span className="text-xs text-[var(--color-text-muted)] flex-shrink-0 tabular-nums">
+        <span className="text-xs flex-shrink-0 tabular-nums" style={{ color: 'var(--color-text-muted)' }}>
           {currentIndex + 1} / {totalCards}
         </span>
       </div>
@@ -222,31 +285,37 @@ export function StudySession({ queue, onExit }: StudySessionProps) {
           >
             {/* Front */}
             <div
-              className="absolute inset-0 rounded-2xl bg-[var(--color-bg-secondary)] border border-[var(--color-border)] flex flex-col items-center justify-center p-8"
-              style={{ backfaceVisibility: 'hidden' }}
+              className="absolute inset-0 rounded-2xl flex flex-col items-center justify-center p-8"
+              style={{
+                backfaceVisibility: 'hidden',
+                backgroundColor: 'var(--color-bg-secondary)',
+                border: '1px solid var(--color-border)',
+              }}
             >
-              <div className="flex items-center gap-2 mb-6 text-[var(--color-text-muted)]">
+              <div className="flex items-center gap-2 mb-6" style={{ color: 'var(--color-text-muted)' }}>
                 <Brain size={16} />
                 <span className="text-xs font-medium uppercase tracking-wide">Question</span>
               </div>
-              <p className="text-xl text-[var(--color-text-primary)] text-center leading-relaxed font-medium">
+              <p className="text-xl text-center leading-relaxed font-medium" style={{ color: 'var(--color-text-primary)' }}>
                 {currentCard.front}
               </p>
             </div>
 
             {/* Back */}
             <div
-              className="absolute inset-0 rounded-2xl bg-[var(--color-bg-elevated)] border border-[var(--color-border)] flex flex-col items-center justify-center p-8"
+              className="absolute inset-0 rounded-2xl flex flex-col items-center justify-center p-8"
               style={{
                 backfaceVisibility: 'hidden',
                 transform: 'rotateY(180deg)',
+                backgroundColor: 'var(--color-bg-elevated)',
+                border: '1px solid var(--color-border)',
               }}
             >
-              <div className="flex items-center gap-2 mb-6 text-[var(--color-success)]">
+              <div className="flex items-center gap-2 mb-6" style={{ color: 'var(--color-success)' }}>
                 <CheckCircle2 size={16} />
                 <span className="text-xs font-medium uppercase tracking-wide">Answer</span>
               </div>
-              <p className="text-xl text-[var(--color-text-primary)] text-center leading-relaxed font-medium">
+              <p className="text-xl text-center leading-relaxed font-medium" style={{ color: 'var(--color-text-primary)' }}>
                 {currentCard.back}
               </p>
             </div>
@@ -259,13 +328,26 @@ export function StudySession({ queue, onExit }: StudySessionProps) {
         {!showingAnswer ? (
           <button
             onClick={handleShowAnswer}
-            className="px-8 py-3 rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] hover:border-[var(--color-border-hover)] transition-all active:scale-95"
+            className="px-8 py-3 rounded-xl text-sm font-medium transition-all active:scale-95"
+            style={{
+              backgroundColor: 'var(--color-bg-secondary)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-primary)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+              e.currentTarget.style.borderColor = 'var(--color-border-hover)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-bg-secondary)';
+              e.currentTarget.style.borderColor = 'var(--color-border)';
+            }}
           >
             Show Answer
           </button>
         ) : (
           <div className="flex gap-3 w-full max-w-xl">
-            {RATING_CONFIG.map(({ rating, label, bgClass, hoverClass, textColor }) => {
+            {RATING_CONFIG.map(({ rating, label, bgColor, textColorVar, borderColorVar, hoverBg }) => {
               const quality = UI_RATING_QUALITY[rating];
               const days = previewInterval(
                 quality,
@@ -278,7 +360,20 @@ export function StudySession({ queue, onExit }: StudySessionProps) {
                   key={rating}
                   onClick={() => handleRate(rating)}
                   disabled={reviewCard.isPending}
-                  className={`flex-1 flex flex-col items-center gap-1 py-3 px-2 rounded-xl border text-sm font-medium transition-all active:scale-95 disabled:opacity-50 ${bgClass} ${hoverClass} ${textColor}`}
+                  className="flex-1 flex flex-col items-center gap-1 py-3 px-2 rounded-xl text-sm font-medium transition-all active:scale-95 disabled:opacity-50"
+                  style={{
+                    backgroundColor: bgColor,
+                    border: `1px solid ${borderColorVar}`,
+                    color: textColorVar,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = hoverBg;
+                    e.currentTarget.style.opacity = '0.85';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = bgColor;
+                    e.currentTarget.style.opacity = '1';
+                  }}
                 >
                   <span className="font-semibold">{label}</span>
                   <span className="text-xs opacity-70">
@@ -290,10 +385,13 @@ export function StudySession({ queue, onExit }: StudySessionProps) {
           </div>
         )}
 
-        {/* Skip / exit */}
+        {/* Exit */}
         <button
           onClick={onExit}
-          className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
+          className="flex items-center gap-1.5 text-xs transition-colors"
+          style={{ color: 'var(--color-text-muted)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
         >
           <RotateCcw size={12} />
           Exit session

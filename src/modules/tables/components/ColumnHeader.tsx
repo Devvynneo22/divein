@@ -106,7 +106,7 @@ export function ColumnHeader({
       onContextMenu={handleContextMenu}
     >
       {/* Type icon */}
-      <span className="text-[var(--color-text-muted)] flex-shrink-0">
+      <span className="flex-shrink-0" style={{ color: 'var(--color-text-muted)' }}>
         {TYPE_ICONS[column.type]}
       </span>
 
@@ -124,12 +124,18 @@ export function ColumnHeader({
               setRenaming(false);
             }
           }}
-          className="flex-1 bg-[var(--color-bg-primary)] text-[var(--color-text-primary)] text-xs font-medium px-1 py-0.5 rounded outline outline-1 outline-[var(--color-accent)]"
+          className="flex-1 text-xs font-medium px-1 py-0.5 rounded"
+          style={{
+            backgroundColor: 'var(--color-bg-primary)',
+            color: 'var(--color-text-primary)',
+            outline: '1px solid var(--color-accent)',
+          }}
           onClick={(e) => e.stopPropagation()}
         />
       ) : (
         <span
-          className="flex-1 text-xs font-medium text-[var(--color-text-secondary)] truncate cursor-pointer"
+          className="flex-1 text-xs font-medium truncate cursor-pointer"
+          style={{ color: 'var(--color-text-secondary)' }}
           onClick={onSort}
         >
           {column.name}
@@ -142,9 +148,9 @@ export function ColumnHeader({
           e.stopPropagation();
           onSort();
         }}
-        className={`flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity ${
-          sortDirection !== false ? '!opacity-100 text-[var(--color-accent)]' : 'text-[var(--color-text-muted)]'
-        }`}
+        className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        style={{ color: sortDirection !== false ? 'var(--color-accent)' : 'var(--color-text-muted)' }}
+        aria-label="Sort"
       >
         <SortIcon size={12} />
       </button>
@@ -155,7 +161,10 @@ export function ColumnHeader({
           e.stopPropagation();
           setMenuOpen((v) => !v);
         }}
-        className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] px-0.5"
+        className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity px-0.5"
+        style={{ color: 'var(--color-text-muted)' }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
       >
         ···
       </button>
@@ -164,11 +173,24 @@ export function ColumnHeader({
       {menuOpen && (
         <div
           ref={menuRef}
-          className="absolute top-full left-0 mt-1 z-50 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] shadow-xl min-w-[160px] py-1 text-xs"
+          className="absolute top-full left-0 mt-1 z-50 rounded-lg shadow-xl min-w-[160px] py-1 text-xs"
+          style={{
+            border: '1px solid var(--color-border)',
+            backgroundColor: 'var(--color-bg-elevated)',
+          }}
           onClick={(e) => e.stopPropagation()}
         >
           <button
-            className="flex items-center gap-2 w-full px-3 py-1.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)] transition-colors"
+            className="flex items-center gap-2 w-full px-3 py-1.5 transition-colors"
+            style={{ color: 'var(--color-text-secondary)' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+              e.currentTarget.style.color = 'var(--color-text-primary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = 'var(--color-text-secondary)';
+            }}
             onClick={() => {
               setMenuOpen(false);
               setRenaming(true);
@@ -179,32 +201,49 @@ export function ColumnHeader({
           </button>
 
           {/* Change type submenu items */}
-          <div className="border-t border-[var(--color-border)] mt-1 pt-1">
-            <p className="px-3 py-1 text-[var(--color-text-muted)] text-[10px] uppercase tracking-wider">
+          <div style={{ borderTop: '1px solid var(--color-border)', marginTop: '4px', paddingTop: '4px' }}>
+            <p
+              className="px-3 py-1 text-[10px] uppercase tracking-wider"
+              style={{ color: 'var(--color-text-muted)' }}
+            >
               Change type
             </p>
             {COLUMN_TYPES.map((t) => (
               <button
                 key={t}
-                className={`flex items-center gap-2 w-full px-3 py-1.5 transition-colors ${
-                  t === column.type
-                    ? 'text-[var(--color-accent)]'
-                    : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]'
-                }`}
+                className="flex items-center gap-2 w-full px-3 py-1.5 transition-colors"
+                style={{
+                  color: t === column.type ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                }}
+                onMouseEnter={(e) => {
+                  if (t !== column.type) {
+                    e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+                    e.currentTarget.style.color = 'var(--color-text-primary)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (t !== column.type) {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = 'var(--color-text-secondary)';
+                  }
+                }}
                 onClick={() => {
                   onChangeType(t);
                   setMenuOpen(false);
                 }}
               >
-                <span className="text-[var(--color-text-muted)]">{TYPE_ICONS[t]}</span>
+                <span style={{ color: 'var(--color-text-muted)' }}>{TYPE_ICONS[t]}</span>
                 <span className="capitalize">{t}</span>
               </button>
             ))}
           </div>
 
-          <div className="border-t border-[var(--color-border)] mt-1 pt-1">
+          <div style={{ borderTop: '1px solid var(--color-border)', marginTop: '4px', paddingTop: '4px' }}>
             <button
-              className="flex items-center gap-2 w-full px-3 py-1.5 text-[var(--color-danger)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+              className="flex items-center gap-2 w-full px-3 py-1.5 transition-colors"
+              style={{ color: 'var(--color-danger)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
               onClick={() => {
                 setMenuOpen(false);
                 if (!window.confirm(`Delete column '${column.name}'? Data in all rows will be lost.`)) return;

@@ -49,13 +49,22 @@ export function ProjectForm({ project, onSave, onCancel }: ProjectFormProps) {
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       {/* Form header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
+        <h2 className="text-base font-semibold" style={{ color: 'var(--color-text-primary)' }}>
           {project ? 'Edit Project' : 'New Project'}
         </h2>
         <button
           type="button"
           onClick={onCancel}
-          className="p-1.5 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
+          className="p-1.5 rounded-md transition-colors"
+          style={{ color: 'var(--color-text-muted)' }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+            e.currentTarget.style.color = 'var(--color-text-primary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.color = 'var(--color-text-muted)';
+          }}
         >
           <X size={16} />
         </button>
@@ -63,7 +72,10 @@ export function ProjectForm({ project, onSave, onCancel }: ProjectFormProps) {
 
       {/* Name */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wide">
+        <label
+          className="text-xs font-medium uppercase tracking-wide"
+          style={{ color: 'var(--color-text-secondary)' }}
+        >
           Name
         </label>
         <input
@@ -72,16 +84,19 @@ export function ProjectForm({ project, onSave, onCancel }: ProjectFormProps) {
           onChange={(e) => setName(e.target.value)}
           placeholder="Project name"
           autoFocus
-          className="px-3 py-2 rounded-lg bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors"
+          className="input-base px-3 py-2 rounded-lg text-sm"
         />
         {nameError && (
-          <p className="text-xs text-[var(--color-danger)]">{nameError}</p>
+          <p className="text-xs" style={{ color: 'var(--color-danger)' }}>{nameError}</p>
         )}
       </div>
 
       {/* Description */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wide">
+        <label
+          className="text-xs font-medium uppercase tracking-wide"
+          style={{ color: 'var(--color-text-secondary)' }}
+        >
           Description
         </label>
         <textarea
@@ -89,13 +104,16 @@ export function ProjectForm({ project, onSave, onCancel }: ProjectFormProps) {
           onChange={(e) => setDescription(e.target.value)}
           placeholder="What is this project about?"
           rows={3}
-          className="px-3 py-2 rounded-lg bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors resize-none"
+          className="input-base px-3 py-2 rounded-lg text-sm resize-none"
         />
       </div>
 
       {/* Color picker */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wide">
+        <label
+          className="text-xs font-medium uppercase tracking-wide"
+          style={{ color: 'var(--color-text-secondary)' }}
+        >
           Color
         </label>
         <div className="flex flex-wrap gap-2">
@@ -107,7 +125,7 @@ export function ProjectForm({ project, onSave, onCancel }: ProjectFormProps) {
               className="w-7 h-7 rounded-full border-2 transition-all"
               style={{
                 backgroundColor: c,
-                borderColor: color === c ? 'white' : 'transparent',
+                borderColor: color === c ? 'var(--color-text-primary)' : 'transparent',
                 transform: color === c ? 'scale(1.15)' : 'scale(1)',
               }}
               title={c}
@@ -118,7 +136,10 @@ export function ProjectForm({ project, onSave, onCancel }: ProjectFormProps) {
 
       {/* Icon picker */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wide">
+        <label
+          className="text-xs font-medium uppercase tracking-wide"
+          style={{ color: 'var(--color-text-secondary)' }}
+        >
           Icon (emoji)
         </label>
         <input
@@ -132,7 +153,7 @@ export function ProjectForm({ project, onSave, onCancel }: ProjectFormProps) {
           }}
           placeholder="📁"
           maxLength={4}
-          className="px-3 py-2 rounded-lg bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors w-20 text-center text-lg"
+          className="input-base px-3 py-2 rounded-lg text-sm w-20 text-center text-lg"
         />
       </div>
 
@@ -140,14 +161,34 @@ export function ProjectForm({ project, onSave, onCancel }: ProjectFormProps) {
       <div className="flex gap-2 pt-1">
         <button
           type="submit"
-          className="flex-1 px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-sm font-medium transition-colors"
+          className="flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          style={{
+            backgroundColor: 'var(--color-accent)',
+            color: 'var(--color-text-primary)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--color-accent)';
+          }}
         >
           {project ? 'Save Changes' : 'Create Project'}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] text-sm hover:bg-[var(--color-bg-tertiary)] transition-colors"
+          className="px-4 py-2 rounded-lg text-sm transition-colors"
+          style={{
+            border: '1px solid var(--color-border)',
+            color: 'var(--color-text-secondary)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
         >
           Cancel
         </button>

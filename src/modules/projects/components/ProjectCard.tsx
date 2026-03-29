@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Archive } from 'lucide-react';
 import type { Project } from '@/shared/types/project';
 import type { ProjectStats } from '@/shared/types/project';
@@ -19,17 +20,18 @@ function formatTime(seconds: number): string {
 export function ProjectCard({ project, stats, onClick }: ProjectCardProps) {
   const accentColor = project.color ?? 'var(--color-accent)';
   const isArchived = project.status === 'archived';
+  const [hovered, setHovered] = useState(false);
 
   return (
     <button
       onClick={onClick}
-      className={`
-        relative w-full text-left rounded-xl border border-[var(--color-border)]
-        bg-[var(--color-bg-secondary)] hover:border-[var(--color-border-hover)]
-        hover:bg-[var(--color-bg-tertiary)] transition-all duration-150
-        overflow-hidden group
-        ${isArchived ? 'opacity-60' : ''}
-      `}
+      className="card card-interactive relative w-full text-left rounded-xl overflow-hidden"
+      style={{
+        opacity: isArchived ? 0.6 : 1,
+        borderColor: hovered ? 'var(--color-border-hover)' : undefined,
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
       {/* Color accent stripe on left */}
       <div
@@ -44,12 +46,18 @@ export function ProjectCard({ project, stats, onClick }: ProjectCardProps) {
             {project.icon && (
               <span className="text-lg leading-none flex-shrink-0">{project.icon}</span>
             )}
-            <span className="font-semibold text-[var(--color-text-primary)] truncate">
+            <span className="font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
               {project.name}
             </span>
           </div>
           {isArchived && (
-            <span className="flex items-center gap-1 text-xs text-[var(--color-text-muted)] bg-[var(--color-bg-tertiary)] px-2 py-0.5 rounded-full flex-shrink-0">
+            <span
+              className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full flex-shrink-0"
+              style={{
+                color: 'var(--color-text-muted)',
+                backgroundColor: 'var(--color-bg-tertiary)',
+              }}
+            >
               <Archive size={10} />
               Archived
             </span>
@@ -58,14 +66,14 @@ export function ProjectCard({ project, stats, onClick }: ProjectCardProps) {
 
         {/* Description */}
         {project.description && (
-          <p className="text-sm text-[var(--color-text-muted)] line-clamp-2 mb-3">
+          <p className="text-sm line-clamp-2 mb-3" style={{ color: 'var(--color-text-muted)' }}>
             {project.description}
           </p>
         )}
 
         {/* Stats row */}
         {stats && (
-          <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
+          <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--color-text-muted)' }}>
             <span>{stats.totalTasks} task{stats.totalTasks !== 1 ? 's' : ''}</span>
             <span>•</span>
             <span>{stats.totalNotes} note{stats.totalNotes !== 1 ? 's' : ''}</span>

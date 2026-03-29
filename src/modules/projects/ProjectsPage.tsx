@@ -102,7 +102,10 @@ function ProjectView({ projectId, onBack, onEdit }: ProjectViewProps) {
       <div className="px-6 pt-4 pb-0 flex-shrink-0">
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors mb-3"
+          className="flex items-center gap-1.5 text-sm transition-colors mb-3"
+          style={{ color: 'var(--color-text-muted)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
         >
           <ArrowLeft size={15} />
           All Projects
@@ -110,7 +113,10 @@ function ProjectView({ projectId, onBack, onEdit }: ProjectViewProps) {
       </div>
 
       {/* Project header */}
-      <div className="flex-shrink-0 border-b border-[var(--color-border)]">
+      <div
+        className="flex-shrink-0 border-b"
+        style={{ borderColor: 'var(--color-border)' }}
+      >
         <ProjectHeader
           project={project}
           onEdit={() => onEdit(project)}
@@ -125,11 +131,21 @@ function ProjectView({ projectId, onBack, onEdit }: ProjectViewProps) {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                activeTab === tab.key
-                  ? 'text-[var(--color-text-primary)] border-[var(--color-accent)]'
-                  : 'text-[var(--color-text-muted)] border-transparent hover:text-[var(--color-text-secondary)]'
-              }`}
+              className="px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px"
+              style={{
+                color: activeTab === tab.key ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+                borderBottomColor: activeTab === tab.key ? 'var(--color-accent)' : 'transparent',
+              }}
+              onMouseEnter={(e) => {
+                if (activeTab !== tab.key) {
+                  e.currentTarget.style.color = 'var(--color-text-secondary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (activeTab !== tab.key) {
+                  e.currentTarget.style.color = 'var(--color-text-muted)';
+                }
+              }}
             >
               {tab.label}
             </button>
@@ -178,8 +194,6 @@ export function ProjectsPage() {
   const updateProject = useUpdateProject();
   const qc = useQueryClient();
 
-  // Stats are loaded per-card inside ProjectCardWithStats below
-
   const handleSave = useCallback(
     (data: CreateProjectInput | UpdateProjectInput) => {
       if (panel?.mode === 'edit' && panel.project) {
@@ -213,7 +227,10 @@ export function ProjectsPage() {
 
         {/* Edit panel */}
         {panel && (
-          <div className="w-80 border-l border-[var(--color-border)] flex flex-col h-full overflow-y-auto">
+          <div
+            className="w-80 border-l flex flex-col h-full overflow-y-auto"
+            style={{ borderColor: 'var(--color-border)' }}
+          >
             <div className="p-6">
               <ProjectForm
                 project={panel.mode === 'edit' ? panel.project : undefined}
@@ -236,28 +253,51 @@ export function ProjectsPage() {
         <div className="px-6 pt-6 pb-4 flex-shrink-0">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
-              <FolderKanban size={20} className="text-[var(--color-accent)]" />
-              <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">Projects</h1>
+              <FolderKanban size={20} style={{ color: 'var(--color-accent)' }} />
+              <h1
+                className="text-2xl font-bold"
+                style={{ color: 'var(--color-text-primary)' }}
+              >
+                Projects
+              </h1>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowArchived((v) => !v)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] text-sm hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-secondary)] transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-colors"
+                style={{
+                  border: '1px solid var(--color-border)',
+                  color: 'var(--color-text-muted)',
+                }}
                 title={showArchived ? 'Hide archived' : 'Show archived'}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+                  e.currentTarget.style.color = 'var(--color-text-secondary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = 'var(--color-text-muted)';
+                }}
               >
                 {showArchived ? <EyeOff size={14} /> : <Eye size={14} />}
                 {showArchived ? 'Hide archived' : 'Show archived'}
               </button>
               <button
                 onClick={() => setPanel({ mode: 'create' })}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-sm font-medium transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: 'var(--color-accent)',
+                  color: '#fff',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent)'; }}
               >
                 <Plus size={16} />
                 New Project
               </button>
             </div>
           </div>
-          <p className="text-sm text-[var(--color-text-muted)]">
+          <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
             Organize your work into projects
           </p>
         </div>
@@ -270,16 +310,22 @@ export function ProjectsPage() {
             <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
               <div className="text-5xl">📁</div>
               <div>
-                <p className="text-[var(--color-text-secondary)] font-medium text-lg">
+                <p className="font-medium text-lg" style={{ color: 'var(--color-text-secondary)' }}>
                   No projects yet
                 </p>
-                <p className="text-[var(--color-text-muted)] text-sm mt-1 max-w-xs">
+                <p className="text-sm mt-1 max-w-xs" style={{ color: 'var(--color-text-muted)' }}>
                   Projects help you organize tasks, notes, and time entries in one place.
                 </p>
               </div>
               <button
                 onClick={() => setPanel({ mode: 'create' })}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-sm font-medium transition-colors"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: 'var(--color-accent)',
+                  color: '#fff',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent)'; }}
               >
                 <Plus size={16} />
                 Create your first project
@@ -301,7 +347,10 @@ export function ProjectsPage() {
 
       {/* Side panel (create / edit) */}
       {panel && (
-        <div className="w-80 border-l border-[var(--color-border)] flex flex-col h-full overflow-y-auto">
+        <div
+          className="w-80 border-l flex flex-col h-full overflow-y-auto"
+          style={{ borderColor: 'var(--color-border)' }}
+        >
           <div className="p-6">
             <ProjectForm
               project={panel.mode === 'edit' ? panel.project : undefined}

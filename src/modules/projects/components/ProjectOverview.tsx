@@ -40,6 +40,11 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Cancelled',
 };
 
+const STATUS_DOT_COLOR: Record<string, string> = {
+  done: 'var(--color-success)',
+  in_progress: 'var(--color-warning)',
+};
+
 export function ProjectOverview({
   projectId,
   stats,
@@ -102,37 +107,41 @@ export function ProjectOverview({
 
       {/* Recent Tasks */}
       <section>
-        <h3 className="text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">
+        <h3
+          className="text-sm font-semibold uppercase tracking-wider mb-3"
+          style={{ color: 'var(--color-text-secondary)' }}
+        >
           Recent Tasks
         </h3>
         {recentTasks.length === 0 ? (
-          <p className="text-sm text-[var(--color-text-muted)]">No tasks yet.</p>
+          <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>No tasks yet.</p>
         ) : (
           <div className="flex flex-col gap-2">
             {recentTasks.map((task) => (
               <div
                 key={task.id}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)]"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg"
+                style={{
+                  backgroundColor: 'var(--color-bg-secondary)',
+                  border: '1px solid var(--color-border)',
+                }}
               >
                 <span
-                  className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                    task.status === 'done'
-                      ? 'bg-[var(--color-success)]'
-                      : task.status === 'in_progress'
-                      ? 'bg-[var(--color-warning)]'
-                      : 'bg-[var(--color-text-muted)]'
-                  }`}
+                  className="w-2 h-2 rounded-full flex-shrink-0"
+                  style={{
+                    backgroundColor: STATUS_DOT_COLOR[task.status] ?? 'var(--color-text-muted)',
+                  }}
                 />
                 <span
-                  className={`text-sm flex-1 min-w-0 truncate ${
-                    task.status === 'done'
-                      ? 'line-through text-[var(--color-text-muted)]'
-                      : 'text-[var(--color-text-primary)]'
-                  }`}
+                  className="text-sm flex-1 min-w-0 truncate"
+                  style={{
+                    textDecoration: task.status === 'done' ? 'line-through' : 'none',
+                    color: task.status === 'done' ? 'var(--color-text-muted)' : 'var(--color-text-primary)',
+                  }}
                 >
                   {task.title}
                 </span>
-                <span className="text-xs text-[var(--color-text-muted)] flex-shrink-0">
+                <span className="text-xs flex-shrink-0" style={{ color: 'var(--color-text-muted)' }}>
                   {STATUS_LABELS[task.status] ?? task.status}
                 </span>
               </div>
@@ -143,28 +152,41 @@ export function ProjectOverview({
 
       {/* Recent Notes */}
       <section>
-        <h3 className="text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">
+        <h3
+          className="text-sm font-semibold uppercase tracking-wider mb-3"
+          style={{ color: 'var(--color-text-secondary)' }}
+        >
           Recent Notes
         </h3>
         {recentNotes.length === 0 ? (
-          <p className="text-sm text-[var(--color-text-muted)]">No notes yet.</p>
+          <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>No notes yet.</p>
         ) : (
           <div className="flex flex-col gap-2">
             {recentNotes.map((note) => (
               <div
                 key={note.id}
-                className="px-3 py-2.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)]"
+                className="px-3 py-2.5 rounded-lg"
+                style={{
+                  backgroundColor: 'var(--color-bg-secondary)',
+                  border: '1px solid var(--color-border)',
+                }}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium text-[var(--color-text-primary)] truncate">
+                  <span
+                    className="text-sm font-medium truncate"
+                    style={{ color: 'var(--color-text-primary)' }}
+                  >
                     {note.title || 'Untitled'}
                   </span>
-                  <span className="text-xs text-[var(--color-text-muted)] flex-shrink-0">
+                  <span
+                    className="text-xs flex-shrink-0"
+                    style={{ color: 'var(--color-text-muted)' }}
+                  >
                     {format(parseISO(note.updatedAt), 'MMM d')}
                   </span>
                 </div>
                 {note.contentText && (
-                  <p className="text-xs text-[var(--color-text-muted)] mt-0.5 truncate">
+                  <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--color-text-muted)' }}>
                     {note.contentText}
                   </p>
                 )}
@@ -180,24 +202,34 @@ export function ProjectOverview({
       {/* Time Summary */}
       {recentEntries.length > 0 && (
         <section>
-          <h3 className="text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">
+          <h3
+            className="text-sm font-semibold uppercase tracking-wider mb-3"
+            style={{ color: 'var(--color-text-secondary)' }}
+          >
             Recent Time Entries
           </h3>
           <div className="flex flex-col gap-2">
             {recentEntries.map((entry) => (
               <div
                 key={entry.id}
-                className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)]"
+                className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg"
+                style={{
+                  backgroundColor: 'var(--color-bg-secondary)',
+                  border: '1px solid var(--color-border)',
+                }}
               >
                 <div className="min-w-0">
-                  <p className="text-sm text-[var(--color-text-primary)] truncate">
+                  <p className="text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>
                     {entry.description ?? 'No description'}
                   </p>
-                  <p className="text-xs text-[var(--color-text-muted)]">
+                  <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
                     {format(parseISO(entry.startTime), 'MMM d, h:mm a')}
                   </p>
                 </div>
-                <span className="text-sm font-medium text-[var(--color-text-secondary)] flex-shrink-0">
+                <span
+                  className="text-sm font-medium flex-shrink-0"
+                  style={{ color: 'var(--color-text-secondary)' }}
+                >
                   {formatDuration(entry.durationSec ?? 0)}
                 </span>
               </div>
@@ -219,15 +251,30 @@ interface StatCardProps {
 
 function StatCard({ icon, label, value, sub, accent }: StatCardProps) {
   return (
-    <div className="px-4 py-3 rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border)]">
+    <div
+      className="px-4 py-3 rounded-xl"
+      style={{
+        backgroundColor: 'var(--color-bg-secondary)',
+        border: '1px solid var(--color-border)',
+      }}
+    >
       <div className="flex items-center gap-2 mb-2">
         <span style={{ color: accent }}>{icon}</span>
-        <span className="text-xs text-[var(--color-text-muted)] uppercase tracking-wide font-medium">
+        <span
+          className="text-xs uppercase tracking-wide font-medium"
+          style={{ color: 'var(--color-text-muted)' }}
+        >
           {label}
         </span>
       </div>
-      <div className="text-2xl font-bold text-[var(--color-text-primary)]">{value}</div>
-      {sub && <div className="text-xs text-[var(--color-text-muted)] mt-0.5">{sub}</div>}
+      <div className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
+        {value}
+      </div>
+      {sub && (
+        <div className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+          {sub}
+        </div>
+      )}
     </div>
   );
 }
@@ -307,7 +354,10 @@ function MilestonesSection({ projectId, tasks, accentColor }: MilestonesSectionP
   return (
     <section>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider flex items-center gap-1.5">
+        <h3
+          className="text-sm font-semibold uppercase tracking-wider flex items-center gap-1.5"
+          style={{ color: 'var(--color-text-secondary)' }}
+        >
           <Target size={14} />
           Milestones
         </h3>
@@ -316,7 +366,10 @@ function MilestonesSection({ projectId, tasks, accentColor }: MilestonesSectionP
             resetForm();
             setShowForm(true);
           }}
-          className="flex items-center gap-1 text-xs text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors"
+          className="flex items-center gap-1 text-xs transition-colors"
+          style={{ color: 'var(--color-accent)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-accent-hover)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-accent)'; }}
         >
           <Plus size={14} />
           Add
@@ -325,7 +378,13 @@ function MilestonesSection({ projectId, tasks, accentColor }: MilestonesSectionP
 
       {/* Create / Edit form */}
       {showForm && (
-        <div className="mb-3 p-3 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)]">
+        <div
+          className="mb-3 p-3 rounded-lg"
+          style={{
+            backgroundColor: 'var(--color-bg-secondary)',
+            border: '1px solid var(--color-border)',
+          }}
+        >
           <input
             autoFocus
             type="text"
@@ -333,32 +392,59 @@ function MilestonesSection({ projectId, tasks, accentColor }: MilestonesSectionP
             value={formName}
             onChange={(e) => setFormName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-            className="w-full px-3 py-1.5 mb-2 rounded-md bg-[var(--color-bg-primary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors"
+            className="w-full px-3 py-1.5 mb-2 rounded-md text-sm focus:outline-none transition-colors"
+            style={{
+              backgroundColor: 'var(--color-bg-primary)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-primary)',
+            }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent)'; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
           />
           <input
             type="text"
             placeholder="Description (optional)"
             value={formDescription}
             onChange={(e) => setFormDescription(e.target.value)}
-            className="w-full px-3 py-1.5 mb-2 rounded-md bg-[var(--color-bg-primary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors"
+            className="w-full px-3 py-1.5 mb-2 rounded-md text-sm focus:outline-none transition-colors"
+            style={{
+              backgroundColor: 'var(--color-bg-primary)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-primary)',
+            }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent)'; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
           />
           <div className="flex items-center gap-2">
             <input
               type="date"
               value={formDueDate}
               onChange={(e) => setFormDueDate(e.target.value)}
-              className="px-3 py-1.5 rounded-md bg-[var(--color-bg-primary)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)] transition-colors"
+              className="px-3 py-1.5 rounded-md text-sm focus:outline-none transition-colors"
+              style={{
+                backgroundColor: 'var(--color-bg-primary)',
+                border: '1px solid var(--color-border)',
+                color: 'var(--color-text-primary)',
+              }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent)'; }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
             />
             <div className="flex gap-1 ml-auto">
               <button
                 onClick={handleSave}
-                className="p-1.5 rounded-md bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white transition-colors"
+                className="p-1.5 rounded-md transition-colors"
+                style={{ backgroundColor: 'var(--color-accent)', color: '#fff' }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent)'; }}
               >
                 <Check size={14} />
               </button>
               <button
                 onClick={resetForm}
-                className="p-1.5 rounded-md hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] transition-colors"
+                className="p-1.5 rounded-md transition-colors"
+                style={{ color: 'var(--color-text-muted)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
               >
                 <X size={14} />
               </button>
@@ -368,7 +454,7 @@ function MilestonesSection({ projectId, tasks, accentColor }: MilestonesSectionP
       )}
 
       {milestones.length === 0 && !showForm ? (
-        <p className="text-sm text-[var(--color-text-muted)]">No milestones yet.</p>
+        <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>No milestones yet.</p>
       ) : (
         <div className="flex flex-col gap-2">
           {milestones.map((milestone) => {
@@ -381,19 +467,33 @@ function MilestonesSection({ projectId, tasks, accentColor }: MilestonesSectionP
             return (
               <div
                 key={milestone.id}
-                className={`group px-3 py-3 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] ${
-                  milestone.status === 'completed' ? 'opacity-60' : ''
-                }`}
+                className="group px-3 py-3 rounded-lg transition-colors"
+                style={{
+                  backgroundColor: 'var(--color-bg-secondary)',
+                  border: '1px solid var(--color-border)',
+                  opacity: milestone.status === 'completed' ? 0.6 : 1,
+                }}
               >
                 <div className="flex items-start gap-2 mb-2">
                   {/* Toggle status */}
                   <button
                     onClick={() => handleToggleStatus(milestone)}
-                    className={`mt-0.5 flex-shrink-0 transition-colors ${
-                      milestone.status === 'completed'
-                        ? 'text-[var(--color-success)]'
-                        : 'text-[var(--color-text-muted)] hover:text-[var(--color-success)]'
-                    }`}
+                    className="mt-0.5 flex-shrink-0 transition-colors"
+                    style={{
+                      color: milestone.status === 'completed'
+                        ? 'var(--color-success)'
+                        : 'var(--color-text-muted)',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (milestone.status !== 'completed') {
+                        e.currentTarget.style.color = 'var(--color-success)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (milestone.status !== 'completed') {
+                        e.currentTarget.style.color = 'var(--color-text-muted)';
+                      }
+                    }}
                   >
                     <Target size={16} />
                   </button>
@@ -401,22 +501,30 @@ function MilestonesSection({ projectId, tasks, accentColor }: MilestonesSectionP
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span
-                        className={`text-sm font-medium ${
-                          milestone.status === 'completed'
-                            ? 'line-through text-[var(--color-text-muted)]'
-                            : 'text-[var(--color-text-primary)]'
-                        }`}
+                        className="text-sm font-medium"
+                        style={{
+                          textDecoration: milestone.status === 'completed' ? 'line-through' : 'none',
+                          color: milestone.status === 'completed'
+                            ? 'var(--color-text-muted)'
+                            : 'var(--color-text-primary)',
+                        }}
                       >
                         {milestone.name}
                       </span>
                       {milestone.status === 'completed' && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-success)] bg-opacity-20 text-[var(--color-success)]">
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded"
+                          style={{
+                            backgroundColor: 'var(--color-success-soft)',
+                            color: 'var(--color-success)',
+                          }}
+                        >
                           Done
                         </span>
                       )}
                     </div>
                     {milestone.description && (
-                      <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                         {milestone.description}
                       </p>
                     )}
@@ -426,13 +534,19 @@ function MilestonesSection({ projectId, tasks, accentColor }: MilestonesSectionP
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
                     <button
                       onClick={() => handleEdit(milestone)}
-                      className="text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors"
+                      className="transition-colors"
+                      style={{ color: 'var(--color-text-muted)' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-accent)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
                     >
                       <Edit3 size={13} />
                     </button>
                     <button
                       onClick={() => deleteMilestone.mutate(milestone.id)}
-                      className="text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-colors"
+                      className="transition-colors"
+                      style={{ color: 'var(--color-text-muted)' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-danger)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
                     >
                       <Trash2 size={13} />
                     </button>
@@ -441,7 +555,10 @@ function MilestonesSection({ projectId, tasks, accentColor }: MilestonesSectionP
 
                 {/* Progress bar */}
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 h-1.5 rounded-full bg-[var(--color-bg-tertiary)] overflow-hidden">
+                  <div
+                    className="flex-1 h-1.5 rounded-full overflow-hidden"
+                    style={{ backgroundColor: 'var(--color-bg-tertiary)' }}
+                  >
                     <div
                       className="h-full rounded-full transition-all"
                       style={{
@@ -450,7 +567,7 @@ function MilestonesSection({ projectId, tasks, accentColor }: MilestonesSectionP
                       }}
                     />
                   </div>
-                  <span className="text-[11px] text-[var(--color-text-muted)] flex-shrink-0">
+                  <span className="text-[11px] flex-shrink-0" style={{ color: 'var(--color-text-muted)' }}>
                     {completedCount}/{totalCount}
                   </span>
                 </div>
@@ -458,8 +575,14 @@ function MilestonesSection({ projectId, tasks, accentColor }: MilestonesSectionP
                 {/* Due date */}
                 {milestone.dueDate && (
                   <div className="flex items-center gap-1 mt-1.5">
-                    <Calendar size={11} className={isOverdue ? 'text-[var(--color-danger)]' : 'text-[var(--color-text-muted)]'} />
-                    <span className={`text-[11px] ${isOverdue ? 'text-[var(--color-danger)]' : 'text-[var(--color-text-muted)]'}`}>
+                    <Calendar
+                      size={11}
+                      style={{ color: isOverdue ? 'var(--color-danger)' : 'var(--color-text-muted)' }}
+                    />
+                    <span
+                      className="text-[11px]"
+                      style={{ color: isOverdue ? 'var(--color-danger)' : 'var(--color-text-muted)' }}
+                    >
                       {format(parseISO(milestone.dueDate), 'MMM d, yyyy')} · {getDaysUntil(milestone.dueDate)}
                     </span>
                   </div>
