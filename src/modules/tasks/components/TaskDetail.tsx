@@ -1,498 +1,920 @@
-import { useState, useEffect } from 'react';
-import { X, Flag, Calendar, Tag, AlignLeft, CheckCircle2, Circle, ListTodo, Repeat } from 'lucide-react';
-import type { Task, UpdateTaskInput, TaskPriority, TaskStatus } from '@/shared/types/task';
-import type { RecurrenceRule, RecurrenceFrequency } from '@/shared/types/recurrence';
-import { FREQUENCY_OPTIONS } from '@/shared/types/recurrence';
-import { describeRecurrence } from '@/shared/lib/recurrenceUtils';
-import { useSubtasks, useCreateTask, useUpdateTask, useDeleteTask } from '../hooks/useTasks';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import {
+  X,
+  MoreHorizontal,
+  Calendar,
+  Clock,
+  RefreshCw,
+  Folder,
+  Plus,
+  Trash2,
+  ChevronDown,
+  Check,
+} from 'lucide-react';
+import type { Task, TaskStatus, TaskPriority, UpdateTaskInput, CreateTaskInput } from '@/shared/types/task';
+import { useSubtasks, useCreateTask, useUpdateTask } from '../hooks/useTasks';
+
+// ─── Status config ────────────────────────────────────────────────────────────
+
+const STATUS_OPTIONS: { value: TaskStatus; label: string; color: string }[] = [
+  { value: 'backlog',     label: 'Backlog',     color: 'var(--color-status-backlog, #a1a1aa)' },
+  { value: 'inbox',       label: 'Inbox',       color: 'var(--color-status-inbox, #a1a1aa)' },
+  { value: 'todo',        label: 'Todo',        color: 'var(--color-status-todo, #60a5fa)' },
+  { value: 'in_progress', label: 'In Progress', color: 'var(--color-status-in-progress, #fb923c)' },
+  { value: 'in_review',   label: 'In Review',   color: 'var(--color-status-in-review, #c084fc)' },
+  { value: 'done',        label: 'Done',        color: 'var(--color-status-done, #4ade80)' },
+  { value: 'cancelled',   label: 'Cancelled',   color: 'var(--color-status-cancelled, #f87171)' },
+];
+
+const PRIORITY_OPTIONS: { value: TaskPriority; label: string; color: string }[] = [
+  { value: 0, label: 'No Priority', color: 'var(--color-text-muted)' },
+  { value: 1, label: 'Low',         color: 'var(--color-priority-low, #3b82f6)' },
+  { value: 2, label: 'Medium',      color: 'var(--color-priority-medium, #eab308)' },
+  { value: 3, label: 'High',        color: 'var(--color-priority-high, #f97316)' },
+  { value: 4, label: 'Urgent',      color: 'var(--color-priority-urgent, #ef4444)' },
+];
+
+// 8 preset tag colors
+const TAG_COLORS = [
+  '#ef4444', '#f97316', '#eab308', '#22c55e',
+  '#3b82f6', '#a855f7', '#ec4899', '#6b7280',
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatDate(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatDateTime(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function toDateInputValue(iso: string | null): string {
+  if (!iso) return '';
+  return iso.split('T')[0];
+}
+
+// ─── Tag pill ────────────────────────────────────────────────────────────────
+
+function TagPill({ label, color, onRemove }: { label: string; color?: string; onRemove?: () => void }) {
+  const bg = color ?? '#6b7280';
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4,
+        padding: '2px 8px',
+        borderRadius: 9999,
+        fontSize: 12,
+        fontWeight: 500,
+        backgroundColor: bg + '33',
+        color: bg,
+        border: `1px solid ${bg}55`,
+      }}
+    >
+      {label}
+      {onRemove && (
+        <button
+          onClick={onRemove}
+          style={{ display: 'flex', alignItems: 'center', marginLeft: 2, opacity: 0.7 }}
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.7'; }}
+        >
+          <X size={10} />
+        </button>
+      )}
+    </span>
+  );
+}
+
+// ─── Select dropdown (generic) ────────────────────────────────────────────────
+
+function SelectDropdown<T extends string | number>({
+  value,
+  options,
+  onChange,
+  renderTrigger,
+}: {
+  value: T;
+  options: { value: T; label: string; color?: string }[];
+  onChange: (v: T) => void;
+  renderTrigger: (selected: { value: T; label: string; color?: string }) => React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const selected = options.find((o) => o.value === value) ?? options[0];
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '5px 10px',
+          borderRadius: 8,
+          border: '1px solid var(--color-border)',
+          backgroundColor: 'var(--color-bg-tertiary)',
+          cursor: 'pointer',
+          fontSize: 13,
+          color: 'var(--color-text-primary)',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-hover)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
+      >
+        {renderTrigger(selected)}
+        <ChevronDown size={12} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: 0,
+            zIndex: 100,
+            minWidth: 160,
+            backgroundColor: 'var(--color-bg-elevated)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 10,
+            boxShadow: 'var(--shadow-popup, 0 8px 24px rgba(0,0,0,0.15))',
+            padding: '4px 0',
+            overflow: 'hidden',
+          }}
+        >
+          {options.map((opt) => (
+            <button
+              key={String(opt.value)}
+              onClick={() => { onChange(opt.value); setOpen(false); }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                width: '100%',
+                padding: '7px 12px',
+                fontSize: 13,
+                color: 'var(--color-text-primary)',
+                backgroundColor: opt.value === value ? 'var(--color-bg-hover)' : 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = opt.value === value ? 'var(--color-bg-hover)' : 'transparent'; }}
+            >
+              {opt.color && (
+                <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: opt.color, flexShrink: 0 }} />
+              )}
+              <span style={{ flex: 1 }}>{opt.label}</span>
+              {opt.value === value && <Check size={12} style={{ color: 'var(--color-accent)' }} />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── PropertyRow ──────────────────────────────────────────────────────────────
+
+function PropertyRow({ label, icon, children }: { label: string; icon?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, minHeight: 32 }}>
+      <div
+        style={{
+          width: 100,
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          paddingTop: 4,
+          fontSize: 12,
+          color: 'var(--color-text-muted)',
+        }}
+      >
+        {icon}
+        {label}
+      </div>
+      <div style={{ flex: 1, fontSize: 14, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ─── Subtask item ────────────────────────────────────────────────────────────
+
+function SubtaskItem({ task }: { task: Task }) {
+  const updateTask = useUpdateTask();
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '4px 0',
+        opacity: task.status === 'done' || task.status === 'cancelled' ? 0.6 : 1,
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <button
+        onClick={() =>
+          updateTask.mutate({
+            id: task.id,
+            data: { status: task.status === 'done' ? 'todo' : 'done' },
+          })
+        }
+        style={{
+          width: 16,
+          height: 16,
+          borderRadius: '50%',
+          border: `2px solid ${task.status === 'done' ? 'var(--color-status-done, #4ade80)' : 'var(--color-border-strong)'}`,
+          backgroundColor: task.status === 'done' ? 'var(--color-status-done, #4ade80)' : 'transparent',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          flexShrink: 0,
+          transition: 'all 0.15s',
+        }}
+      >
+        {task.status === 'done' && <Check size={9} style={{ color: 'white' }} />}
+      </button>
+      <span
+        style={{
+          fontSize: 13,
+          color: 'var(--color-text-primary)',
+          flex: 1,
+          textDecoration: task.status === 'done' ? 'line-through' : 'none',
+          opacity: hovered ? 1 : undefined,
+        }}
+      >
+        {task.title}
+      </span>
+    </div>
+  );
+}
+
+// ─── TaskDetail ───────────────────────────────────────────────────────────────
 
 interface TaskDetailProps {
   task: Task;
   onUpdate: (data: UpdateTaskInput) => void;
+  onDelete: () => void;
   onClose: () => void;
 }
 
-const PRIORITIES: { value: TaskPriority; label: string; color: string }[] = [
-  { value: 0, label: 'None', color: 'var(--color-text-muted)' },
-  { value: 1, label: 'Low', color: 'var(--color-p4)' },
-  { value: 2, label: 'Medium', color: 'var(--color-p3)' },
-  { value: 3, label: 'High', color: 'var(--color-p2)' },
-  { value: 4, label: 'Urgent', color: 'var(--color-p1)' },
-];
-
-const STATUSES: { value: TaskStatus; label: string }[] = [
-  { value: 'inbox', label: 'Inbox' },
-  { value: 'todo', label: 'Todo' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'done', label: 'Done' },
-  { value: 'cancelled', label: 'Cancelled' },
-];
-
-export function TaskDetail({ task, onUpdate, onClose }: TaskDetailProps) {
-  const [title, setTitle] = useState(task.title);
-  const [description, setDescription] = useState(task.description ?? '');
-  const [tagInput, setTagInput] = useState('');
-  const [subtaskInput, setSubtaskInput] = useState('');
-
-  // Parse recurrence from JSON string
-  const parsedRecurrence: RecurrenceRule | null = (() => {
-    if (!task.recurrence) return null;
-    try { return JSON.parse(task.recurrence) as RecurrenceRule; } catch { return null; }
-  })();
-
-  const { data: subtasks = [] } = useSubtasks(task.parentId === null ? task.id : null);
-  const createTask = useCreateTask();
-  const updateSubtask = useUpdateTask();
-  const deleteSubtask = useDeleteTask();
-
-  const isRootTask = task.parentId === null;
-  const doneCount = subtasks.filter((s) => s.status === 'done').length;
-
-  // Sync state when task changes
+export function TaskDetail({ task, onUpdate, onDelete, onClose }: TaskDetailProps) {
+  // ── Animation state ───────────────────────────────────────────────────────
+  const [visible, setVisible] = useState(false);
   useEffect(() => {
-    setTitle(task.title);
-    setDescription(task.description ?? '');
-  }, [task.id, task.title, task.description]);
+    requestAnimationFrame(() => setVisible(true));
+  }, []);
 
-  function handleTitleBlur() {
-    if (title.trim() && title !== task.title) {
-      onUpdate({ title: title.trim() });
+  // ── Local edit state ──────────────────────────────────────────────────────
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(task.title);
+  const [description, setDescription] = useState(task.description ?? '');
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showTagPicker, setShowTagPicker] = useState(false);
+  const [tagInput, setTagInput] = useState('');
+
+  const titleRef = useRef<HTMLTextAreaElement>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+  const tagPickerRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const descriptionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Keep local draft in sync when task changes externally
+  useEffect(() => { setTitleDraft(task.title); }, [task.title]);
+  useEffect(() => { setDescription(task.description ?? ''); }, [task.description]);
+
+  // ── Subtasks ──────────────────────────────────────────────────────────────
+  const { data: subtasks = [] } = useSubtasks(task.id);
+  const createTask = useCreateTask();
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+
+  // ── More menu outside click ───────────────────────────────────────────────
+  useEffect(() => {
+    if (!showMoreMenu) return;
+    function handler(e: MouseEvent) {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) setShowMoreMenu(false);
     }
-  }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showMoreMenu]);
 
-  function handleDescriptionBlur() {
-    const val = description.trim() || null;
-    if (val !== task.description) {
-      onUpdate({ description: val });
+  // ── Tag picker outside click ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!showTagPicker) return;
+    function handler(e: MouseEvent) {
+      if (tagPickerRef.current && !tagPickerRef.current.contains(e.target as Node)) setShowTagPicker(false);
     }
-  }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showTagPicker]);
 
-  function handleAddTag(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' && tagInput.trim()) {
-      const newTag = tagInput.trim().toLowerCase();
-      if (!task.tags.includes(newTag)) {
-        onUpdate({ tags: [...task.tags, newTag] });
-      }
-      setTagInput('');
+  // ── Auto-resize description textarea ─────────────────────────────────────
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [description]);
+
+  // ── Auto-resize title textarea ────────────────────────────────────────────
+  useEffect(() => {
+    if (!editingTitle) return;
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, [editingTitle]);
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+
+  const handleTitleSave = useCallback(() => {
+    const trimmed = titleDraft.trim();
+    if (trimmed && trimmed !== task.title) {
+      onUpdate({ title: trimmed });
+    } else {
+      setTitleDraft(task.title);
     }
-  }
+    setEditingTitle(false);
+  }, [titleDraft, task.title, onUpdate]);
 
-  function handleRemoveTag(tag: string) {
+  const handleDescriptionChange = useCallback((val: string) => {
+    setDescription(val);
+    if (descriptionTimerRef.current) clearTimeout(descriptionTimerRef.current);
+    descriptionTimerRef.current = setTimeout(() => {
+      onUpdate({ description: val || null });
+    }, 600);
+  }, [onUpdate]);
+
+  const handleAddTag = useCallback((tag: string) => {
+    const trimmed = tag.trim();
+    if (!trimmed || task.tags.includes(trimmed)) return;
+    onUpdate({ tags: [...task.tags, trimmed] });
+    setTagInput('');
+  }, [task.tags, onUpdate]);
+
+  const handleRemoveTag = useCallback((tag: string) => {
     onUpdate({ tags: task.tags.filter((t) => t !== tag) });
-  }
+  }, [task.tags, onUpdate]);
 
-  function handleSubtaskToggle(subtask: Task) {
-    const newStatus: TaskStatus = subtask.status === 'done' ? 'todo' : 'done';
-    updateSubtask.mutate({ id: subtask.id, data: { status: newStatus } });
-  }
+  const handleAddSubtask = useCallback(() => {
+    const trimmed = newSubtaskTitle.trim();
+    if (!trimmed) return;
+    const input: CreateTaskInput = { title: trimmed, parentId: task.id, status: 'todo' };
+    createTask.mutate(input);
+    setNewSubtaskTitle('');
+  }, [newSubtaskTitle, task.id, createTask]);
 
-  function handleAddSubtask(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' && subtaskInput.trim()) {
-      createTask.mutate({ title: subtaskInput.trim(), parentId: task.id });
-      setSubtaskInput('');
-    }
-  }
+  // Subtask progress
+  const totalSubs = subtasks.length;
+  const doneSubs = subtasks.filter((s) => s.status === 'done' || s.status === 'cancelled').length;
+  const progress = totalSubs > 0 ? (doneSubs / totalSubs) * 100 : 0;
 
-  function handleDeleteSubtask(id: string) {
-    deleteSubtask.mutate(id);
-  }
+  const statusConfig = STATUS_OPTIONS.find((s) => s.value === task.status) ?? STATUS_OPTIONS[0];
+  const priorityConfig = PRIORITY_OPTIONS.find((p) => p.value === task.priority) ?? PRIORITY_OPTIONS[0];
 
   return (
-    <div
-      className="card w-96 flex flex-col"
-      style={{
-        borderLeft: '1px solid var(--color-border)',
-        borderRadius: 0,
-        boxShadow: 'none',
-      }}
-    >
-      {/* Header */}
+    <>
+      {/* Slide-in panel */}
       <div
-        className="flex items-center justify-between px-6 py-4"
-        style={{ borderBottom: '1px solid var(--color-border)' }}
+        style={{
+          position: 'fixed',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: 420,
+          zIndex: 50,
+          display: 'flex',
+          flexDirection: 'column',
+          backgroundColor: 'var(--color-bg-elevated)',
+          borderLeft: '1px solid var(--color-border)',
+          boxShadow: 'var(--shadow-popup, -4px 0 24px rgba(0,0,0,0.12))',
+          transform: visible ? 'translateX(0)' : 'translateX(100%)',
+          transition: 'transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+        }}
       >
-        <span
-          className="text-xs font-semibold uppercase tracking-widest"
-          style={{ color: 'var(--color-text-muted)' }}
-        >
-          Details
-        </span>
-        <button
-          className="transition-colors p-1 rounded"
-          style={{ color: 'var(--color-text-muted)' }}
-          onClick={onClose}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = 'var(--color-text-primary)';
-            e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = 'var(--color-text-muted)';
-            e.currentTarget.style.backgroundColor = 'transparent';
+        {/* ── Top bar ────────────────────────────────────────────────────── */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 16px',
+            borderBottom: '1px solid var(--color-border)',
+            flexShrink: 0,
+            position: 'sticky',
+            top: 0,
+            backgroundColor: 'var(--color-bg-elevated)',
+            zIndex: 10,
           }}
         >
-          <X size={16} />
-        </button>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        {/* Title */}
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onBlur={handleTitleBlur}
-          className="w-full text-xl font-semibold bg-transparent border-none outline-none"
-          style={{ color: 'var(--color-text-primary)' }}
-        />
-
-        {/* Status */}
-        <div>
-          <label
-            className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide mb-2"
-            style={{ color: 'var(--color-text-muted)' }}
-          >
-            Status
-          </label>
-          <select
-            value={task.status}
-            onChange={(e) => onUpdate({ status: e.target.value as TaskStatus })}
-            className="w-full px-3 py-2.5 rounded-lg text-sm outline-none transition-colors"
+          <button
+            onClick={onClose}
             style={{
-              backgroundColor: 'var(--color-bg-tertiary)',
-              border: '1px solid var(--color-border)',
-              color: 'var(--color-text-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 28,
+              height: 28,
+              borderRadius: 6,
+              border: 'none',
+              backgroundColor: 'transparent',
+              cursor: 'pointer',
+              color: 'var(--color-text-muted)',
             }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'; e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+            title="Close"
           >
-            {STATUSES.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
-            ))}
-          </select>
-        </div>
+            <X size={16} />
+          </button>
 
-        {/* Priority */}
-        <div>
-          <label
-            className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide mb-2"
-            style={{ color: 'var(--color-text-muted)' }}
-          >
-            <Flag size={12} /> Priority
-          </label>
-          <div className="flex gap-1.5">
-            {PRIORITIES.map((p) => {
-              const isActive = task.priority === p.value;
-              return (
+          {/* More menu */}
+          <div ref={moreMenuRef} style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowMoreMenu((v) => !v)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 28,
+                height: 28,
+                borderRadius: 6,
+                border: 'none',
+                backgroundColor: showMoreMenu ? 'var(--color-bg-hover)' : 'transparent',
+                cursor: 'pointer',
+                color: 'var(--color-text-muted)',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'; e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+              onMouseLeave={(e) => { if (!showMoreMenu) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--color-text-muted)'; } }}
+              title="More options"
+            >
+              <MoreHorizontal size={16} />
+            </button>
+
+            {showMoreMenu && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 4px)',
+                  right: 0,
+                  zIndex: 100,
+                  backgroundColor: 'var(--color-bg-elevated)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 10,
+                  boxShadow: 'var(--shadow-popup, 0 8px 24px rgba(0,0,0,0.15))',
+                  padding: '4px 0',
+                  minWidth: 160,
+                }}
+              >
                 <button
-                  key={p.value}
-                  onClick={() => onUpdate({ priority: p.value })}
-                  className="flex-1 px-2 py-2 rounded-lg text-xs font-medium transition-colors"
-                  style={
-                    isActive
-                      ? {
-                          backgroundColor: 'var(--color-bg-tertiary)',
-                          border: '1px solid var(--color-border)',
-                          color: p.color,
-                        }
-                      : {
-                          backgroundColor: 'transparent',
-                          border: '1px solid transparent',
-                          color: 'var(--color-text-muted)',
-                        }
-                  }
-                  onMouseEnter={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
-                      e.currentTarget.style.color = p.color;
-                    }
+                  onClick={() => { setShowMoreMenu(false); onDelete(); }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    width: '100%',
+                    padding: '8px 12px',
+                    fontSize: 13,
+                    color: 'var(--color-danger, #ef4444)',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    textAlign: 'left',
                   }}
-                  onMouseLeave={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = 'var(--color-text-muted)';
-                    }
-                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-danger-soft, rgba(239,68,68,0.08))'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                 >
-                  {p.label}
+                  <Trash2 size={14} />
+                  Delete task
                 </button>
-              );
-            })}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Due date */}
-        <div>
-          <label
-            className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide mb-2"
-            style={{ color: 'var(--color-text-muted)' }}
-          >
-            <Calendar size={12} /> Due Date
-          </label>
-          <input
-            type="date"
-            value={task.dueDate?.split('T')[0] ?? ''}
-            onChange={(e) => onUpdate({ dueDate: e.target.value || null })}
-            className="w-full px-3 py-2.5 rounded-lg text-sm outline-none"
-            style={{
-              backgroundColor: 'var(--color-bg-tertiary)',
-              border: '1px solid var(--color-border)',
-              color: 'var(--color-text-primary)',
-            }}
-          />
-        </div>
+        {/* ── Body ───────────────────────────────────────────────────────── */}
+        <div style={{ flex: 1, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-        {/* Recurrence */}
-        <div>
-          <label
-            className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide mb-2"
-            style={{ color: 'var(--color-text-muted)' }}
-          >
-            <Repeat size={12} /> Recurrence
-          </label>
-          {parsedRecurrence ? (
-            <div className="space-y-2">
-              <div
-                className="flex items-center gap-2 px-3 py-2.5 rounded-lg"
+          {/* Status + Priority row */}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <SelectDropdown
+              value={task.status}
+              options={STATUS_OPTIONS}
+              onChange={(v) => onUpdate({ status: v })}
+              renderTrigger={(sel) => (
+                <>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: sel.color, flexShrink: 0 }} />
+                  <span style={{ fontSize: 13 }}>{sel.label}</span>
+                </>
+              )}
+            />
+            <SelectDropdown
+              value={task.priority}
+              options={PRIORITY_OPTIONS}
+              onChange={(v) => onUpdate({ priority: v })}
+              renderTrigger={(sel) => (
+                <>
+                  <span style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: sel.color, flexShrink: 0, transform: 'rotate(45deg)' }} />
+                  <span style={{ fontSize: 13 }}>{sel.label}</span>
+                </>
+              )}
+            />
+          </div>
+
+          {/* Title */}
+          {editingTitle ? (
+            <textarea
+              ref={titleRef}
+              value={titleDraft}
+              onChange={(e) => {
+                setTitleDraft(e.target.value);
+                e.target.style.height = 'auto';
+                e.target.style.height = `${e.target.scrollHeight}px`;
+              }}
+              onBlur={handleTitleSave}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleTitleSave(); }
+                if (e.key === 'Escape') { setTitleDraft(task.title); setEditingTitle(false); }
+              }}
+              style={{
+                width: '100%',
+                fontSize: 22,
+                fontWeight: 700,
+                lineHeight: 1.3,
+                color: 'var(--color-text-primary)',
+                backgroundColor: 'var(--color-bg-tertiary)',
+                border: '1px solid var(--color-accent)',
+                borderRadius: 8,
+                padding: '4px 8px',
+                resize: 'none',
+                overflow: 'hidden',
+                outline: 'none',
+                fontFamily: 'inherit',
+              }}
+              rows={1}
+            />
+          ) : (
+            <h2
+              onClick={() => setEditingTitle(true)}
+              style={{
+                fontSize: 22,
+                fontWeight: 700,
+                lineHeight: 1.3,
+                color: 'var(--color-text-primary)',
+                cursor: 'text',
+                margin: 0,
+                padding: '4px 8px',
+                borderRadius: 8,
+                border: '1px solid transparent',
+                wordBreak: 'break-word',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+            >
+              {task.title}
+            </h2>
+          )}
+
+          {/* Properties section */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 0', borderTop: '1px solid var(--color-border)', borderBottom: '1px solid var(--color-border)' }}>
+
+            {/* Due date */}
+            <PropertyRow label="Due date" icon={<Calendar size={12} />}>
+              <input
+                type="date"
+                value={toDateInputValue(task.dueDate)}
+                onChange={(e) => onUpdate({ dueDate: e.target.value || null })}
                 style={{
-                  backgroundColor: 'var(--color-bg-tertiary)',
-                  border: '1px solid var(--color-border)',
+                  fontSize: 13,
+                  color: task.dueDate ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+                  backgroundColor: 'transparent',
+                  border: '1px solid transparent',
+                  borderRadius: 6,
+                  padding: '2px 6px',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  fontFamily: 'inherit',
                 }}
-              >
-                <Repeat size={12} style={{ color: 'var(--color-accent)' }} />
-                <span className="text-sm" style={{ color: 'var(--color-text-primary)' }}>
-                  {describeRecurrence(parsedRecurrence)}
-                </span>
+                onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+              />
+              {!task.dueDate && <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Not set</span>}
+            </PropertyRow>
+
+            {/* Start date */}
+            <PropertyRow label="Start date" icon={<Calendar size={12} />}>
+              <input
+                type="date"
+                value={toDateInputValue(task.startDate)}
+                onChange={(e) => onUpdate({ startDate: e.target.value || null })}
+                style={{
+                  fontSize: 13,
+                  color: task.startDate ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+                  backgroundColor: 'transparent',
+                  border: '1px solid transparent',
+                  borderRadius: 6,
+                  padding: '2px 6px',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  fontFamily: 'inherit',
+                }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+              />
+              {!task.startDate && <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Not set</span>}
+            </PropertyRow>
+
+            {/* Tags */}
+            <PropertyRow label="Tags" icon={<span style={{ fontSize: 11 }}>🏷</span>}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+                {task.tags.map((tag) => (
+                  <TagPill
+                    key={tag}
+                    label={tag}
+                    color={TAG_COLORS[Math.abs(tag.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % TAG_COLORS.length]}
+                    onRemove={() => handleRemoveTag(tag)}
+                  />
+                ))}
+
+                {/* Tag picker */}
+                <div ref={tagPickerRef} style={{ position: 'relative' }}>
+                  <button
+                    onClick={() => setShowTagPicker((v) => !v)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 3,
+                      padding: '2px 7px',
+                      borderRadius: 9999,
+                      border: '1px dashed var(--color-border)',
+                      backgroundColor: 'transparent',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      color: 'var(--color-text-muted)',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-hover)'; e.currentTarget.style.color = 'var(--color-text-secondary)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+                  >
+                    <Plus size={10} /> Add
+                  </button>
+
+                  {showTagPicker && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 4px)',
+                        left: 0,
+                        zIndex: 100,
+                        backgroundColor: 'var(--color-bg-elevated)',
+                        border: '1px solid var(--color-border)',
+                        borderRadius: 10,
+                        boxShadow: 'var(--shadow-popup, 0 8px 24px rgba(0,0,0,0.15))',
+                        padding: 10,
+                        minWidth: 180,
+                      }}
+                    >
+                      <input
+                        autoFocus
+                        type="text"
+                        placeholder="Tag name..."
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') { handleAddTag(tagInput); setShowTagPicker(false); }
+                          if (e.key === 'Escape') setShowTagPicker(false);
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '6px 8px',
+                          fontSize: 12,
+                          borderRadius: 6,
+                          border: '1px solid var(--color-border)',
+                          backgroundColor: 'var(--color-bg-tertiary)',
+                          color: 'var(--color-text-primary)',
+                          outline: 'none',
+                          marginBottom: 8,
+                          fontFamily: 'inherit',
+                        }}
+                      />
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {TAG_COLORS.map((color) => (
+                          <button
+                            key={color}
+                            onClick={() => { handleAddTag(tagInput || color); setShowTagPicker(false); }}
+                            style={{
+                              width: 20,
+                              height: 20,
+                              borderRadius: '50%',
+                              backgroundColor: color,
+                              border: '2px solid transparent',
+                              cursor: 'pointer',
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-text-primary)'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="flex gap-2">
-                <select
-                  value={parsedRecurrence.frequency}
-                  onChange={(e) => {
-                    const updated: RecurrenceRule = { ...parsedRecurrence, frequency: e.target.value as RecurrenceFrequency };
-                    onUpdate({ recurrence: JSON.stringify(updated) });
-                  }}
-                  className="flex-1 px-2 py-2 rounded-lg text-sm outline-none"
-                  style={{
-                    backgroundColor: 'var(--color-bg-tertiary)',
-                    border: '1px solid var(--color-border)',
-                    color: 'var(--color-text-primary)',
-                  }}
-                >
-                  {FREQUENCY_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+            </PropertyRow>
+
+            {/* Estimate */}
+            <PropertyRow label="Estimate" icon={<Clock size={12} />}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <input
                   type="number"
-                  min={1}
-                  value={parsedRecurrence.interval}
-                  onChange={(e) => {
-                    const n = parseInt(e.target.value, 10);
-                    if (n > 0) {
-                      const updated: RecurrenceRule = { ...parsedRecurrence, interval: n };
-                      onUpdate({ recurrence: JSON.stringify(updated) });
-                    }
-                  }}
-                  className="w-16 px-2 py-2 rounded-lg text-sm outline-none"
+                  min={0}
+                  value={task.estimatedMin ?? ''}
+                  onChange={(e) => onUpdate({ estimatedMin: e.target.value ? parseInt(e.target.value) : null })}
+                  placeholder="—"
                   style={{
-                    backgroundColor: 'var(--color-bg-tertiary)',
-                    border: '1px solid var(--color-border)',
+                    width: 56,
+                    fontSize: 13,
+                    padding: '2px 6px',
+                    borderRadius: 6,
+                    border: '1px solid transparent',
+                    backgroundColor: 'transparent',
                     color: 'var(--color-text-primary)',
+                    outline: 'none',
+                    fontFamily: 'inherit',
+                  }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+                />
+                {task.estimatedMin != null && (
+                  <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>min</span>
+                )}
+              </div>
+            </PropertyRow>
+
+            {/* Project */}
+            {task.projectId && (
+              <PropertyRow label="Project" icon={<Folder size={12} />}>
+                <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{task.projectId}</span>
+              </PropertyRow>
+            )}
+
+            {/* Recurrence */}
+            <PropertyRow label="Recurrence" icon={<RefreshCw size={12} />}>
+              <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
+                {task.recurrence ? (() => { try { const r = JSON.parse(task.recurrence); return r.frequency ?? task.recurrence; } catch { return task.recurrence; } })() : 'None'}
+              </span>
+            </PropertyRow>
+          </div>
+
+          {/* Description */}
+          <div>
+            <textarea
+              ref={textareaRef}
+              value={description}
+              onChange={(e) => handleDescriptionChange(e.target.value)}
+              placeholder="Add description..."
+              style={{
+                width: '100%',
+                minHeight: 80,
+                fontSize: 14,
+                lineHeight: 1.6,
+                padding: '8px',
+                borderRadius: 8,
+                border: '1px solid transparent',
+                backgroundColor: 'transparent',
+                color: 'var(--color-text-primary)',
+                resize: 'none',
+                overflow: 'hidden',
+                outline: 'none',
+                fontFamily: 'inherit',
+                transition: 'border-color 0.15s, background-color 0.15s',
+              }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+            />
+          </div>
+
+          {/* Subtasks section */}
+          <div>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                Subtasks
+              </span>
+              {totalSubs > 0 && (
+                <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+                  {doneSubs}/{totalSubs}
+                </span>
+              )}
+            </div>
+
+            {/* Progress bar */}
+            {totalSubs > 0 && (
+              <div
+                style={{
+                  height: 4,
+                  borderRadius: 9999,
+                  backgroundColor: 'var(--color-bg-tertiary)',
+                  marginBottom: 10,
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    height: '100%',
+                    width: `${progress}%`,
+                    borderRadius: 9999,
+                    backgroundColor: 'var(--color-status-done, #4ade80)',
+                    transition: 'width 0.3s ease',
                   }}
                 />
               </div>
-              <button
-                className="text-xs transition-colors"
-                style={{ color: 'var(--color-text-muted)' }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-danger)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
-                onClick={() => onUpdate({ recurrence: null })}
-              >
-                Remove recurrence
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => onUpdate({ recurrence: JSON.stringify({ frequency: 'weekly', interval: 1 } as RecurrenceRule) })}
-              className="w-full px-3 py-2.5 rounded-lg text-sm text-left transition-colors"
-              style={{
-                backgroundColor: 'var(--color-bg-tertiary)',
-                border: '1px solid var(--color-border)',
-                color: 'var(--color-text-muted)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = 'var(--color-text-primary)';
-                e.currentTarget.style.borderColor = 'var(--color-accent)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = 'var(--color-text-muted)';
-                e.currentTarget.style.borderColor = 'var(--color-border)';
-              }}
-            >
-              + Add recurrence
-            </button>
-          )}
-        </div>
-
-        {/* Tags */}
-        <div>
-          <label
-            className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide mb-2"
-            style={{ color: 'var(--color-text-muted)' }}
-          >
-            <Tag size={12} /> Tags
-          </label>
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {task.tags.map((tag) => (
-              <span
-                key={tag}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs"
-                style={{
-                  backgroundColor: 'var(--color-bg-tertiary)',
-                  color: 'var(--color-text-secondary)',
-                }}
-              >
-                {tag}
-                <button
-                  onClick={() => handleRemoveTag(tag)}
-                  className="transition-colors"
-                  style={{ color: 'var(--color-text-muted)' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-danger)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
-          <input
-            type="text"
-            value={tagInput}
-            onChange={(e) => setTagInput(e.target.value)}
-            onKeyDown={handleAddTag}
-            placeholder="Add tag…"
-            className="input-base w-full text-sm"
-          />
-        </div>
-
-        {/* Description */}
-        <div>
-          <label
-            className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide mb-2"
-            style={{ color: 'var(--color-text-muted)' }}
-          >
-            <AlignLeft size={12} /> Description
-          </label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            onBlur={handleDescriptionBlur}
-            placeholder="Add a description…"
-            rows={4}
-            className="w-full px-3 py-2.5 rounded-lg text-sm outline-none resize-none"
-            style={{
-              backgroundColor: 'var(--color-bg-tertiary)',
-              border: '1px solid var(--color-border)',
-              color: 'var(--color-text-primary)',
-            }}
-          />
-        </div>
-
-        {/* Subtasks section (only for root tasks) */}
-        {isRootTask && (
-          <div>
-            <label
-              className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide mb-2"
-              style={{ color: 'var(--color-text-muted)' }}
-            >
-              <ListTodo size={12} /> Subtasks
-              {subtasks.length > 0 && (
-                <span className="ml-auto text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                  {doneCount}/{subtasks.length} complete
-                </span>
-              )}
-            </label>
+            )}
 
             {/* Subtask list */}
-            <div className="space-y-1 mb-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {subtasks.map((sub) => (
-                <div
-                  key={sub.id}
-                  className="flex items-center gap-2 px-2 py-2 rounded-lg group transition-colors"
-                  style={{ backgroundColor: 'transparent' }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLDivElement).style.backgroundColor = 'var(--color-bg-hover)';
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <button
-                    onClick={() => handleSubtaskToggle(sub)}
-                    className="flex-shrink-0 transition-colors"
-                    style={{
-                      color: sub.status === 'done'
-                        ? 'var(--color-success)'
-                        : 'var(--color-text-muted)',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (sub.status !== 'done') {
-                        e.currentTarget.style.color = 'var(--color-accent)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.color = sub.status === 'done'
-                        ? 'var(--color-success)'
-                        : 'var(--color-text-muted)';
-                    }}
-                  >
-                    {sub.status === 'done' ? <CheckCircle2 size={15} /> : <Circle size={15} />}
-                  </button>
-                  <span
-                    className="flex-1 text-sm truncate"
-                    style={{
-                      color: sub.status === 'done' ? 'var(--color-text-muted)' : 'var(--color-text-primary)',
-                      textDecoration: sub.status === 'done' ? 'line-through' : 'none',
-                    }}
-                  >
-                    {sub.title}
-                  </span>
-                  <button
-                    onClick={() => handleDeleteSubtask(sub.id)}
-                    className="opacity-0 group-hover:opacity-100 transition-all"
-                    style={{ color: 'var(--color-text-muted)' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-danger)'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
+                <SubtaskItem key={sub.id} task={sub} />
               ))}
             </div>
 
-            {/* Add subtask input */}
-            <input
-              type="text"
-              value={subtaskInput}
-              onChange={(e) => setSubtaskInput(e.target.value)}
-              onKeyDown={handleAddSubtask}
-              placeholder="Add subtask…"
-              className="input-base w-full text-sm"
-            />
+            {/* Add subtask */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+              <Plus size={14} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+              <input
+                type="text"
+                placeholder="Add subtask..."
+                value={newSubtaskTitle}
+                onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleAddSubtask();
+                  if (e.key === 'Escape') setNewSubtaskTitle('');
+                }}
+                style={{
+                  flex: 1,
+                  fontSize: 13,
+                  padding: '4px 0',
+                  border: 'none',
+                  borderBottom: '1px solid transparent',
+                  backgroundColor: 'transparent',
+                  color: 'var(--color-text-primary)',
+                  outline: 'none',
+                  fontFamily: 'inherit',
+                }}
+                onFocus={(e) => { e.currentTarget.style.borderBottomColor = 'var(--color-accent)'; }}
+                onBlur={(e) => { e.currentTarget.style.borderBottomColor = 'transparent'; }}
+              />
+            </div>
           </div>
-        )}
 
-        {/* Metadata */}
-        <div
-          className="text-xs space-y-1 pt-4"
-          style={{
-            color: 'var(--color-text-muted)',
-            borderTop: '1px solid var(--color-border)',
-          }}
-        >
-          <div>Created: {new Date(task.createdAt).toLocaleString()}</div>
-          <div>Updated: {new Date(task.updatedAt).toLocaleString()}</div>
-          {task.completedAt && <div>Completed: {new Date(task.completedAt).toLocaleString()}</div>}
+          {/* Timestamps */}
+          <div
+            style={{
+              marginTop: 'auto',
+              paddingTop: 16,
+              borderTop: '1px solid var(--color-border)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4,
+            }}
+          >
+            <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+              Created {formatDateTime(task.createdAt)}
+            </span>
+            <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+              Updated {formatDateTime(task.updatedAt)}
+            </span>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
