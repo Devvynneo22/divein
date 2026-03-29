@@ -7,6 +7,7 @@ interface TaskBoardColumnProps {
   label: string;
   tasks: Task[];
   onDrop: (taskId: string) => void;
+  onReorderWithinColumn: (taskId: string, beforeTaskId: string | null) => void;
   onCreateTask: () => void;
   onSelectTask: (id: string) => void;
   selectedTaskId: string | null;
@@ -45,6 +46,7 @@ export function TaskBoardColumn({
   tasks,
   onDrop,
   onCreateTask,
+  onReorderWithinColumn,
   onSelectTask,
   selectedTaskId,
   onStatusChange,
@@ -86,20 +88,21 @@ export function TaskBoardColumn({
   return (
     <div
       style={{
-        width: '280px',
+        width: '296px',
         flexShrink: 0,
         display: 'flex',
         flexDirection: 'column',
         maxHeight: '100%',
-        borderRadius: '12px 12px 0 0',
+        borderRadius: '16px',
         overflow: 'hidden',
         border: isDragOver
           ? '2px dashed var(--color-accent, #6366f1)'
-          : '2px solid transparent',
-        transition: 'border-color 0.15s ease',
+          : '1px solid var(--color-border)',
+        transition: 'border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease',
         backgroundColor: isDragOver
           ? 'var(--color-accent-soft, rgba(99,102,241,0.06))'
-          : columnBg,
+          : 'var(--color-bg-secondary)',
+        boxShadow: isDragOver ? 'var(--shadow-md)' : 'var(--shadow-sm)',
       }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -114,7 +117,7 @@ export function TaskBoardColumn({
           padding: '12px 12px 8px 12px',
           flexShrink: 0,
           borderBottom: '1px solid var(--color-border)',
-          backgroundColor: columnBg,
+          background: `linear-gradient(180deg, ${columnBg} 0%, var(--color-bg-secondary) 100%)`,
         }}
       >
         {/* Status dot */}
@@ -200,26 +203,61 @@ export function TaskBoardColumn({
         }}
       >
         {tasks.map((task) => (
-          <TaskCard
+          <div
             key={task.id}
-            task={task}
-            isSelected={selectedTaskId === task.id}
-            onSelect={() => onSelectTask(task.id)}
-            onStatusChange={(newStatus) => onStatusChange(task.id, newStatus)}
-            onPriorityChange={(newPriority) => onPriorityChange(task.id, newPriority)}
-            onDelete={() => onDeleteTask(task.id)}
-            draggable={true}
-            subtaskProgress={subtaskProgressMap?.[task.id]}
-            onDragStart={(e) => {
-              e.dataTransfer.setData('text/plain', task.id);
-              e.dataTransfer.effectAllowed = 'move';
-              onDragStart(task.id, e);
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
             }}
-            onDragEnd={() => onDragEnd()}
-          />
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const taskId = e.dataTransfer.getData('text/plain');
+              if (taskId && taskId !== task.id) {
+                onReorderWithinColumn(taskId, task.id);
+              }
+            }}
+          >
+            <TaskCard
+              task={task}
+              isSelected={selectedTaskId === task.id}
+              onSelect={() => onSelectTask(task.id)}
+              onStatusChange={(newStatus) => onStatusChange(task.id, newStatus)}
+              onPriorityChange={(newPriority) => onPriorityChange(task.id, newPriority)}
+              onDelete={() => onDeleteTask(task.id)}
+              draggable={true}
+              subtaskProgress={subtaskProgressMap?.[task.id]}
+              onDragStart={(e) => {
+                e.dataTransfer.setData('text/plain', task.id);
+                e.dataTransfer.effectAllowed = 'move';
+                onDragStart(task.id, e);
+              }}
+              onDragEnd={() => onDragEnd()}
+            />
+          </div>
         ))}
 
         {/* Empty drop zone hint when dragging over an empty column */}
+        {isDragOver && tasks.length > 0 && (
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const taskId = e.dataTransfer.getData('text/plain');
+              if (taskId) {
+                onReorderWithinColumn(taskId, null);
+              }
+            }}
+            style={{
+              height: 10,
+              borderRadius: 999,
+              backgroundColor: 'var(--color-accent-soft, rgba(99,102,241,0.18))',
+              border: '1px dashed var(--color-accent, #6366f1)',
+            }}
+          />
+        )}
+
         {tasks.length === 0 && isDragOver && (
           <div
             style={{

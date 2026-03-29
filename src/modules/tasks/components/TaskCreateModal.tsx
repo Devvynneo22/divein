@@ -27,6 +27,14 @@ const TAG_COLORS = [
   '#3b82f6', '#a855f7', '#ec4899', '#6b7280',
 ];
 
+function sanitizeTag(tag: string): string {
+  const trimmed = tag.trim();
+  if (!trimmed) return '';
+  // Reject bare hex color strings (3, 4, 6, or 8 hex digits, with or without #)
+  if (/^#?[0-9a-fA-F]{3,8}$/.test(trimmed)) return '';
+  return trimmed;
+}
+
 // ─── Inline dropdown ──────────────────────────────────────────────────────────
 
 function FieldDropdown<T extends string | number>({
@@ -232,7 +240,7 @@ export function TaskCreateModal({ isOpen, onClose, onCreate, defaultStatus }: Ta
   }, [title, status, priority, dueDate, tags, estimatedMin, description, onCreate, onClose]);
 
   const handleTagAdd = useCallback(() => {
-    const t = tagInput.trim();
+    const t = sanitizeTag(tagInput);
     if (t && !tags.includes(t)) setTags((prev) => [...prev, t]);
     setTagInput('');
   }, [tagInput, tags]);

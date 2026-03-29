@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { isToday, isPast, format, parseISO } from 'date-fns';
-import type { Task, TaskStatus, TaskPriority } from '@/shared/types/task';
+import type { Task, TaskStatus } from '@/shared/types/task';
 import { StatusIcon } from './StatusIcon';
 import { PriorityIcon } from './PriorityIcon';
 
@@ -196,9 +196,28 @@ export function TaskListRow({
             color: dueDateColor,
             flexShrink: 0,
             whiteSpace: 'nowrap',
+            fontWeight: isDueToday ? 700 : 500,
           }}
         >
           {formatDueDate(task.dueDate)}
+        </span>
+      )}
+
+      {isDueToday && (
+        <span
+          style={{
+            fontSize: 10,
+            padding: '2px 6px',
+            borderRadius: 999,
+            backgroundColor: 'var(--color-accent-soft)',
+            color: 'var(--color-accent)',
+            fontWeight: 700,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            flexShrink: 0,
+          }}
+        >
+          Today
         </span>
       )}
 

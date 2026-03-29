@@ -11,6 +11,7 @@ interface TaskBoardProps {
   onPriorityChange: (taskId: string, priority: TaskPriority) => void;
   onDeleteTask: (taskId: string) => void;
   onCreateTask: (status: TaskStatus) => void;
+  onReorderTask: (taskId: string, newOrder: number) => void;
   subtaskProgressMap?: Record<string, { done: number; total: number }>;
 }
 
@@ -45,6 +46,7 @@ export function TaskBoard({
   onPriorityChange,
   onDeleteTask,
   onCreateTask,
+  onReorderTask,
   subtaskProgressMap,
 }: TaskBoardProps) {
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
@@ -72,6 +74,36 @@ export function TaskBoard({
       setDraggingTaskId(null);
     },
     [tasks, onStatusChange],
+  );
+
+  const handleReorderWithinColumn = useCallback(
+    (status: TaskStatus, taskId: string, beforeTaskId: string | null) => {
+      // Compute column tasks fresh to avoid stale closure over tasksByStatus
+      const columnTasks = tasks.filter((t) => t.status === status);
+      const moving = tasks.find((t) => t.id === taskId);
+      if (!moving) return;
+
+      if (moving.status !== status) {
+        onStatusChange(taskId, status);
+      }
+
+      const withoutMoving = columnTasks.filter((t) => t.id !== taskId);
+      const insertIndex = beforeTaskId ? withoutMoving.findIndex((t) => t.id === beforeTaskId) : withoutMoving.length;
+      const finalIndex = insertIndex === -1 ? withoutMoving.length : insertIndex;
+
+      const previous = withoutMoving[finalIndex - 1];
+      const next = withoutMoving[finalIndex];
+
+      let newOrder: number;
+      if (previous && next) newOrder = (previous.sortOrder + next.sortOrder) / 2;
+      else if (previous) newOrder = previous.sortOrder + 1;
+      else if (next) newOrder = next.sortOrder - 1;
+      else newOrder = moving.sortOrder;
+
+      onReorderTask(taskId, newOrder);
+      setDraggingTaskId(null);
+    },
+    [tasks, onStatusChange, onReorderTask],
   );
 
   const handleDragStart = useCallback(
@@ -115,6 +147,7 @@ export function TaskBoard({
             tasks={tasksByStatus[status]}
             onDrop={(taskId) => handleDrop(status, taskId)}
             onCreateTask={() => onCreateTask(status)}
+            onReorderWithinColumn={(taskId, beforeTaskId) => handleReorderWithinColumn(status, taskId, beforeTaskId)}
             onSelectTask={onSelectTask}
             selectedTaskId={selectedTaskId}
             onStatusChange={onStatusChange}

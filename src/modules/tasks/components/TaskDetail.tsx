@@ -40,6 +40,22 @@ const TAG_COLORS = [
   '#3b82f6', '#a855f7', '#ec4899', '#6b7280',
 ];
 
+function sanitizeTag(tag: string): string {
+  const trimmed = tag.trim();
+  if (!trimmed) return '';
+  // Reject bare hex color strings (3, 4, 6, or 8 hex digits, with or without #)
+  if (/^#?[0-9a-fA-F]{3,8}$/.test(trimmed)) return '';
+  return trimmed;
+}
+
+function getTagColor(tag: string): string {
+  let hash = 0;
+  for (let i = 0; i < tag.length; i++) {
+    hash = (hash * 31 + tag.charCodeAt(i)) & 0xffffffff;
+  }
+  return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length];
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatDate(iso: string | null): string {
@@ -57,6 +73,19 @@ function formatDateTime(iso: string | null): string {
 function toDateInputValue(iso: string | null): string {
   if (!iso) return '';
   return iso.split('T')[0];
+}
+
+function formatQuickDateLabel(days: number): string {
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Tomorrow';
+  if (days === 7) return 'Next week';
+  return `+${days}d`;
+}
+
+function offsetDate(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split('T')[0];
 }
 
 // ─── Tag pill ────────────────────────────────────────────────────────────────
@@ -374,7 +403,7 @@ export function TaskDetail({ task, onUpdate, onDelete, onClose }: TaskDetailProp
   }, [onUpdate]);
 
   const handleAddTag = useCallback((tag: string) => {
-    const trimmed = tag.trim();
+    const trimmed = sanitizeTag(tag);
     if (!trimmed || task.tags.includes(trimmed)) return;
     onUpdate({ tags: [...task.tags, trimmed] });
     setTagInput('');
@@ -610,25 +639,59 @@ export function TaskDetail({ task, onUpdate, onDelete, onClose }: TaskDetailProp
 
             {/* Due date */}
             <PropertyRow label="Due date" icon={<Calendar size={12} />}>
-              <input
-                type="date"
-                value={toDateInputValue(task.dueDate)}
-                onChange={(e) => onUpdate({ dueDate: e.target.value || null })}
-                style={{
-                  fontSize: 13,
-                  color: task.dueDate ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                  backgroundColor: 'transparent',
-                  border: '1px solid transparent',
-                  borderRadius: 6,
-                  padding: '2px 6px',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  fontFamily: 'inherit',
-                }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.backgroundColor = 'transparent'; }}
-              />
-              {!task.dueDate && <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Not set</span>}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <input
+                  type="date"
+                  value={toDateInputValue(task.dueDate)}
+                  onChange={(e) => onUpdate({ dueDate: e.target.value || null })}
+                  style={{
+                    fontSize: 13,
+                    color: task.dueDate ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+                    backgroundColor: 'transparent',
+                    border: '1px solid transparent',
+                    borderRadius: 6,
+                    padding: '2px 6px',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    fontFamily: 'inherit',
+                  }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+                />
+                {[0, 1, 7].map((days) => (
+                  <button
+                    key={days}
+                    onClick={() => onUpdate({ dueDate: offsetDate(days) })}
+                    style={{
+                      fontSize: 11,
+                      padding: '3px 8px',
+                      borderRadius: 999,
+                      border: '1px solid var(--color-border)',
+                      backgroundColor: 'var(--color-bg-tertiary)',
+                      color: 'var(--color-text-secondary)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {formatQuickDateLabel(days)}
+                  </button>
+                ))}
+                {task.dueDate && (
+                  <button
+                    onClick={() => onUpdate({ dueDate: null })}
+                    style={{
+                      fontSize: 11,
+                      padding: '3px 8px',
+                      borderRadius: 999,
+                      border: '1px solid var(--color-border)',
+                      backgroundColor: 'transparent',
+                      color: 'var(--color-text-muted)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
             </PropertyRow>
 
             {/* Start date */}
@@ -661,7 +724,7 @@ export function TaskDetail({ task, onUpdate, onDelete, onClose }: TaskDetailProp
                   <TagPill
                     key={tag}
                     label={tag}
-                    color={TAG_COLORS[Math.abs(tag.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % TAG_COLORS.length]}
+                    color={getTagColor(tag)}
                     onRemove={() => handleRemoveTag(tag)}
                   />
                 ))}
@@ -726,23 +789,8 @@ export function TaskDetail({ task, onUpdate, onDelete, onClose }: TaskDetailProp
                           fontFamily: 'inherit',
                         }}
                       />
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {TAG_COLORS.map((color) => (
-                          <button
-                            key={color}
-                            onClick={() => { handleAddTag(tagInput || color); setShowTagPicker(false); }}
-                            style={{
-                              width: 20,
-                              height: 20,
-                              borderRadius: '50%',
-                              backgroundColor: color,
-                              border: '2px solid transparent',
-                              cursor: 'pointer',
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-text-primary)'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; }}
-                          />
-                        ))}
+                      <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+                        Press Enter to add a tag name. Tag colors are assigned automatically for now.
                       </div>
                     </div>
                   )}

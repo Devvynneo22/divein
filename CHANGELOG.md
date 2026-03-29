@@ -153,6 +153,140 @@ e37b49e feat: Tasks overhaul foundation — new statuses, status/priority colors
 
 ---
 
+## Session 15 — Tasks refinement pass: real grouping/sorting, tag fix, intra-column reorder, better due-date UX (2026-03-29, ~13:44–14:10 SGT)
+
+**Coordinator / implementer:** Work Claw  
+**Context:** Devvyn pushed for maximum-effort improvement on Tasks, specifically calling out weak board design, broken group/sort behavior, bad tagging UX, weak date UX, missing in-column drag reorder, and overall lack of world-class polish.
+
+### What was verified from code before changes
+The user’s complaints were largely correct:
+- **Group / Sort controls were mostly not affecting rendered output** at the page level
+- **Tag UX was broken** — the detail tag picker could accidentally save color hex values like `#ef4444` as tag names
+- **Board drag/drop only supported cross-column moves**, not proper reordering inside the same column
+- **Today linkage was conceptually present as a separate view**, but weakly surfaced in list/task UI
+- **Date UX relied mostly on raw native date inputs** with no fast affordances
+- **Board styling was serviceable but still too flat / low-hierarchy** for the target bar
+
+### Implementation changes made
+
+#### 1) Grouping and sorting now actually drive rendered views
+Created:
+- `src/modules/tasks/components/taskViewUtils.ts`
+
+Added:
+- canonical task sorting utility
+- canonical grouping utility for:
+  - none
+  - status
+  - priority
+  - project
+  - due date
+- today/overdue helper logic
+
+Wired `TasksPage.tsx` to:
+- compute `sortedTasks` from toolbar sort state
+- compute `groupedTasks` from toolbar group state
+- pass sorted/grouped results into list and backlog views
+
+Result:
+- **Sort now affects list/backlog/today inputs**
+- **Group now affects list/backlog rendering**
+- board still groups by status only for now (intentional in this pass)
+
+#### 2) Tagging bug fixed
+Updated:
+- `TaskDetail.tsx`
+- `TaskCreateModal.tsx`
+- `TaskCard.tsx`
+
+Changes:
+- added tag sanitization
+- reject empty tags
+- reject accidental hex-color inputs like `#ef4444`
+- removed the broken "color dots create a color-string tag" behavior from detail panel
+- clarified that tags are names, and color is currently auto-assigned visually
+
+Result:
+- the exact bad behavior Devvyn reported is fixed
+
+#### 3) Board drag-and-drop now supports reordering inside the same column
+Updated:
+- `TaskBoard.tsx`
+- `TaskBoardColumn.tsx`
+- `TasksPage.tsx`
+
+Changes:
+- added reorder handling via existing `useReorderTask`
+- implemented drop targets around cards for before-position insertion
+- added same-column and cross-column reorder path using `sortOrder`
+- preserved existing cross-column status changes
+
+Result:
+- you can now drag tasks **within the same status column**, not just across columns
+
+#### 4) Due-date UX improved
+Updated:
+- `TaskDetail.tsx`
+
+Changes:
+- added quick due-date actions:
+  - Today
+  - Tomorrow
+  - Next week
+  - Clear
+- kept direct date input for precise edits
+
+Result:
+- much faster common scheduling flow without removing precision control
+
+#### 5) Today linkage surfaced more clearly
+Updated:
+- `TaskListRow.tsx`
+
+Changes:
+- tasks due today now show a visible **Today** chip in list rows
+- today due date gets stronger visual emphasis
+
+Result:
+- better connection between general task views and the Today concept
+
+#### 6) Board visual polish improved
+Updated:
+- `TaskBoardColumn.tsx`
+
+Changes:
+- slightly wider columns
+- stronger card-column framing
+- proper bordered column containers instead of mostly flat washes
+- subtle gradient header treatment
+- better depth / separation via radius + shadow
+
+Result:
+- board reads more intentionally and less like loosely spaced boxes on a blank canvas
+
+### Validation performed
+- Ran `npm exec tsc --noEmit --incremental false`
+- First run surfaced a real type issue from stricter toolbar state typing
+- Fixed it
+- Re-ran typecheck successfully
+
+Final TypeScript state after this pass: **zero errors**
+
+### What still remains after this pass
+This was a meaningful fix pass, but not the end-state.
+Still needed for true best-in-class quality:
+- richer board/card density controls
+- better customizable color system (themes, status palettes, label colors)
+- true multi-property board grouping beyond status
+- better list header semantics now that parent controls own sorting
+- stronger Today integration on board (if desired: badges/sections/filters)
+- better date/time UX beyond due date only (time, reminders, natural language entry)
+- stronger empty states, microinteractions, and hover behaviors
+- better tag model if you want customizable per-tag color rather than hashed display colors
+- more serious product-level features: saved views, WIP limits, command palette task actions, batch actions, subtask previews, recurring UX cleanup, etc.
+
+---
+
 ## Session 13 — Comprehensive Audit Round 3 + Fixes (2026-03-28, 15:13–15:28 SGT)
 
 **Model:** Opus × 8 sub-agents (3 audit + 4 fix + 1 verification)

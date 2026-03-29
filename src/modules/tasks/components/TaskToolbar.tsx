@@ -26,6 +26,7 @@ const GROUP_OPTIONS = [
   { value: 'status', label: 'Status' },
   { value: 'priority', label: 'Priority' },
   { value: 'project', label: 'Project' },
+  { value: 'dueDate', label: 'Due Date' },
 ];
 
 const SORT_OPTIONS = [

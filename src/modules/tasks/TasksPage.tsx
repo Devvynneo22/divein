@@ -26,6 +26,7 @@ import { TaskCreateModal } from './components/TaskCreateModal';
 import { TaskToolbar } from './components/TaskToolbar';
 import { TaskFilterChips } from './components/TaskFilterChips';
 import { TaskToast } from './components/TaskToast';
+import { groupTasks, sortTasks, type TaskGroupBy, type TaskSortBy } from './components/taskViewUtils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -70,8 +71,8 @@ export function TasksPage() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [filters, setFilters] = useState<TaskFilters>({});
   const [searchQuery, setSearchQuery] = useState('');
-  const [groupBy, setGroupBy] = useState<string>('status');
-  const [sortBy, setSortBy] = useState<string>('manual');
+  const [groupBy, setGroupBy] = useState<TaskGroupBy>('status');
+  const [sortBy, setSortBy] = useState<TaskSortBy>('manual');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [toast, setToast] = useState<ToastData | null>(null);
   const [quickAddTitle, setQuickAddTitle] = useState('');
@@ -116,6 +117,8 @@ export function TasksPage() {
 
   // Root tasks only
   const tasks = useMemo(() => allTasks.filter((t) => t.parentId === null), [allTasks]);
+  const sortedTasks = useMemo(() => sortTasks(tasks, sortBy), [tasks, sortBy]);
+  const groupedTasks = useMemo(() => groupTasks(tasks, groupBy, sortBy), [tasks, groupBy, sortBy]);
 
   const selectedTask = useMemo(
     () => tasks.find((t) => t.id === selectedTaskId) ?? null,
@@ -201,9 +204,8 @@ export function TasksPage() {
 
   const handleCreateTaskForStatus = useCallback(
     (status: TaskStatus) => {
+      setCreateModalDefaultStatus(status);
       setShowCreateModal(true);
-      // The modal will pick up defaultStatus via the status passed in
-      // We track the requested status in a ref so the modal can use it
     },
     [],
   );
@@ -225,6 +227,13 @@ export function TasksPage() {
     setCreateModalDefaultStatus(status);
     setShowCreateModal(true);
   }, []);
+
+  const handleReorder = useCallback(
+    (id: string, newOrder: number) => {
+      reorderTask.mutate({ id, newOrder });
+    },
+    [reorderTask],
+  );
 
   // ─── Keyboard shortcuts ────────────────────────────────────────────────────
 
@@ -310,7 +319,7 @@ export function TasksPage() {
       case 'board':
         return (
           <TaskBoard
-            tasks={tasks}
+            tasks={sortedTasks}
             selectedTaskId={selectedTaskId}
             onSelectTask={setSelectedTaskId}
             groupBy="status"
@@ -318,12 +327,14 @@ export function TasksPage() {
             onPriorityChange={handlePriorityChange}
             onDeleteTask={handleDelete}
             onCreateTask={handleBoardCreateTask}
+            onReorderTask={handleReorder}
           />
         );
       case 'list':
         return (
           <TaskList
-            tasks={tasks}
+            tasks={sortedTasks}
+            groupedTasks={groupedTasks}
             selectedTaskId={selectedTaskId}
             onSelectTask={setSelectedTaskId}
             onStatusChange={handleStatusChange}
@@ -333,7 +344,7 @@ export function TasksPage() {
       case 'today':
         return (
           <TaskTodayView
-            tasks={tasks}
+            tasks={sortedTasks}
             onSelectTask={setSelectedTaskId}
             onStatusChange={handleStatusChange}
           />
@@ -341,7 +352,8 @@ export function TasksPage() {
       case 'backlog':
         return (
           <TaskList
-            tasks={tasks}
+            tasks={sortedTasks}
+            groupedTasks={groupedTasks}
             selectedTaskId={selectedTaskId}
             onSelectTask={setSelectedTaskId}
             onStatusChange={handleStatusChange}
@@ -453,9 +465,9 @@ export function TasksPage() {
           searchQuery={searchQuery}
           onSearch={setSearchQuery}
           groupBy={groupBy}
-          onGroupByChange={setGroupBy}
+          onGroupByChange={(value) => setGroupBy(value as TaskGroupBy)}
           sortBy={sortBy}
-          onSortByChange={setSortBy}
+          onSortByChange={(value) => setSortBy(value as TaskSortBy)}
           filters={filters}
           onFilterChange={setFilters}
           onNewTask={() => { setCreateModalDefaultStatus(getDefaultStatusForView(activeView)); setShowCreateModal(true); }}

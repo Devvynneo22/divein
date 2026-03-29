@@ -1,6 +1,6 @@
 # DiveIn — Implementation Status
 
-> Last updated: 2026-03-29 13:31 SGT  
+> Last updated: 2026-03-29 14:10 SGT  
 > Architecture: Electron (planned) + React 19 + TypeScript + Vite  
 > Current mode: Web-only dev (localStorage persistence, no Electron IPC yet)
 
@@ -65,14 +65,22 @@
 | Rich task create modal | ✅ |
 | Search + filter + sorting toolbar | ✅ |
 | Filter chips | ✅ |
+| Toolbar sort actually affects rendered task views | ✅ |
+| Toolbar group actually affects list/backlog rendering | ✅ |
 | Status workflow: backlog/inbox/todo/in_progress/in_review/done/cancelled | ✅ |
 | Priority indicators + colored borders | ✅ |
 | Tags / due date / estimate editing | ✅ |
+| Tag hex-color bug fixed | ✅ | Prevents accidental tags like `#ef4444` |
+| Drag-and-drop between columns | ✅ |
+| Drag-and-drop reorder within same board column | ✅ |
+| Quick due-date actions (Today/Tomorrow/Next week/Clear) | ✅ |
+| Today chip surfaced in list rows | ✅ |
 | Subtasks + subtask progress | ✅ |
 | Keyboard shortcuts (n/j/k/d/Delete/1-4/Esc) | ✅ |
 | Undo on delete toast | ✅ |
 | Recurring tasks (existing logic retained) | ✅ |
-| Visual polish vs top-tier tools | 🔨 | Implemented, but still needs screenshot-driven refinement with Devvyn |
+| Board customization (user-configurable colors/themes) | 📋 |
+| Visual polish vs top-tier tools | 🔨 | Better than before, but still needs screenshot-driven refinement with Devvyn |
 
 ### Notes & Knowledge Base ✅
 | Feature | Status |

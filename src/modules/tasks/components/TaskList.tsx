@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { Task, TaskStatus } from '@/shared/types/task';
 import { TaskListRow } from './TaskListRow';
+import type { TaskGroup } from './taskViewUtils';
 
 interface TaskListProps {
   tasks: Task[];
+  groupedTasks?: TaskGroup[];
   selectedTaskId: string | null;
   onSelectTask: (id: string) => void;
   onStatusChange: (id: string, status: TaskStatus) => void;
@@ -12,34 +14,6 @@ interface TaskListProps {
 
 type SortKey = 'title' | 'priority' | 'dueDate' | 'status' | 'createdAt';
 type SortDir = 'asc' | 'desc';
-
-function sortTasks(tasks: Task[], key: SortKey, dir: SortDir): Task[] {
-  const sorted = [...tasks].sort((a, b) => {
-    let cmp = 0;
-    switch (key) {
-      case 'title':
-        cmp = a.title.localeCompare(b.title);
-        break;
-      case 'priority':
-        cmp = b.priority - a.priority;
-        break;
-      case 'dueDate': {
-        const da = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
-        const db = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
-        cmp = da - db;
-        break;
-      }
-      case 'status':
-        cmp = a.status.localeCompare(b.status);
-        break;
-      case 'createdAt':
-        cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-        break;
-    }
-    return dir === 'asc' ? cmp : -cmp;
-  });
-  return sorted;
-}
 
 const COLUMNS: { key: SortKey; label: string; width?: string | number }[] = [
   { key: 'status', label: 'STATUS', width: 80 },
@@ -50,24 +24,20 @@ const COLUMNS: { key: SortKey; label: string; width?: string | number }[] = [
 
 export function TaskList({
   tasks,
+  groupedTasks,
   selectedTaskId,
   onSelectTask,
   onStatusChange,
   onDelete,
 }: TaskListProps) {
-  const [sortKey, setSortKey] = useState<SortKey>('createdAt');
-  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [sortKey] = useState<SortKey>('createdAt');
+  const [sortDir] = useState<SortDir>('desc');
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
 
-  const sorted = sortTasks(tasks, sortKey, sortDir);
+  const sorted = tasks;
 
-  const handleHeaderClick = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortKey(key);
-      setSortDir('asc');
-    }
+  const handleHeaderClick = (_key: SortKey) => {
+    // Sorting is controlled by the parent toolbar now.
   };
 
   const handleKeyDown = useCallback(
@@ -186,6 +156,41 @@ export function TaskList({
         >
           No tasks match your filters
         </div>
+      ) : groupedTasks && groupedTasks.length > 1 ? (
+        groupedTasks.map((group) => (
+          <div key={group.key}>
+            <div
+              style={{
+                padding: '10px 12px',
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: 'var(--color-text-muted)',
+                backgroundColor: 'var(--color-bg-wash)',
+                borderBottom: '1px solid var(--color-border)',
+              }}
+            >
+              {group.label} · {group.tasks.length}
+            </div>
+            {group.tasks.map((task) => {
+              const idx = sorted.findIndex((t) => t.id === task.id);
+              return (
+                <TaskListRow
+                  key={task.id}
+                  task={task}
+                  isSelected={task.id === selectedTaskId || idx === focusedIndex}
+                  onSelect={() => {
+                    setFocusedIndex(idx);
+                    onSelectTask(task.id);
+                  }}
+                  onStatusChange={(status) => onStatusChange(task.id, status)}
+                  onDelete={() => onDelete(task.id)}
+                />
+              );
+            })}
+          </div>
+        ))
       ) : (
         sorted.map((task, idx) => (
           <TaskListRow

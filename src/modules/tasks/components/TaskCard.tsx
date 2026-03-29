@@ -51,10 +51,15 @@ const TAG_COLORS = [
   '#3b82f6', '#a855f7', '#ec4899', '#6b7280',
 ];
 
+function normalizeTagLabel(tag: string): string {
+  return tag.trim();
+}
+
 function getTagColor(tag: string): string {
+  const clean = normalizeTagLabel(tag);
   let hash = 0;
-  for (let i = 0; i < tag.length; i++) {
-    hash = ((hash << 5) - hash) + tag.charCodeAt(i);
+  for (let i = 0; i < clean.length; i++) {
+    hash = ((hash << 5) - hash) + clean.charCodeAt(i);
     hash |= 0;
   }
   return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length];
@@ -327,7 +332,8 @@ export function TaskCard({
 
           {/* Tags — up to 3 */}
           {task.tags.slice(0, 3).map((tag) => {
-            const color = getTagColor(tag);
+            const label = normalizeTagLabel(tag);
+            const color = getTagColor(label);
             return (
               <span
                 key={tag}
@@ -344,7 +350,7 @@ export function TaskCard({
                   lineHeight: 1.6,
                 }}
               >
-                {tag}
+                {label}
               </span>
             );
           })}
