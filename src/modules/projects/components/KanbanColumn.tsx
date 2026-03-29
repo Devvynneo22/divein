@@ -11,11 +11,13 @@ interface KanbanColumnProps {
 }
 
 const STATUS_COLORS: Record<TaskStatus, string> = {
-  inbox: 'var(--color-text-muted)',
-  todo: 'var(--color-accent)',
-  in_progress: 'var(--color-warning)',
-  done: 'var(--color-success)',
-  cancelled: 'var(--color-danger)',
+  backlog: 'var(--color-status-backlog)',
+  inbox: 'var(--color-status-inbox)',
+  todo: 'var(--color-status-todo)',
+  in_progress: 'var(--color-status-in-progress)',
+  in_review: 'var(--color-status-in-review)',
+  done: 'var(--color-status-done)',
+  cancelled: 'var(--color-status-cancelled)',
 };
 
 export function KanbanColumn({ status, label, tasks, onDrop }: KanbanColumnProps) {

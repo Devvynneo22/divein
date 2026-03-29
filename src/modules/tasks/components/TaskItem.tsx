@@ -86,9 +86,11 @@ function formatDueDate(dateStr: string): { text: string; color: string } {
 }
 
 const nextStatus: Record<TaskStatus, TaskStatus> = {
+  backlog: 'todo',
   inbox: 'todo',
   todo: 'in_progress',
-  in_progress: 'done',
+  in_progress: 'in_review',
+  in_review: 'done',
   done: 'todo',
   cancelled: 'todo',
 };

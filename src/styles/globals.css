@@ -43,6 +43,41 @@
   --color-p3: #2383e2;
   --color-p4: #9b9b9b;
 
+  /* Task status colors */
+  --color-status-backlog: #a1a1aa;
+  --color-status-inbox: #a1a1aa;
+  --color-status-todo: #3b82f6;
+  --color-status-in-progress: #f97316;
+  --color-status-in-review: #a855f7;
+  --color-status-done: #22c55e;
+  --color-status-cancelled: #ef4444;
+
+  /* Task status background tints */
+  --color-status-backlog-soft: rgba(161, 161, 170, 0.08);
+  --color-status-inbox-soft: rgba(161, 161, 170, 0.08);
+  --color-status-todo-soft: rgba(59, 130, 246, 0.08);
+  --color-status-in-progress-soft: rgba(249, 115, 22, 0.08);
+  --color-status-in-review-soft: rgba(168, 85, 247, 0.08);
+  --color-status-done-soft: rgba(34, 197, 94, 0.08);
+  --color-status-cancelled-soft: rgba(239, 68, 68, 0.08);
+
+  /* Task priority colors */
+  --color-priority-urgent: #ef4444;
+  --color-priority-high: #f97316;
+  --color-priority-medium: #eab308;
+  --color-priority-low: #3b82f6;
+  --color-priority-none: transparent;
+
+  /* Tag preset colors */
+  --color-tag-red: #ef4444;
+  --color-tag-orange: #f97316;
+  --color-tag-yellow: #eab308;
+  --color-tag-green: #22c55e;
+  --color-tag-blue: #3b82f6;
+  --color-tag-purple: #a855f7;
+  --color-tag-pink: #ec4899;
+  --color-tag-gray: #6b7280;
+
   /* Shadows */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
@@ -96,6 +131,38 @@
   --color-p2: #e0b44d;
   --color-p3: #529cca;
   --color-p4: #6b6b6b;
+
+  /* Task status colors (same in dark — these are already vibrant enough) */
+  --color-status-backlog: #a1a1aa;
+  --color-status-inbox: #a1a1aa;
+  --color-status-todo: #60a5fa;
+  --color-status-in-progress: #fb923c;
+  --color-status-in-review: #c084fc;
+  --color-status-done: #4ade80;
+  --color-status-cancelled: #f87171;
+
+  --color-status-backlog-soft: rgba(161, 161, 170, 0.12);
+  --color-status-inbox-soft: rgba(161, 161, 170, 0.12);
+  --color-status-todo-soft: rgba(96, 165, 250, 0.12);
+  --color-status-in-progress-soft: rgba(251, 146, 60, 0.12);
+  --color-status-in-review-soft: rgba(192, 132, 252, 0.12);
+  --color-status-done-soft: rgba(74, 222, 128, 0.12);
+  --color-status-cancelled-soft: rgba(248, 113, 113, 0.12);
+
+  --color-priority-urgent: #f87171;
+  --color-priority-high: #fb923c;
+  --color-priority-medium: #fbbf24;
+  --color-priority-low: #60a5fa;
+  --color-priority-none: transparent;
+
+  --color-tag-red: #f87171;
+  --color-tag-orange: #fb923c;
+  --color-tag-yellow: #fbbf24;
+  --color-tag-green: #4ade80;
+  --color-tag-blue: #60a5fa;
+  --color-tag-purple: #c084fc;
+  --color-tag-pink: #f472b6;
+  --color-tag-gray: #9ca3af;
 
   /* Shadows */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
