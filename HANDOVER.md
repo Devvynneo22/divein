@@ -1,18 +1,20 @@
 # 📋 Handoff Message for Next Session
 
-**Project:** Nexus — local-first productivity super-app  
-**Location:** `C:\Users\immer\OneDrive\Desktop\nexus\`  
+**Project:** DiveIn — local-first productivity super-app  
+**Location:** `C:\Users\immer\OneDrive\Desktop\divein\`  
 **Branch:** Develop  
-**Date:** 2026-03-28 15:08 SGT
+**Date:** 2026-03-29 13:31 SGT
 
 ---
 
 ## Start Here
 
 Read these files in order:
-1. **`IMPLEMENTATION-STATUS.md`** — what's done, what's left (✅/📋 for every feature)
-2. **`CHANGELOG.md`** — full session history (Sessions 1–11) + handover notes
-3. **`productivity-app-plan.md`** — master design doc (Phase 4 items, deferred features list)
+1. **`TASKS-OVERHAUL-SPEC.md`** — detailed architecture/spec for the new Tasks module
+2. **`TASKS-UI-RESEARCH.md`** — market research (Linear, Notion, Jira, Todoist, TickTick, Asana)
+3. **`IMPLEMENTATION-STATUS.md`** — updated product/module status
+4. **`CHANGELOG.md`** — session history + latest work log
+5. **`productivity-app-plan.md`** — master product/design plan
 
 ---
 
@@ -20,187 +22,195 @@ Read these files in order:
 
 | Aspect | Status |
 |--------|--------|
-| **Phases 1–3** | ✅ 100% Complete |
-| **Phase 4** | 📋 Not started |
-| **TypeScript** | Zero errors (`npx tsc --noEmit --incremental false`) |
-| **Git** | Clean working tree, 29 commits on Develop |
-| **npm** | Clean (`npm ls` — no warnings) |
-| **Source files** | 103 (.ts/.tsx) |
-| **Audit status** | 2 rounds complete. 0 critical, 0 medium bugs remaining |
+| **App Name** | ✅ Renamed from Nexus → DiveIn |
+| **Theme System** | ✅ Light / Dark / System implemented |
+| **Tasks Module** | ✅ Major overhaul completed |
+| **TypeScript** | ✅ Zero errors (`npx tsc --noEmit`) |
+| **Git** | Clean working tree after latest commits |
+| **Dev server** | Vite ran on `http://localhost:5174` during session (5173 was occupied) |
+
+### Latest Commits on `Develop`
+```bash
+2ffc80d feat: complete Tasks module overhaul — Kanban board, list, today, detail panel
+e37b49e feat: Tasks overhaul foundation — new statuses, status/priority colors, spec
+5abbc93 feat: complete UI overhaul — Flashcards, Tables, Projects, Settings
+aae6e5c feat: DiveIn rebrand + light/dark theme + comprehensive UI overhaul
+```
 
 ### Run it
 ```bash
-cd C:\Users\immer\OneDrive\Desktop\nexus
+cd C:\Users\immer\OneDrive\Desktop\divein
 npm run dev
-# → http://localhost:5173
+# if 5173 is occupied:
+npx vite --port 5174
 ```
 
 ---
 
-## Tech Stack
+## What Was Done This Session
 
-- **Framework:** React 19 + TypeScript (strict) + Vite
-- **Styling:** Tailwind CSS 4 + CSS custom properties (dark theme)
-- **State:** TanStack Query (server state) + Zustand (timer + app settings)
-- **Rich text:** TipTap 2 (ProseMirror) with extensions
-- **Calendar:** FullCalendar
-- **Tables:** TanStack Table
-- **Command palette:** cmdk
-- **Icons:** Lucide React
-- **Dates:** date-fns
-- **Data:** localStorage (12+ keys across 8 services)
-- **ORM (planned):** Drizzle ORM (schemas already written)
-- **DB (planned):** SQLite via better-sqlite3
+### 1. Rebrand + Theming
+- Renamed **Nexus → DiveIn** in package metadata, title, sidebar, settings, exports
+- Implemented full **Light / Dark / System** theme support
+- Rewrote `globals.css` into a proper tokenized design system with semantic CSS variables
+- Added theme persistence + migration logic in `appSettingsStore.ts`
+- Sidebar now has direct theme toggle
 
----
+### 2. App-Wide UI Overhaul
+- Reworked sidebar to a more Notion-like structure with clearer sections and better spacing
+- Overhauled Dashboard, Calendar, Habits, Timer, Flashcards, Tables, Projects, Settings, Notes, and app-shell UI
+- Converted large parts of UI from hardcoded dark styling to theme-aware CSS variable usage
+- Added `UI-DESIGN-GUIDE.md` to standardize future UI work across sub-agents
 
-## Architecture
+### 3. Tasks Module — Complete Rewrite
+The previous Tasks module was rejected as too basic. It has now been rebuilt around a **Linear + Notion + Todoist hybrid** design.
 
+#### New Views
+- **Board** — Kanban with status columns and drag-and-drop
+- **List** — Dense, sortable Linear-style issue list
+- **Today** — Focused task view grouped by priority with zero state
+- **Backlog** — backlog/inbox-oriented view
+
+#### New/rewritten files
+```text
+src/modules/tasks/
+  TasksPage.tsx                         # complete rewrite
+  components/
+    PriorityIcon.tsx                   # new
+    StatusIcon.tsx                     # new
+    TaskToast.tsx                      # new
+    TaskQuickActions.tsx               # new
+    TaskBoard.tsx                      # new
+    TaskBoardColumn.tsx                # new
+    TaskCard.tsx                       # new
+    TaskList.tsx                       # new
+    TaskListRow.tsx                    # new
+    TaskTodayView.tsx                  # new
+    TaskToolbar.tsx                    # new
+    TaskFilterChips.tsx                # new
+    TaskCreateModal.tsx                # new
+    TaskDetail.tsx                     # complete rewrite
 ```
-src/
-  app/          → App shell (Layout, Sidebar, StatusBar, CommandPalette, ErrorBoundary, ShortcutCheatsheet)
-  modules/      → 10 feature modules (dashboard, tasks, notes, calendar, habits, timer, flashcards, tables, projects, settings)
-    [module]/
-      [Module]Page.tsx     → Main page component
-      hooks/use[Module].ts → TanStack Query hooks
-      components/          → Sub-components
-  shared/
-    types/      → TypeScript interfaces (9 type files + recurrence.ts)
-    lib/        → Service layer (14 services — localStorage CRUD, each matches future Electron IPC contract)
-    stores/     → Zustand stores (timerStore, appSettingsStore)
-```
 
-**Key pattern:** DataService abstraction. Every module calls through `shared/lib/*Service.ts`. Components never touch storage directly. When wiring Electron, only the service files change — zero component changes.
+#### Tasks UX/features now implemented
+- Rich **kanban board** with columns: `backlog`, `inbox`, `todo`, `in_progress`, `in_review`, `done`, `cancelled`
+- Drag-and-drop between columns
+- Linear-style **task cards** with:
+  - colored priority border
+  - due date / overdue highlighting
+  - tag pills
+  - subtask progress badge
+  - hover quick actions
+- Sortable **list view** with keyboard navigation
+- **Today view** grouped by Overdue / Urgent / High / Medium / Low / None
+- 420px **slide-in detail panel** with editable title, dates, tags, estimate, description, subtasks
+- **Create modal** with richer task creation flow
+- Filter bar + filter chips + search + grouping + sorting
+- Existing keyboard shortcuts preserved and adapted
 
----
-
-## 9 Modules (all complete)
-
-| Module | Key Features |
-|--------|-------------|
-| **Dashboard** | 5 stat cards, quick capture, today's tasks/events/habits |
-| **Tasks** | CRUD, subtasks, keyboard shortcuts, drag reorder, recurring tasks, undo delete |
-| **Notes** | TipTap editor, hierarchical pages, wiki-links, backlinks, slash commands, images, code blocks, flashcard creation, export (MD/PDF) |
-| **Calendar** | FullCalendar (month/week/day), event CRUD, tasks on calendar, recurring events with exceptions |
-| **Habits** | Boolean + measurable, streaks, heatmap, groups |
-| **Timer** | Stopwatch + Pomodoro, audio notifications, task linking, phase indicator, settings persist |
-| **Flashcards** | SM-2 spaced repetition, deck/card CRUD, 3D flip study session |
-| **Tables** | 9 column types (incl. formula), inline editing, filtering, sorting, board view, CSV import/export |
-| **Projects** | Organizational layer, kanban board, milestones with progress bars, cross-service stats |
-
-Plus: Command Palette (Ctrl+K with global search), Settings (6 tabs, all persist), Keyboard Shortcuts (? cheatsheet, customizable), Error Boundaries, Loading States.
+#### Type/model changes
+- `TaskStatus` now includes:
+  - `backlog`
+  - `in_review`
+- Added task status / priority / tag color variables to `globals.css`
 
 ---
 
-## Phase 4: What's Next
+## Important User Preferences / Instructions
 
-Priority order from the plan:
+### Hard rule for future sessions
+- **Do not code directly unless explicitly necessary.**
+- Devvyn specifically instructed: **be the brain/planner/manager**.
+- **All coding should be done by sub-agents using Claude Sonnet 4.6.**
+- Use yourself for strategy, critique, research, auditing, prioritization, and orchestration.
 
-### 1. Electron IPC Wiring
-- `electron/main.ts` and `electron/preload.ts` are scaffolded but not wired
-- Need: IPC handlers for each service, preload API exposure, main process DB connection
-- Swap each `shared/lib/*Service.ts` from localStorage to `window.api.*` IPC calls
-- Drizzle schemas exist in `drizzle/schema/` (9 files) — ready for SQLite tables
+### Sub-agent model policy
+- **Mandatory for coding sub-agents:** `anthropic/claude-sonnet-4-6`
+- Devvyn explicitly said Opus is too expensive.
 
-### 2. SQLite Persistence
-- Replace localStorage with better-sqlite3 via Electron main process
-- Drizzle ORM migrations from existing schemas
-- Data migration: one-time import from localStorage → SQLite
-
-### 3. Auto-backup
-- Periodic SQLite DB file copy to backup location
-- Configurable in Settings → Data tab
-
-### 4. Auto-updater
-- electron-updater (already in deps)
-
-### 5. CI/CD + Packaging
-- electron-builder config already in package.json (win/mac/linux targets)
-
-### 6. Cloud Sync (future)
-- Drizzle ORM supports both SQLite and PostgreSQL — schema migration path is clean
+### Quality bar
+- Devvyn is explicitly unhappy with merely “good enough”.
+- Target standard: **top 1% product quality**, closer to **FAANG / Linear / Notion / Jira polish**.
+- The right loop is:
+  1. research,
+  2. spec,
+  3. parallel coding,
+  4. audit,
+  5. refine,
+  6. user review with screenshots,
+  7. repeat.
 
 ---
 
-## Remaining Low-Priority Polish (optional)
+## Files Created This Session
 
-These were flagged in audit but are cosmetic/non-functional:
-- aria-labels on interactive elements (sidebar, status bar, task toggles)
-- Focus trapping in modals (CommandPalette, ShortcutCheatsheet, CreateFlashcardModal)
-- Hardcoded hex colors in CalendarPage priority colors → should use CSS vars
-- Document title updates per route (browser tab always shows default)
-- Mutation loading states (buttons don't disable during save)
-- Formula engine: no circular reference detection (silent wrong results, not crash)
-- CSV import: no user feedback for empty files; sequential row creation (slow for large imports)
+### Core docs
+- `UI-DESIGN-GUIDE.md`
+- `TASKS-UI-RESEARCH.md`
+- `TASKS-OVERHAUL-SPEC.md`
+- this updated `HANDOVER.md`
 
----
-
-## localStorage Keys (current persistence)
-
-| Key | Service | Data |
-|-----|---------|------|
-| `nexus-tasks` | taskService | Task[] |
-| `nexus-events` | eventService | CalendarEvent[] |
-| `nexus-projects` | projectService | Project[] |
-| `nexus-milestones` | milestoneService | Milestone[] |
-| `nexus-notes` | noteService | Note[] |
-| `nexus-habits` | habitService | Habit[] |
-| `nexus-habit-entries` | habitService | HabitEntry[] |
-| `nexus-timer-entries` | timerService | TimeEntry[] |
-| `nexus-timer-settings` | timerStore | PomodoroSettings |
-| `nexus-decks` | flashcardService | Deck[] |
-| `nexus-cards` | flashcardService | Card[] |
-| `nexus-reviews` | flashcardService | Review[] |
-| `nexus-tables` | tableService | TableDef[] |
-| `nexus-table-rows` | tableService | TableRow[] |
-| `nexus-shortcuts` | shortcutService | user overrides |
-| `nexus-app-settings` | appSettingsStore | AppSettings |
-| `nexus-flashcard-settings` | appSettingsStore | FlashcardSettings |
+These are important — future sessions should use them rather than redesigning blindly.
 
 ---
 
-## Standing Rules
+## Known Follow-Up Work
 
-- **Sub-agents for coding MUST use Claude Opus 4-6** (`anthropic/claude-opus-4-6`)
-- **Quality bar:** Top 1% FANG engineering standards. Test everything in browser.
-- **After every session:** Append to `CHANGELOG.md`, update `IMPLEMENTATION-STATUS.md`
-- **Plan changes:** Update `productivity-app-plan.md`
-- **Dependencies:** `npm install --legacy-peer-deps`
-- **Type check:** `npx tsc --noEmit --incremental false` must pass zero errors
-- Sub-agents can be spawned freely, in parallel where possible
+### 1. Visual QA / polish pass on Tasks
+The new Tasks system is implemented, but it still needs **human review + refinement**. Expect the next session to focus on:
+- checking the board/list/today UX visually
+- improving spacing, density, empty states, icons, and transitions
+- making cards feel more premium
+- validating drag/drop behavior and detail panel UX
+- verifying quick-create and quick-actions flow feels world-class
+
+### 2. Remaining UI debt
+There are still some legacy theme patterns in the broader app (some `bg-[var(...)]` / older styling conventions) that are functional but not fully cleaned up.
+
+### 3. Testing needed
+Do a structured test pass on:
+- light mode
+- dark mode
+- task creation/editing/deletion
+- subtask creation/update
+- drag-and-drop across statuses
+- Today filtering
+- keyboard shortcuts
+- tag editing / date editing / estimate editing
+
+### 4. Documentation consistency
+The legacy docs still contain “Nexus” references and older project state. `CHANGELOG.md` and `IMPLEMENTATION-STATUS.md` should be treated as partially outdated until next cleanup pass finishes.
 
 ---
 
-## Git Log (full)
+## Recommended Next Session Plan
 
-```
-ea53213 fix: resolve 4 medium issues from round 2 audit
-b04ea63 docs: CHANGELOG session 11 — comprehensive audit + 28 bug fixes
-03bedbf chore: docs rewrite, dependency cleanup, dead code removal
-b7cd9cb fix: persist settings, improve search, fix audio & add phase indicator
-c49086c fix: editor memory leak, bubble menu positioning, 404 route, PDF export, null guard
-70fba9e docs: CHANGELOG + IMPLEMENTATION-STATUS session 10 — Phase 2+3 complete
-17ddd1b feat: loading states + note export menu + CSV import/board view fixups
-806ee80 feat: add recurring events and tasks support
-c364e10 feat(tables): add formula column type with expression engine
-e278c9d feat: add global search, keyboard shortcut cheatsheet, and customizable shortcuts
-3427fa6 feat: add Notes → Flashcards cross-module integration
-3ec0a35 feat(timer): add audio notifications on pomodoro phase transitions and task linking
-bbe28a0 docs: handover notes for Phase 2+3 completion
-e9496ef docs: CHANGELOG + IMPLEMENTATION-STATUS session 9 — MVP1 100% complete
-2a1d718 feat: Wiki-links [[...]] with autocomplete + Backlinks panel
-f54e1a2 feat: Global quick-add hotkey (Ctrl+Shift+N)
-13bd5ad docs: CHANGELOG + IMPLEMENTATION-STATUS session 8 — MVP1 complete
-b3b74d1 feat: MVP1 completion — Tasks polish + Tasks on Calendar
-d9b10a6 docs: CHANGELOG + IMPLEMENTATION-STATUS session 7
-9a7ab6f feat: localStorage persistence for ALL services
-f6d8e37 docs: CHANGELOG session 6, IMPLEMENTATION-STATUS update
-75331e1 feat: Notes overhaul — localStorage, slash commands, images, task lists
-d496242 docs: update IMPLEMENTATION-STATUS for Notes overhaul
-c4d50ca docs: CHANGELOG session 5
-0726827 feat: Notes overhaul + dashboard fix
-037b2ba docs: session 4
-c0306ba feat: Tables + Projects + Command Palette + Settings
-4f9bb23 feat: Habits + Timer + Flashcards + Dashboard wiring
-2347e42 Initial commit
-```
+1. **Open the app and review Tasks first**
+   - Board
+   - List
+   - Today
+   - Detail panel
+   - Create modal
+
+2. **Collect screenshot-based critique from Devvyn**
+   - what still feels amateur?
+   - what still feels cluttered?
+   - what feels missing versus Linear/Notion/Jira?
+
+3. **Spawn 2–4 Sonnet 4.6 agents for Tasks refinement only**
+   - one for board/card polish
+   - one for detail panel/modal polish
+   - one for keyboard / interactions / transitions
+   - one for audit + bug hunting
+
+4. **Audit before claiming completion**
+   - visual audit
+   - functional audit
+   - TS check
+   - regression check
+
+---
+
+## Short Summary for Next You
+
+DiveIn has been rebranded, themed, and massively redesigned. The biggest new work is the **complete Tasks module rewrite** into a multi-view productivity system inspired by Linear, Notion, Jira, and Todoist. The next session should not start from scratch — it should **review and refine what’s now built**, especially the Tasks UX, based on Devvyn’s live feedback and screenshots.

@@ -1,6 +1,155 @@
-# Nexus — Changelog
+# DiveIn — Changelog
 
 Session-by-session record of all development work. AI agents: **append to this file after every session.**
+
+---
+
+## Session 14 — Rebrand, Theme System, Full UI Overhaul, and Tasks Rewrite (2026-03-29, ~11:39–13:18 SGT)
+
+**Coordinator:** Work Claw (planning / orchestration / auditing)  
+**Coding agents:** Claude Sonnet 4.6 sub-agents only (per Devvyn instruction)
+
+### Context / user direction
+Devvyn rejected the current UI quality as far below the target standard and asked for:
+- rebrand from **Nexus → DiveIn**
+- proper **light mode**
+- all future coding to be done by **Claude Sonnet 4.6** sub-agents
+- research-driven, top-tier product thinking (Linear / Notion / Jira / Todoist quality bar)
+- better project management discipline: auditing, context docs, handover quality
+- immediate focus on a **complete Tasks feature overhaul**
+
+### Part 1 — Rebrand + Theme + App-wide UI overhaul
+
+#### Rebrand
+- Renamed **Nexus → DiveIn** across project metadata, page title, sidebar branding, settings/about, export text
+- Project now lives at: `C:\Users\immer\OneDrive\Desktop\divein\`
+
+#### Theme system
+- Rewrote `src/styles/globals.css` into a tokenized semantic design system
+- Added **Light / Dark / System** theme support via CSS variables and `[data-theme="dark"]`
+- Added theme persistence/migration in `src/shared/stores/appSettingsStore.ts`
+- Added system theme detection (`prefers-color-scheme`) support
+- Sidebar theme toggle + Settings theme selector both wired
+
+#### App-shell UI changes
+- `Sidebar.tsx` redesigned into a cleaner Notion-style layout with sections and stronger navigation hierarchy
+- `Layout.tsx`, `StatusBar.tsx`, `CommandPalette.tsx`, `ShortcutCheatsheet.tsx` themed and polished
+- Created `UI-DESIGN-GUIDE.md` for future sub-agent consistency
+
+#### Module-level UI work completed
+Large visual overhaul across:
+- Dashboard
+- Calendar
+- Habits
+- Notes
+- Timer
+- Flashcards
+- Tables
+- Projects
+- Settings
+- app shell components
+
+### Part 2 — Tasks research + architecture
+Because Devvyn explicitly wanted much stronger product thinking before more coding, a research-first pass was done.
+
+#### Research output
+Created: **`TASKS-UI-RESEARCH.md`**
+
+Covered and analyzed:
+- Notion
+- Linear
+- Jira
+- Todoist
+- TickTick
+- Asana
+
+Documented:
+- views
+- kanban structures
+- task card anatomy
+- detail panel patterns
+- drag/drop expectations
+- filtering and grouping patterns
+- concrete color/layout recommendations
+- React/Tailwind implementation patterns
+
+#### Spec output
+Created: **`TASKS-OVERHAUL-SPEC.md`**
+
+Defined a complete Tasks rewrite with:
+- 4 views: **Board / List / Today / Backlog**
+- Linear-inspired rich cards
+- Notion-style columns/grouping
+- Todoist-style focus view
+- slide-in detail panel
+- richer create modal
+- filtering, chips, search, sorting, grouping
+- new statuses: `backlog`, `in_review`
+
+### Part 3 — Complete Tasks module rewrite
+
+#### Foundation updates
+- `TaskStatus` expanded to include:
+  - `backlog`
+  - `in_review`
+- Added status / priority / tag semantic color tokens to `globals.css`
+- Added reusable task UI primitives:
+  - `StatusIcon.tsx`
+  - `PriorityIcon.tsx`
+  - `TaskToast.tsx`
+  - `TaskQuickActions.tsx`
+
+#### New Tasks components created
+- `TaskBoard.tsx`
+- `TaskBoardColumn.tsx`
+- `TaskCard.tsx`
+- `TaskList.tsx`
+- `TaskListRow.tsx`
+- `TaskTodayView.tsx`
+- `TaskToolbar.tsx`
+- `TaskFilterChips.tsx`
+- `TaskCreateModal.tsx`
+
+#### Existing Tasks components rewritten
+- `TasksPage.tsx` — complete rewrite into orchestrator page
+- `TaskDetail.tsx` — complete rewrite into 420px slide-in detail panel
+
+#### Tasks UX/features delivered
+- **Board view** with kanban columns and drag-and-drop
+- **List view** with dense rows and sorting
+- **Today view** grouped by priority and overdue state
+- **Backlog view** using the new backlog status
+- hover quick actions on task cards
+- rich create modal
+- slide-in detail panel with editable title/properties/description/subtasks
+- toolbar with search, filter, grouping, sorting
+- filter chips
+- keyboard shortcuts preserved and adapted
+
+### Git commits
+```bash
+aae6e5c feat: DiveIn rebrand + light/dark theme + comprehensive UI overhaul
+5abbc93 feat: complete UI overhaul — Flashcards, Tables, Projects, Settings
+e37b49e feat: Tasks overhaul foundation — new statuses, status/priority colors, spec
+2ffc80d feat: complete Tasks module overhaul — Kanban board, list, today, detail panel
+```
+
+### Validation
+- Repeated `npx tsc --noEmit` checks throughout session
+- Final TypeScript state: **zero errors**
+
+### Important instructions from Devvyn established this session
+1. **All coding should be done by Claude Sonnet 4.6 sub-agents** until told otherwise
+2. Main agent should act as **planner / researcher / manager / auditor**, not default coder
+3. Quality bar is **top-tier product quality**, not “acceptable” quality
+4. Continue improving UI/UX iteratively with research and critique, especially using screenshots
+
+### Remaining / next steps
+- Visually QA the new Tasks module in real usage
+- Refine board/list/detail panel UX based on live feedback
+- Audit drag/drop and keyboard interaction polish
+- Clean remaining legacy styling inconsistencies across the broader app
+- Update/normalize any remaining old “Nexus” wording in docs
 
 ---
 
@@ -50,821 +199,3 @@ Session-by-session record of all development work. AI agents: **append to this f
 
 ### Commit
 `9dc56e5` on Develop — 29 files changed, +347/-220 lines
-
----
-
-## Session 1 — 2026-03-28 09:42–10:50 SGT (Gemini)
-
-**Worker:** Gemini (via OpenClaw sub-agent)  
-**Model:** google/gemini
-
-### What was done
-- Initial product brainstorming and requirements gathering with Devvyn
-- Created `productivity-app-plan.md` v1.0 (Tauri + React stack)
-- Reviewed and upgraded plan to v2.0 (switched Tauri → Electron due to DB layer issues)
-- Created Drizzle schemas for tasks, notes, projects
-- Scaffolded project with `npm create vite@latest` (vanilla TS template — **wrong template**)
-- Installed dependencies
-- Created electron/main.ts, electron/preload.ts, electron/db/connection.ts
-- Created directory structure for all modules
-
-### Key decisions
-- **Tauri → Electron:** better-sqlite3 and Drizzle ORM cannot run in Tauri's WebView; Rust learning curve too steep
-- **SQLite over PostgreSQL:** local-first desktop app, portable, no server needed; Drizzle ORM makes future Postgres migration easy
-- **DataService abstraction:** all modules call through service layer, not direct DB/IPC; enables web extraction later
-
-### Issues left
-- ⚠️ Project scaffolded with **vanilla Vite TS template, not React** — needs complete rebuild
-- ⚠️ Electron not wired (main.ts/preload.ts exist but aren't integrated)
-- ⚠️ No React, no ReactDOM, no Router in the project
-
----
-
-## Session 2 — 2026-03-28 11:05–11:30 SGT (Claude Opus)
-
-**Worker:** Claude Opus 4 (via OpenClaw main session)  
-**Model:** anthropic/claude-opus-4-6
-
-### Audit findings
-1. Project was fundamentally broken — vanilla Vite TS template, not React
-2. `src/main.ts` was raw DOM manipulation (Vite welcome page), not React
-3. Missing: React, react-dom, react-router-dom, @vitejs/plugin-react, lucide-react, @fullcalendar/react, concurrently
-4. No `vite.config.ts` with React plugin
-5. No JSX support in tsconfig
-6. Drizzle schemas had import bugs (`notes.ts` missing `real` import, `projects.ts` missing `sql` import)
-
-### What was rebuilt from scratch
-1. **package.json** — complete rewrite with correct deps (React 19, Router, TanStack Query, all UI libs)
-2. **tsconfig.json** — JSX support, path aliases (@/, @shared/, @modules/), strict mode
-3. **tsconfig.node.json** — for Vite config
-4. **tsconfig.electron.json** — for future Electron compilation
-5. **vite.config.ts** — React plugin, Tailwind plugin, path aliases
-6. **index.html** — React root div, dark body class
-7. **src/main.tsx** — React 19 entry point
-8. **src/styles/globals.css** — Tailwind 4 + custom theme CSS variables, scrollbar styling
-
-### What was built new
-1. **App shell** — Layout with collapsible sidebar (9 nav items + settings), status bar, React Router
-2. **Dashboard** — stat cards (tasks/events/habits/flashcards), quick capture bar, today sections
-3. **Task Manager (full CRUD)**
-   - Types: `shared/types/task.ts`
-   - Service: `shared/lib/taskService.ts` (in-memory, matches IPC contract)
-   - Hooks: `modules/tasks/hooks/useTasks.ts` (TanStack Query)
-   - UI: TasksPage, TaskItem, TaskDetail
-   - Features: quick-add, status tabs, priority flags, due dates, tags, description, status cycling
-4. **Notes module (full CRUD)**
-   - Types: `shared/types/note.ts`
-   - Service: `shared/lib/noteService.ts`
-   - Hooks: `modules/notes/hooks/useNotes.ts`
-   - UI: NotesPage with sidebar + NoteEditor (TipTap)
-   - Features: rich text toolbar, search, pin/unpin, auto-save (500ms debounce)
-5. **Calendar module (full CRUD)**
-   - Types: `shared/types/event.ts`
-   - Service: `shared/lib/eventService.ts`
-   - Hooks: `modules/calendar/hooks/useEvents.ts`
-   - UI: CalendarPage with FullCalendar + event form panel
-   - Features: month/week/day views, click-to-create, click-to-edit, drag-to-reschedule, dark theme
-6. **All Drizzle schemas completed** — 9 files covering every module
-7. **Fixed schema bugs** — missing imports in notes.ts and projects.ts
-8. **IMPLEMENTATION-STATUS.md** — comprehensive tracking document
-9. **README.md** — project overview and documentation index
-10. **CHANGELOG.md** — this file
-
-### Files deleted
-- `src/main.ts` (old vanilla Vite entry)
-- `src/counter.ts` (old Vite demo)
-- `src/style.css` (old Vite demo)
-
-### Architecture patterns established
-- **DataService abstraction:** every module has a service in `shared/lib/` that matches the future Electron IPC contract. Components never call IPC directly. When wiring Electron, only the service files change.
-- **Module structure:** Types → Service → Hooks → Components → Page
-- **Event bus pattern** (planned, not implemented): modules will communicate via typed events, never direct imports
-
-### Verified working
-- ✅ Vite dev server starts and serves app
-- ✅ All routes render (sidebar navigation works)
-- ✅ Task creation, display, status cycling, detail panel
-- ✅ Note creation, TipTap editor with formatting toolbar
-- ✅ Calendar renders with FullCalendar (month/week/day), event creation
-- ✅ Dark theme consistent across all modules
-
-### Context for next session
-- 200k token context window was at 80% (161k/200k) at session end
-- Devvyn wants top-class quality — think carefully, verify correctness
-- User is a data scientist, not a deep engineer — keep things clean and well-documented
-- Data is in-memory only — page refresh clears everything. This is expected until Electron is wired.
-
----
-
-## Devvyn's Standing Instructions
-
-1. **Quality bar:** "I expect a top class world standard quality product." Think deeply, verify correctness, consider if there's a better way.
-2. **Documentation:** Every session must update `IMPLEMENTATION-STATUS.md` and append to `CHANGELOG.md`.
-3. **Plan updates:** Any changes to features, cancellations, or architecture upgrades should be reflected in `productivity-app-plan.md`.
-4. **Sub-agents welcome:** "Spawn as many sub agents as you need to get the job done."
-5. **Think first, build second:** "Is this correct? Is there a better way?" — but also "get the first layer done."
-6. **Future-proof:** Always consider scalability (personal → multi-user), platform expansion (desktop → web → mobile), and AI integration readiness.
-7. **SQLite first:** Devvyn initially wanted PostgreSQL but was convinced SQLite is better for local-first. Don't revisit this unless there's a real problem.
-
----
-
-## Next Steps (Priority Order)
-
-> ✅ All items below were completed in Sessions 5–10.
-
-1. Build Tables module (TanStack Table)
-2. Build Projects module
-3. Wire Electron (main process, preload, IPC handlers, SQLite persistence)
-4. Command palette (Ctrl+K)
-5. Settings page
-6. Keyboard shortcuts system
-7. Cross-module integration (tasks on calendar, notes→flashcards)
-
----
-
-## Session 3 — 2026-03-28 11:35–11:55 SGT (Claude Opus)
-
-**Worker:** Claude Opus 4 (main) + 3× Claude Sonnet sub-agents  
-**Model:** anthropic/claude-opus-4-6 (orchestrator), anthropic/claude-sonnet-4-6 (builders)
-
-### Audit & fixes on entry
-1. Fixed tsconfig.node.json — added `composite: true` and `declaration: true` (TS project reference requirement)
-2. Fixed CalendarPage.tsx — `eventClick` handler typing (FullCalendar's `EventClickArg` vs inline type)
-3. Fixed NoteEditor.tsx — `useRef()` requires initial value in React 19 strict types
-4. Removed cruft files: `src/assets/hero.png`, `src/assets/typescript.svg`, `src/assets/vite.svg`
-5. `npx tsc --noEmit` passes clean after all fixes
-
-### Built: Habits Module (sub-agent)
-**Files created:** 7
-- `src/shared/types/habit.ts` — Habit, HabitEntry, HabitFrequency, HabitWithStatus types
-- `src/shared/lib/habitService.ts` — Full service: CRUD + checkIn/uncheckIn + streak/longestStreak/completionRate + getTodayStatus
-- `src/modules/habits/hooks/useHabits.ts` — 9 TanStack Query hooks
-- `src/modules/habits/HabitsPage.tsx` — Main page with grouped list, side panel, empty state
-- `src/modules/habits/components/HabitItem.tsx` — Boolean checkbox / measurable input+progress, streak badge
-- `src/modules/habits/components/HabitForm.tsx` — Full form: name, color picker, emoji, frequency (daily/specific days/X per week), boolean/measurable toggle, groups
-- `src/modules/habits/components/HabitStats.tsx` — Current/longest streak, 7/30-day rates, 12-week GitHub-style heatmap
-
-### Built: Timer & Pomodoro Module (sub-agent)
-**Files created:** 8
-- `src/shared/types/timer.ts` — TimeEntry, PomodoroSettings, PomodoroPhase types
-- `src/shared/lib/timerService.ts` — Start/stop, manual entry, today total, week summary
-- `src/shared/stores/timerStore.ts` — Zustand store with drift-free `tick()` via `Date.now()` epoch anchoring
-- `src/modules/timer/hooks/useTimer.ts` — 7 TanStack Query hooks
-- `src/modules/timer/TimerPage.tsx` — Hero timer display, controls, session entries
-- `src/modules/timer/components/TimerDisplay.tsx` — SVG circular progress ring (Pomodoro) / plain digits (Stopwatch)
-- `src/modules/timer/components/TimerControls.tsx` — Play/Pause/Stop/Skip, Stopwatch↔Pomodoro toggle
-- `src/modules/timer/components/TimeEntryList.tsx` — Today's entries with 🍅 badges
-- `src/modules/timer/components/PomodoroSettings.tsx` — Collapsible settings with sliders/toggles
-
-### Built: Flashcards & Spaced Repetition Module (sub-agent)
-**Files created:** 9
-- `src/shared/types/flashcard.ts` — Deck, Card, CardReview, StudySession, DeckStats types
-- `src/shared/lib/sm2.ts` — Pure SM-2 algorithm + interval preview function
-- `src/shared/lib/flashcardService.ts` — Full service: deck/card CRUD + study queue (learning→due→new ordering) + review + stats
-- `src/modules/flashcards/hooks/useFlashcards.ts` — 13 TanStack Query hooks
-- `src/modules/flashcards/FlashcardsPage.tsx` — Two-mode: deck browser grid ↔ deck view (Cards/Study tabs)
-- `src/modules/flashcards/components/DeckCard.tsx` — Color stripe, counts, due badge
-- `src/modules/flashcards/components/DeckForm.tsx` — Name, description, color, new cards/day
-- `src/modules/flashcards/components/CardList.tsx` — Status badges, next review, inline creation
-- `src/modules/flashcards/components/CardForm.tsx` — Front/back textareas + tags
-- `src/modules/flashcards/components/StudySession.tsx` — CSS 3D card flip, 4 review buttons with interval previews, session complete screen
-
-### Integrated: Dashboard (main session)
-- Rewrote `DashboardPage.tsx` — now wired to all 6 services (tasks, events, habits, flashcards, timer)
-- 5 stat cards with live data + click-to-navigate
-- Quick capture creates tasks with today's due date
-- Today's Tasks/Events sections pull from services with "view all" links
-- Today's Habits section with completion status
-- Dynamic greeting (morning/afternoon/evening)
-
-### Integrated: StatusBar (main session)
-- Rewrote `StatusBar.tsx` — shows live timer from Zustand store
-- Animated green pulse dot when timer running
-- Monospace tabular-nums display (no digit jumping)
-- Phase label for Pomodoro (🍅 Focus / ☕ Break)
-- Click to navigate to Timer page
-
-### Verification
-- `npx tsc --noEmit` — **zero errors** across entire codebase
-- All 7 modules render correctly in browser (verified via snapshot)
-- All navigation working
-- Dashboard displays real data from all services
-- StatusBar timer integration working
-
-### File count
-- **Total new files this session:** 24
-- **Files modified:** 4 (DashboardPage.tsx, StatusBar.tsx, CalendarPage.tsx, NoteEditor.tsx, tsconfig.node.json)
-
-### Architecture patterns maintained
-- DataService abstraction: every new module has service → hooks → components → page
-- Zustand for real-time state (timer) that React Query can't handle
-- SM-2 as pure function (testable, no side effects)
-- All modules follow same directory and naming conventions
-
----
-
-## Session 4 — 2026-03-28 12:05–12:15 SGT (Claude Opus)
-
-**Worker:** Claude Opus 4 (main) + 2× Claude Sonnet sub-agents  
-**Model:** anthropic/claude-opus-4-6 (orchestrator), anthropic/claude-sonnet-4-6 (builders)
-
-### Built: Tables & Structured Data Module (sub-agent)
-**Files created:** 10
-- `src/shared/types/table.ts` — ColumnDef (8 types), TableDef, TableRow, filter/sort interfaces
-- `src/shared/lib/tableService.ts` — 16 methods: CRUD + addColumn/updateColumn/deleteColumn + updateCell + type-aware filtering & sorting
-- `src/modules/tables/hooks/useTables.ts` — 13 TanStack Query hooks
-- `src/modules/tables/TablesPage.tsx` — Two-mode: table browser grid → table view with grid
-- `src/modules/tables/components/TableCard.tsx` — Browser grid card
-- `src/modules/tables/components/TableGrid.tsx` — TanStack Table spreadsheet: sticky header, inline editing, Tab nav, row selection
-- `src/modules/tables/components/CellEditor.tsx` — Per-type inline editors (text/number/date/select/multiselect/url/email/checkbox)
-- `src/modules/tables/components/ColumnHeader.tsx` — Sort toggle, right-click context menu (rename/type change/delete)
-- `src/modules/tables/components/AddColumnPanel.tsx` — Add column with type selector, options editor for select/multiselect
-- `src/modules/tables/components/FilterBar.tsx` — Multi-filter bar with type-appropriate operators
-- `src/modules/tables/components/SortBar.tsx` — Multi-sort with direction toggle and priority
-
-### Built: Projects Module (sub-agent)
-**Files created:** 10
-- `src/shared/types/project.ts` — Project, ProjectStatus, ProjectStats types
-- `src/shared/lib/projectService.ts` — CRUD + archive/unarchive + cross-service getStats
-- `src/modules/projects/hooks/useProjects.ts` — 10 hooks including useProjectTasks, useProjectNotes, useProjectStats
-- `src/modules/projects/ProjectsPage.tsx` — Two-mode: project browser → project view with tabs
-- `src/modules/projects/components/ProjectCard.tsx` — Color stripe, stats row, archived badge
-- `src/modules/projects/components/ProjectForm.tsx` — Name, description, color picker, emoji icon
-- `src/modules/projects/components/ProjectHeader.tsx` — Color accent bar, actions (edit/archive/delete)
-- `src/modules/projects/components/ProjectOverview.tsx` — 4 stat cards + recent tasks + recent notes + time
-- `src/modules/projects/components/ProjectTaskList.tsx` — Quick-add with auto projectId, status filters
-- `src/modules/projects/components/ProjectNoteList.tsx` — Note list with inline creation
-- `src/modules/projects/components/ProjectActivity.tsx` — Time entries for project
-
-### Built: Command Palette (main session)
-- `src/app/CommandPalette.tsx` — cmdk-powered, Ctrl+K trigger, backdrop overlay
-- 10 navigation items + 4 create actions, fuzzy search, keyboard hints
-- Integrated into App.tsx (renders above Routes)
-
-### Built: Settings Page (main session)
-- Complete rewrite of `src/modules/settings/SettingsPage.tsx`
-- Tabbed layout: General (theme/sidebar/date format/week start), Pomodoro (wired to Zustand), Flashcards, Data (storage info), About
-- Custom ToggleSwitch component, SettingRow pattern
-
-### Fixes
-- `noteService.list()` now filters by `projectId` (was missing, needed for Projects module)
-- Restarted Vite dev server (stale cache from deleted asset files)
-
-### Verification
-- `npx tsc --noEmit` — **zero errors** across entire 97-file codebase
-- All 9 modules + settings render correctly in browser
-- Command palette opens/closes with Ctrl+K, search works
-- Dashboard, Tables, Projects all verified via browser snapshots
-
-### Committed
-- `c0306ba` — Tables + Projects + Command Palette + Settings (26 files, +4352 lines)
-
-### Milestone: ALL 9 MODULES COMPLETE 🎉
-Every module in the plan is now functional:
-1. Dashboard ✅ (wired to all services)
-2. Tasks ✅ (full CRUD)
-3. Notes ✅ (TipTap editor)
-4. Calendar ✅ (FullCalendar)
-5. Habits ✅ (tracker + heatmap)
-6. Timer ✅ (stopwatch + pomodoro)
-7. Flashcards ✅ (SM-2 + study sessions)
-8. Tables ✅ (spreadsheet + inline editing)
-9. Projects ✅ (organizational layer)
-Plus: Command Palette ✅, Settings ✅
-
-### Next priorities
-1. Electron IPC wiring (main process, preload, SQLite persistence)
-2. Cross-module integration (tasks on calendar, notes→flashcards)
-3. Keyboard shortcuts system
-4. Polish (error boundaries, loading states, animations)
-
----
-
-## Session 5 — 2026-03-28 12:23–12:35 SGT (Claude Opus)
-
-**Worker:** Claude Opus 4 (main) + Claude Sonnet (Notes overhaul)
-**Model:** anthropic/claude-opus-4-6 (orchestrator), anthropic/claude-sonnet-4-6 (builder)
-
-### 🔥 Major: Notes Module Overhaul
-Complete rebuild from flat note list to Notion-level hierarchical knowledge base:
-
-**New architecture:**
-- Pages nest infinitely (any page can contain sub-pages)
-- Tree sidebar with expand/collapse, hover actions (+ sub-page, ⋯ menu)
-- Breadcrumb navigation showing full page path
-- Page icons (emoji picker with 30+ presets)
-- Favorites section (pinned pages at sidebar top)
-- Sub-pages list at bottom of each page editor
-- Soft delete with Trash (restore + empty trash)
-- Full-text search with breadcrumb context in results
-
-**New components created (8):**
-- `NotesSidebar.tsx` — Tree sidebar with search, favorites, pages, trash
-- `NoteTreeItem.tsx` — Recursive tree node with expand/collapse animations
-- `NoteBreadcrumb.tsx` — Clickable hierarchy breadcrumb
-- `NoteHeader.tsx` — Editable icon + title + creation meta
-- `SubPagesList.tsx` — Children shown at bottom of each page
-- `NoteSearchResults.tsx` — Search results with breadcrumb context
-- `TrashPanel.tsx` — Trash management (restore, empty)
-- `PageIconPicker.tsx` — Emoji grid picker
-
-**Rewritten files (5):**
-- `shared/types/note.ts` — Added parentId, icon, coverColor, isTrashed, depth, hasChildren, sortOrder, NoteTreeNode
-- `shared/lib/noteService.ts` — Full tree-aware service: getTree, getAncestors, moveTo, trash/restore, search, descendants
-- `modules/notes/hooks/useNotes.ts` — 15 hooks including useNoteTree, useNoteAncestors, useMoveNote, useTrashNote
-- `modules/notes/NotesPage.tsx` — Complete rebuild with sidebar + breadcrumb + header + editor + sub-pages
-- `modules/notes/components/NoteEditor.tsx` — Enhanced styling and placeholder
-
-### Fix: Dashboard Numbers Not Updating
-Root cause: dashboard query keys used `['dashboard', ...]` prefix which wasn't invalidated by module mutations.
-Fix: Aligned query keys to start with module prefix (e.g. `['tasks', 'dashboard', 'dueToday']`) so TanStack Query's prefix-based invalidation cascades from module mutations.
-Also set `staleTime: 0` and `refetchOnWindowFocus: true` for dashboard queries.
-
-### Thorough Testing Done
-Verified in browser:
-- ✅ Task creation + detail panel + status cycling
-- ✅ Notes: create root page, create sub-page, rename, breadcrumb navigation
-- ✅ Notes: tree sidebar expand/collapse, sub-pages list
-- ✅ Flashcards: create deck, view deck with stats
-- ✅ All modules render without errors
-
-### Committed
-- `0726827` — Notes overhaul + dashboard fix (14 files, +1455/-229 lines)
-
----
-
-## Session 6 — 2026-03-28 12:50–13:15 SGT (Claude Opus)
-
-**Worker:** Claude Opus 4 (main) + Claude Sonnet (initial pass, reviewed by Opus)
-**Model:** anthropic/claude-opus-4-6
-
-### 🔥 Major: Notes Editor Deep Overhaul (Per Devvyn's Request)
-Focus: make Notes the best module in the app. Quality over breadth.
-
-**Devvyn's specific requests:**
-- Notes should persist (not lost on refresh)
-- Add image support
-- Top = title area, bottom = freeform content (words, pictures, emojis)
-- Remove "add sub-page" button from editor (sidebar-only)
-- Make it truly great
-
-### What was built
-
-**1. localStorage Persistence**
-- Notes now survive page refresh via `localStorage` (`nexus-notes` key)
-- Every mutation (create/update/delete/trash/restore/move/emptyTrash) calls `persist()`
-- Bridge solution until Electron/SQLite wiring
-
-**2. Freeform Editor Layout**
-- Removed SubPagesList from editor area — sub-pages managed only from sidebar
-- Removed border between header and editor — flows as one continuous page
-- Editor fills all remaining space below header
-
-**3. Image Support**
-- Toolbar button opens file picker
-- Drag & drop images into editor
-- Paste from clipboard (Ctrl+V screenshots)
-- Images stored as base64 data URLs in content JSON
-- Images render with rounded corners, max-width 100%, selection outline
-
-**4. Slash Commands (/ menu)**
-- Type `/` to open floating command menu
-- 11 commands: Heading 1/2/3, Bullet/Numbered/To-do List, Image, Code Block, Quote, Divider, Callout
-- Fuzzy search as you type, keyboard navigation (↑↓ Enter Escape)
-- Menu positioned at caret, auto-deletes slash text on selection
-
-**5. Task Lists**
-- Interactive checkboxes via @tiptap/extension-task-list + task-item
-- Checked items get strikethrough + muted color
-- Custom checkbox styling (accent color, checkmark SVG)
-
-**6. Enhanced Toolbar**
-- Added: Underline, Highlight (yellow), Text color picker (9 colors + reset), Image, Emoji, Task List, Code Block
-- Emoji picker: 6 categories (Smileys, Gestures, Objects, Nature, Symbols, Activities), search, ~230 emojis
-
-**7. Floating Bubble Menu**
-- Appears on text selection
-- Bold, Italic, Underline, Strikethrough, Code, Highlight, Link + 7-color palette
-- Custom implementation (TipTap v3 doesn't export React BubbleMenu component)
-
-**8. Code Blocks with Syntax Highlighting**
-- Powered by @tiptap/extension-code-block-lowlight + lowlight
-- 8 languages: JavaScript, TypeScript, Python, CSS, HTML, JSON, SQL, Bash
-- Catppuccin-inspired dark theme for syntax colors
-
-**9. Editor CSS**
-- Task list checkbox styling with custom checkmark
-- Code block dark theme with rounded corners
-- Image styling with selection outline
-- Blockquote accent border
-- Inline code pink highlight
-- Link styling with underline offset
-- Horizontal rule styling
-
-### New files (3)
-- `SlashCommandMenu.tsx` — Floating slash command menu (192 lines)
-- `EditorBubbleMenu.tsx` — Custom floating selection toolbar (160 lines)
-- `EmojiPicker.tsx` — Rich categorized emoji picker (130 lines)
-
-### Modified files (5)
-- `noteService.ts` — localStorage persistence layer
-- `NotesPage.tsx` — Removed SubPagesList, seamless layout
-- `NoteEditor.tsx` — Complete rewrite with all new extensions
-- `globals.css` — All new editor styles (task lists, code blocks, images, etc.)
-- `package.json` — 10 new TipTap extensions
-
-### New dependencies installed
-@tiptap/extension-task-list, @tiptap/extension-task-item, @tiptap/extension-underline, @tiptap/extension-highlight, @tiptap/extension-text-style, @tiptap/extension-color, @tiptap/extension-dropcursor
-
-### Verification
-- `npx tsc --noEmit` — **zero errors** (with `--incremental false` to clear stale cache)
-- Tested in browser:
-  - ✅ Create page, type content, word count updates
-  - ✅ Slash command menu appears on `/`, all commands work
-  - ✅ Task list checkbox renders and is interactive
-  - ✅ **Content persists across full page refresh** (localStorage working)
-  - ✅ Sub-page creation from sidebar, tree hierarchy intact
-  - ✅ Breadcrumb navigation correct for nested pages
-  - ✅ Enhanced toolbar renders all new buttons
-
-### Committed
-- `75331e1` — Notes overhaul: localStorage, slash commands, images, task lists, enhanced editor (9 files, +1365/-67 lines)
-
-### Devvyn's Standing Instruction Update
-- **Sub-agents for coding must use Claude Opus 4-6** — not Sonnet or other models
-
----
-
-## Session 7 — 2026-03-28 13:27–13:35 SGT (Claude Opus)
-
-**Worker:** Claude Opus 4 (main) + 2× Claude Opus sub-agents (parallel)
-**Model:** anthropic/claude-opus-4-6
-
-### 🔥 Critical: localStorage Persistence for ALL Services
-
-All 7 remaining data services now persist to localStorage (Notes was done in session 6):
-
-| Service | Storage Keys | Mutations with persist() |
-|---------|-------------|--------------------------|
-| taskService | `nexus-tasks` | create, update, delete, reorder |
-| eventService | `nexus-events` | create, update, delete |
-| habitService | `nexus-habits`, `nexus-habit-entries` | create, update, delete, checkIn, uncheckIn |
-| timerService | `nexus-timer-entries` | startTimer, stopTimer, createManualEntry, updateEntry, deleteEntry |
-| flashcardService | `nexus-decks`, `nexus-cards`, `nexus-reviews` | createDeck, updateDeck, deleteDeck, createCard, updateCard, deleteCard, reviewCard |
-| tableService | `nexus-tables`, `nexus-table-rows` | createTable, updateTable, deleteTable, addColumn, updateColumn, deleteColumn, createRow, updateRow, deleteRow, updateCell |
-| projectService | `nexus-projects` | create, update, delete |
-
-**Total: 12 localStorage keys across 8 services (including noteService).**
-
-### Verification
-- `npx tsc --noEmit --incremental false` — **zero errors**
-- Tested in browser:
-  - ✅ Created task "Test persistence task" → survived page refresh
-  - ✅ Created calendar event "Persistence test event" → survived page refresh
-  - ✅ Dashboard shows persisted data (1 event today, task count)
-  - ✅ Cross-module data flow working (events service → dashboard)
-
-### Committed
-- `9a7ab6f` — localStorage persistence for ALL services (7 files, +242/-15 lines)
-
-### Impact
-**The app is now genuinely usable as a daily tool.** Every module retains data across sessions. This was the single biggest blocker to MVP usability.
-
----
-
-## Session 8 — 2026-03-28 13:36–13:43 SGT (Claude Opus)
-
-**Worker:** Claude Opus 4 (main) + 2× Claude Opus sub-agents (parallel)
-**Model:** anthropic/claude-opus-4-6
-
-### 🎯 MVP1 Completion — Tasks Polish + Tasks on Calendar
-
-**Goal:** Complete all remaining Phase 1 MVP features per the product plan.
-
-### Tasks Module Polish (Agent 1)
-
-**1. Subtasks (one level deep)**
-- taskService: Added `getSubtasks(parentId)` method
-- useTasks: Added `useSubtasks(parentId)` hook
-- TaskItem: Expand/collapse chevron, indented subtask rendering, "+" hover button for adding subtasks
-- TaskDetail: Subtasks section with checkboxes, done/total counter, inline add
-- TasksPage: Filters main list to root tasks only (parentId === null)
-
-**2. Keyboard shortcuts**
-- `n` → focus quick-add input
-- `Enter` → select first task / open detail
-- `Escape` → close detail panel
-- `1-4` → set priority on selected task
-- `d` → toggle done/todo
-- `Delete`/`Backspace` → delete selected task
-- `j`/`↓` and `k`/`↑` → navigate task list
-- Skips when focused in input/textarea
-
-**3. Drag to reorder**
-- HTML5 drag and drop on TaskItems
-- Visual accent-colored drop indicator
-- Midpoint sort order computation
-- `useReorderTask()` mutation hook
-
-**4. Undo on delete (Toast)**
-- Fixed bottom-center toast, 5s auto-dismiss
-- Stores full task data before delete
-- "Undo" re-creates with same properties
-
-### Calendar Integration (Agent 2)
-
-**Tasks on Calendar:**
-- Tasks with due dates rendered as FullCalendar events alongside regular events
-- `✓` prefix to visually distinguish from events
-- Priority-based color coding (P1=red, P2=orange, P3=blue, P4=gray, none=indigo)
-- Done tasks dimmed (opacity-50) with strikethrough
-- Click task → side panel with status toggle, priority, due date, "Open in Tasks" button
-- Drag task on calendar → reschedules due date
-- "Show tasks" toggle checkbox at top of calendar
-
-### Verification
-- `npx tsc --noEmit --incremental false` — **zero errors**
-- Tested in browser:
-  - ✅ Task detail panel shows subtasks section with "Add subtask" input
-  - ✅ Task with due date (High priority) appears on calendar in orange
-  - ✅ Calendar event "Persistence test event" still renders alongside task
-  - ✅ Show/hide tasks toggle visible at top-left of calendar
-
-### Committed
-- `b3b74d1` — MVP1 completion: Tasks polish + Tasks on Calendar (6 files, +748/-87 lines)
-
-### 🏆 MVP1 STATUS: COMPLETE
-Phase 1 from the product plan is now fully delivered:
-- ✅ Dashboard (wired to all services, live data)
-- ✅ Tasks (full CRUD + subtasks + keyboard shortcuts + drag reorder + undo)
-- ✅ Notes (Notion-level editor with slash commands, images, persistence)
-- ✅ Calendar (events + tasks with due dates, drag reschedule)
-- ✅ All data persists via localStorage
-
-Remaining Phase 1 plan items deferred to Phase 3: recurring events (Calendar).
-
----
-
-## Session 9 — 2026-03-28 13:48–13:55 SGT (Claude Opus)
-
-**Worker:** Claude Opus 4 (main) + 1× Claude Opus sub-agent
-**Model:** anthropic/claude-opus-4-6
-
-### Final MVP1 Items — All 4 Remaining Plan Features
-
-**1. Global quick-add hotkey (Ctrl+Shift+N)** ✅
-- Added GlobalShortcuts component in App.tsx (inside BrowserRouter)
-- Navigates to /tasks and focuses the quick-add input
-- Works from any page in the app
-
-**2. Markdown shortcuts** ✅ (already working)
-- Confirmed TipTap StarterKit InputRules handle all markdown shortcuts:
-  - `# ` → H1, `## ` → H2, `### ` → H3
-  - `- ` or `* ` → bullet list, `1. ` → ordered list
-  - `> ` → blockquote, `---` → horizontal rule
-  - Backtick for inline code, triple backtick for code block (via CodeBlockLowlight)
-
-**3. Wiki-links `[[...]]` with autocomplete** ✅
-- Custom TipTap WikiLink Node extension (inline, atomic)
-- Type `[[` to trigger floating autocomplete dropdown
-- Shows all pages filtered as you type
-- Arrow key navigation, Enter to select, Escape to dismiss
-- Inserts styled span with data-note-id attribute
-- Clickable to navigate to target page via onNavigateToNote prop
-- CSS styling: accent color background, cursor pointer, hover underline
-
-**4. Backlinks panel** ✅
-- `noteService.getBacklinks(noteId)` scans all note content for wiki-link references
-- `useBacklinks` hook with React Query
-- BacklinksPanel component: collapsible, shows count badge, lists linking pages
-- Empty state: "No pages link to this page"
-- Click to navigate to linking page
-
-### New files (3)
-- `extensions/WikiLink.ts` — Custom TipTap node extension
-- `components/WikiLinkSuggestion.tsx` — Autocomplete dropdown
-- `components/BacklinksPanel.tsx` — Collapsible backlinks list
-
-### Modified files (5)
-- `App.tsx` — GlobalShortcuts component for Ctrl+Shift+N
-- `NoteEditor.tsx` — WikiLink extension, `[[` detection, onNavigateToNote prop
-- `NotesPage.tsx` — Backlinks panel integration, onNavigateToNote wiring
-- `noteService.ts` — getBacklinks method
-- `useNotes.ts` — useBacklinks hook
-- `globals.css` — Wiki-link styling
-
-### Committed
-- `f54e1a2` — Global quick-add hotkey (Ctrl+Shift+N)
-- `2a1d718` — Wiki-links + Backlinks panel (8 files, +410/-5 lines)
-
-### 🏆🏆 MVP1 PLAN: 100% COMPLETE 🏆🏆
-Every single item from the Phase 1 MVP plan is now delivered:
-
-**Dashboard:** ✅ All 4 items
-**Tasks:** ✅ All 9 items (CRUD, subtasks, shortcuts, Ctrl+Shift+N, drag reorder, undo)
-**Notes:** ✅ All 9 items (TipTap editor, markdown shortcuts, slash commands, tree sidebar, search, wiki-links, backlinks, auto-save)
-**Calendar:** ✅ All 6 items (FullCalendar, CRUD, tasks on calendar, drag reschedule)
-
-Only item deferred: recurring events (Calendar) — explicitly Phase 3 scope per plan.
-
----
-
-## Handover Notes for Next Session
-
-> ✅ All Phase 2+3 items completed in Session 10. See Session 10 entry below.
-
-### Priority: Complete Phase 2 + Phase 3
-
-Phase 1 (MVP) is 100% complete. Devvyn wants Phase 2 and Phase 3 finished before moving to Phase 4 (Electron/distribution).
-
-### Phase 2 — Missing Plan Items
-
-| Feature | Module | Effort |
-|---------|--------|--------|
-| Audio notification on timer/pomodoro complete | Timer | Small — use Web Audio API or `new Audio()` |
-| Time logged against tasks (link timer entries to tasks) | Timer | Medium — timerService already has taskId field, need UI for selecting task when starting timer |
-| Kanban board view (tasks by status within a project) | Projects | Medium — drag between status columns |
-| Milestones | Projects | Medium — new data model + UI |
-| Global search across ALL content types (tasks, notes, events, etc.) | Command Palette | Medium — search across all services |
-| Keyboard shortcut cheatsheet (`?` key) | Command Palette | Small |
-| Customizable shortcuts (Settings) | Command Palette | Medium |
-
-### Phase 3 — All Items
-
-| Feature | Module | Effort |
-|---------|--------|--------|
-| Notes → Flashcards (select text → create card) | Cross-module | Medium |
-| Formula columns (SUM, AVG, COUNT, IF) | Tables | Large |
-| Board/Calendar views for Tables | Tables | Medium |
-| CSV import/export (tables, tasks) | Tables/Tasks | Medium |
-| Full-text search across everything | Global | Medium |
-| Recurring events and tasks | Calendar/Tasks | Medium |
-| Calendar event reminders (system notifications) | Calendar | Small-Medium |
-| Error boundaries + loading states | Global | Small |
-| Export: notes to Markdown/PDF | Notes | Medium |
-| Auto-updater (electron-updater) | Distribution | Deferred to Phase 4 |
-
-### Standing Instructions
-- **Sub-agents for coding MUST use Claude Opus 4-6** (anthropic/claude-opus-4-6). No other models.
-- **Quality bar:** Top 1% FANG engineering standards. Test everything in browser.
-- **Documentation:** Every session MUST append to CHANGELOG.md and update IMPLEMENTATION-STATUS.md
-- **Plan changes:** Update productivity-app-plan.md for any scope changes
-- **Dependencies:** Use `npm install --legacy-peer-deps`
-- **TypeScript:** `npx tsc --noEmit --incremental false` must pass zero errors
-- Sub-agents can be spawned freely, in parallel where possible
-- Always verify sub-agent work — check TS compilation, test in browser
-
----
-
-## Session 10 — 2026-03-28 14:10–14:30 SGT (Claude Opus × 8 sub-agents)
-
-**Worker:** Claude Opus 4 (main orchestrator + 8 parallel sub-agents)  
-**Model:** anthropic/claude-opus-4-6
-
-### 🏆 Phase 2 + Phase 3: COMPLETE
-
-All 15 remaining plan items delivered across two parallel batches of sub-agents.
-
-### Batch 1 (4 agents, 14:11–14:18)
-
-**1. Timer Enhancements** ✅ (commit `3ec0a35`)
-- Audio notifications via Web Audio API (oscillator-based, no external files)
-  - Work complete: cheerful ascending C major arpeggio
-  - Break complete: gentle descending two-note chime
-- `audioEnabled` setting with toggle in PomodoroSettings
-- Task linking: searchable task selector dropdown when starting timer
-- Time entry list shows linked task name with icon
-
-**2. Notes → Flashcards** ✅ (commit `3427fa6`)
-- Brain icon in bubble menu (on text selection) and editor toolbar
-- CreateFlashcardModal: front pre-filled with selected text, back auto-focused
-- Deck selector with existing decks + "Create new deck" option
-- Ctrl+Enter to save, success animation, auto-close
-
-**3. Global Search + Shortcuts** ✅ (commit `e278c9d`)
-- Global search in Command Palette: queries all 7 services in parallel
-- 300ms debounced, fuzzy substring matching, color-coded type badges
-- Shortcut cheatsheet (`?` key): grouped modal overlay
-- shortcutService registry: 20+ defaults, localStorage persistence
-- Settings → Shortcuts tab: inline editing, "custom" badges, per-shortcut reset
-
-**4. Projects Expansion** ✅ (commit `e278c9d` — files included in same commit)
-- Kanban board: 5 status columns, draggable task cards, Board tab in project view
-- Milestones: full CRUD, progress bars, due date countdown, completion toggle
-- `milestoneId` added to Task type for linking
-
-### Batch 2 (4 agents, 14:18–14:27)
-
-**5. Formula Columns** ✅ (commit `c364e10`)
-- `formulaEngine.ts`: recursive-descent parser with tokenizer and evaluator
-- Functions: SUM, AVG, COUNT, MIN, MAX, IF
-- Arithmetic: +, -, *, / with comparisons
-- Column name references (case-insensitive), error handling (#ERROR, #REF, #DIV/0!)
-- "ƒ" indicator on formula cells and column headers
-- Formula input in AddColumnPanel with function hints
-
-**6. Recurring Events and Tasks** ✅ (commit `806ee80`)
-- `recurrence.ts`: shared RecurrenceRule type + getNextOccurrence/expandOccurrences
-- Events: virtual occurrence expansion in list(), single-occurrence exceptions
-- Tasks: auto-create next occurrence on completion
-- Calendar UI: recurrence form, edit scope dialog ("this" vs "all"), 🔁 icon
-- Task UI: recurrence selector in detail panel, 🔁 badge on items
-
-**7. CSV Import/Export + Board View** ✅ (commit `c364e10` + `17ddd1b`)
-- `csvService.ts`: RFC 4180 export/import with proper quoted field handling
-- Export: toolbar button, browser download, all column types handled
-- Import: file picker, column mapping (case-insensitive), preview modal, type coercion
-- Board view: Grid | Board toggle, group by select column, drag-and-drop
-
-**8. Error Boundaries + Loading States + Note Export** ✅ (commit `c364e10` + `17ddd1b`)
-- ErrorBoundary + ModuleErrorBoundary: route wrapping, friendly error screens
-- LoadingSpinner + ModuleSkeleton: replaced plain "Loading..." across all pages
-- Note export: ⋯ dropdown menu in NoteHeader with Markdown and PDF export
-
-### Verification
-- `npx tsc --noEmit --incremental false` — **zero errors** after all changes
-- All uncommitted work from concurrent agents committed in `17ddd1b`
-
-### Git log on Develop (as of 14:30 SGT)
-```
-17ddd1b feat: loading states + note export menu + CSV import/board view fixups
-806ee80 feat: add recurring events and tasks support
-c364e10 feat(tables): add formula column type with expression engine
-e278c9d feat: add global search, keyboard shortcut cheatsheet, and customizable shortcuts
-3427fa6 feat: add Notes → Flashcards cross-module integration
-3ec0a35 feat(timer): add audio notifications on pomodoro phase transitions and task linking
-bbe28a0 docs: handover notes for Phase 2+3 completion
-```
-
-### 🏆🏆🏆 PHASES 1 + 2 + 3: ALL COMPLETE 🏆🏆🏆
-
-Every feature through Phase 3 is delivered. Next: Phase 4 (Electron wiring, SQLite, distribution).
-
----
-
-## Session 11 — 2026-03-28 14:32–14:49 SGT (Claude Opus — Audit + Fix)
-
-**Worker:** Claude Opus 4 (main orchestrator + 3 audit agents + 4 fix agents)  
-**Model:** anthropic/claude-opus-4-6
-
-### Comprehensive Pitstop Audit
-
-Ran 3 parallel audit agents covering:
-- **Code & Logic:** Types, services, cross-module wiring, localStorage, runtime bugs
-- **UI/UX:** Components, React patterns, CSS, accessibility, missing wiring
-- **Docs & PM:** IMPLEMENTATION-STATUS, CHANGELOG, README, plan, package.json accuracy
-
-### Findings: 7 Critical, 17 Medium, 6 Doc Errors, 10+ Low issues
-
-### Fix Groups (4 parallel agents)
-
-**Group A — Data Layer (7 fixes)** ✅
-- Event date filtering: safe Date comparisons instead of string comparison
-- Multi-day events: overlap check (eventStart ≤ rangeEnd AND eventEnd ≥ rangeStart)
-- Exception field leaking: whitelisted fields only into occurrence exceptions
-- Task date filters: undated tasks now excluded from dueBefore/dueAfter
-- Recurring task without dueDate: console.warn + graceful skip
-- Weekly+daysOfWeek recurrence: rewritten to prevent skipped occurrences
-- Kanban drop: try/catch with finally for query invalidation
-
-**Group B — Editor + Shell (6 fixes)** ✅
-- EditorBubbleMenu memory leak: stable useCallback ref for blur handler
-- Bubble menu positioning: removed erroneous window.scrollY/X offsets
-- 404 route: catch-all redirects to /dashboard
-- PDF export: hidden iframe approach (no popup blocker issues)
-- NoteEditor handleFileChange: null guard for editorInstance
-
-**Group C — Persistence + Settings (7 fixes)** ✅
-- Timer settings: persist to localStorage (nexus-timer-settings key)
-- General settings: new appSettingsStore with Zustand + localStorage
-- Flashcard settings: wired to store with persistence
-- Data section text: corrected from "resets on refresh" to "persists via localStorage"
-- Global search: now checks note content + task descriptions (not just titles)
-- Audio notification: awaits AudioContext.resume() properly
-- Timer phase indicator: 🎯/☕/🌿 pill in hero section
-
-**Group D — Docs + Cleanup (8 tasks)** ✅
-- README.md: complete rewrite (accurate Phase 3 status)
-- 9 unused deps removed (dnd-kit, recharts, flexsearch, etc.)
-- highlight.js added as explicit dependency
-- dev script fixed (just runs vite; dev:full for electron)
-- Orphaned SubPagesList.tsx deleted
-- Dead code cleaned (unused imports in Dashboard + Flashcards)
-- CHANGELOG stale sections annotated
-- Plan checkboxes updated + 12 deferred features documented
-
-### Git log on Develop (as of 14:49 SGT)
-```
-03bedbf chore: docs rewrite, dependency cleanup, dead code removal
-b7cd9cb fix: persist settings, improve search, fix audio & add phase indicator
-c49086c fix: editor memory leak, bubble menu positioning, 404 route, PDF export, null guard
-70fba9e docs: CHANGELOG + IMPLEMENTATION-STATUS session 10 — Phase 2+3 complete
-```
-
-### Post-Audit Status
-- **TypeScript:** zero errors
-- **Working tree:** clean
-- **All critical bugs:** resolved
-- **All medium bugs addressed:** persistence, search, audio, UX indicators
-- **Documentation:** accurate and current
-- **Dependencies:** clean (no unused packages)
