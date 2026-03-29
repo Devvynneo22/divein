@@ -1,10 +1,26 @@
 import React, { useState, useCallback } from 'react';
 import type { Task, TaskStatus, TaskPriority } from '@/shared/types/task';
+import { useAppSettingsStore } from '@/shared/stores/appSettingsStore';
+import type { TaskDensity } from '@/shared/stores/appSettingsStore';
+
+// Lock icon for blocked tasks
+function LockIcon({ size = 12, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 12 12" fill="none" style={{ display: 'inline-block', flexShrink: 0 }}>
+      <rect x="2" y="5.5" width="8" height="5.5" rx="1.2" fill={color} />
+      <path d="M4 5.5V3.5a2 2 0 0 1 4 0v2" stroke={color} strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 interface TaskCardProps {
   task: Task;
   isSelected: boolean;
-  onSelect: () => void;
+  isMultiSelected?: boolean;
+  isBlocked?: boolean;
+  onSelect: (e: React.MouseEvent<HTMLDivElement>) => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
   onStatusChange: (status: TaskStatus) => void;
   onPriorityChange: (priority: TaskPriority) => void;
   onDelete: () => void;
@@ -16,11 +32,13 @@ interface TaskCardProps {
   onDragEnd?: (e: React.DragEvent<HTMLDivElement>) => void;
 }
 
+// ─── Priority ────────────────────────────────────────────────────────────────
+
 const PRIORITY_BORDER_COLOR: Record<number, string> = {
-  4: 'var(--color-priority-urgent, #ef4444)',
-  3: 'var(--color-priority-high, #f97316)',
-  2: 'var(--color-priority-medium, #eab308)',
-  1: 'var(--color-priority-low, #3b82f6)',
+  4: '#ef4444',
+  3: '#f97316',
+  2: '#eab308',
+  1: '#3b82f6',
   0: 'transparent',
 };
 
@@ -32,38 +50,85 @@ const PRIORITY_LABELS: Record<number, string> = {
   0: 'None',
 };
 
+// ─── Status ──────────────────────────────────────────────────────────────────
+
 const STATUS_LABELS: Record<TaskStatus, string> = {
-  backlog: 'Backlog',
-  inbox: 'Inbox',
-  todo: 'Todo',
+  backlog:     'Backlog',
+  inbox:       'Inbox',
+  todo:        'To Do',
   in_progress: 'In Progress',
-  in_review: 'In Review',
-  done: 'Done',
-  cancelled: 'Cancelled',
+  in_review:   'In Review',
+  done:        'Done',
+  cancelled:   'Cancelled',
 };
 
 const STATUS_CYCLE: TaskStatus[] = [
   'backlog', 'inbox', 'todo', 'in_progress', 'in_review', 'done', 'cancelled',
 ];
 
-const TAG_COLORS = [
-  '#ef4444', '#f97316', '#eab308', '#22c55e',
-  '#3b82f6', '#a855f7', '#ec4899', '#6b7280',
+// Solid vibrant status block colors
+const STATUS_BLOCK_COLOR: Record<TaskStatus, string> = {
+  backlog:     '#64748b',
+  inbox:       '#6b7280',
+  todo:        '#3b82f6',
+  in_progress: '#f97316',
+  in_review:   '#a855f7',
+  done:        '#22c55e',
+  cancelled:   '#ef4444',
+};
+
+// ─── Tags — solid vibrant colors keyed by tag name ───────────────────────────
+
+const TAG_MAP: Record<string, { bg: string; text: string }> = {
+  // Technology / dev
+  ios:           { bg: '#7c3aed', text: '#ffffff' },
+  mobile:        { bg: '#2563eb', text: '#ffffff' },
+  frontend:      { bg: '#0891b2', text: '#ffffff' },
+  backend:       { bg: '#0f766e', text: '#ffffff' },
+  development:   { bg: '#16a34a', text: '#ffffff' },
+  devops:        { bg: '#b45309', text: '#ffffff' },
+  performance:   { bg: '#d97706', text: '#ffffff' },
+  analytics:     { bg: '#7c3aed', text: '#ffffff' },
+  bug:           { bg: '#dc2626', text: '#ffffff' },
+  // Design / research
+  design:        { bg: '#db2777', text: '#ffffff' },
+  research:      { bg: '#9333ea', text: '#ffffff' },
+  // Business
+  marketing:     { bg: '#ea580c', text: '#ffffff' },
+  documentation: { bg: '#4f46e5', text: '#ffffff' },
+  // Fallbacks by position in TAG_PALETTE
+};
+
+const TAG_PALETTE: Array<{ bg: string; text: string }> = [
+  { bg: '#7c3aed', text: '#ffffff' },
+  { bg: '#2563eb', text: '#ffffff' },
+  { bg: '#16a34a', text: '#ffffff' },
+  { bg: '#db2777', text: '#ffffff' },
+  { bg: '#ea580c', text: '#ffffff' },
+  { bg: '#0891b2', text: '#ffffff' },
+  { bg: '#9333ea', text: '#ffffff' },
+  { bg: '#dc2626', text: '#ffffff' },
+  { bg: '#0f766e', text: '#ffffff' },
+  { bg: '#b45309', text: '#ffffff' },
 ];
+
+function getTagStyle(tag: string): { bg: string; text: string } {
+  const key = tag.toLowerCase().trim();
+  if (TAG_MAP[key]) return TAG_MAP[key];
+  // Hash fallback
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = ((hash << 5) - hash) + key.charCodeAt(i);
+    hash |= 0;
+  }
+  return TAG_PALETTE[Math.abs(hash) % TAG_PALETTE.length];
+}
 
 function normalizeTagLabel(tag: string): string {
   return tag.trim();
 }
 
-function getTagColor(tag: string): string {
-  const clean = normalizeTagLabel(tag);
-  let hash = 0;
-  for (let i = 0; i < clean.length; i++) {
-    hash = ((hash << 5) - hash) + clean.charCodeAt(i);
-    hash |= 0;
-  }
-  return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length];
-}
+// ─── Date helpers ─────────────────────────────────────────────────────────────
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
@@ -76,6 +141,28 @@ function isOverdue(dateStr: string): boolean {
   today.setHours(0, 0, 0, 0);
   return date < today;
 }
+
+// ─── Density config ───────────────────────────────────────────────────────────
+
+const DENSITY_PADDING: Record<TaskDensity, string> = {
+  compact:  '10px 12px',
+  default:  '14px 16px',
+  spacious: '20px 20px',
+};
+
+const DENSITY_FONT_SIZE: Record<TaskDensity, string> = {
+  compact:  '13px',
+  default:  '14px',
+  spacious: '15px',
+};
+
+const DENSITY_META_FONT_SIZE: Record<TaskDensity, string> = {
+  compact:  '10px',
+  default:  '11px',
+  spacious: '12px',
+};
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function ActionButton({
   onClick,
@@ -104,13 +191,11 @@ function ActionButton({
         borderRadius: '6px',
         border: '1px solid var(--color-border)',
         backgroundColor: hovered
-          ? (danger ? 'var(--color-danger-soft, rgba(239,68,68,0.1))' : 'var(--color-bg-hover)')
+          ? (danger ? 'rgba(239,68,68,0.1)' : 'var(--color-bg-hover)')
           : 'var(--color-bg-elevated)',
         cursor: 'pointer',
         fontSize: '12px',
-        color: danger
-          ? 'var(--color-danger, #ef4444)'
-          : 'var(--color-text-secondary)',
+        color: danger ? '#ef4444' : 'var(--color-text-secondary)',
         transition: 'background-color 0.1s ease',
         padding: 0,
         lineHeight: 1,
@@ -121,10 +206,103 @@ function ActionButton({
   );
 }
 
+function MoreMenuButton({
+  onClick,
+  children,
+  danger,
+}: {
+  onClick: (e: React.MouseEvent) => void;
+  children: React.ReactNode;
+  danger?: boolean;
+}) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'block',
+        width: '100%',
+        padding: '8px 12px',
+        textAlign: 'left',
+        fontSize: '13px',
+        color: danger ? '#ef4444' : 'var(--color-text-primary)',
+        background: hovered ? 'var(--color-bg-hover)' : 'none',
+        border: 'none',
+        cursor: 'pointer',
+        transition: 'background-color 0.1s ease',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+// ─── Assignee avatars ─────────────────────────────────────────────────────────
+
+function AssigneeAvatars({ urls, max = 4 }: { urls: string[]; max?: number }) {
+  if (!urls || urls.length === 0) return null;
+  const visible = urls.slice(0, max);
+  const remainder = urls.length - visible.length;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center' }}>
+      {visible.map((url, i) => (
+        <img
+          key={url}
+          src={url}
+          alt={`Assignee ${i + 1}`}
+          style={{
+            width: '22px',
+            height: '22px',
+            borderRadius: '50%',
+            border: '2px solid #ffffff',
+            objectFit: 'cover',
+            marginLeft: i === 0 ? 0 : '-7px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+            flexShrink: 0,
+          }}
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).style.display = 'none';
+          }}
+        />
+      ))}
+      {remainder > 0 && (
+        <div
+          style={{
+            width: '22px',
+            height: '22px',
+            borderRadius: '50%',
+            border: '2px solid #ffffff',
+            backgroundColor: '#6366f1',
+            color: '#ffffff',
+            fontSize: '9px',
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginLeft: '-7px',
+            flexShrink: 0,
+          }}
+        >
+          +{remainder}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
 export function TaskCard({
   task,
   isSelected,
+  isMultiSelected = false,
+  isBlocked = false,
   onSelect,
+  onMouseEnter: onMouseEnterProp,
+  onMouseLeave: onMouseLeaveProp,
   onStatusChange,
   onPriorityChange,
   onDelete,
@@ -138,14 +316,21 @@ export function TaskCard({
   const [isHovered, setIsHovered] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
-  const borderColor = PRIORITY_BORDER_COLOR[task.priority] ?? 'transparent';
-  const overdueDate = task.dueDate ? isOverdue(task.dueDate) : false;
+  const density = useAppSettingsStore((s) => s.app.taskDensity);
+  const showCoverImages = useAppSettingsStore((s) => s.app.showCoverImages);
+  const showIssueKeys = useAppSettingsStore((s) => s.app.showIssueKeys);
 
-  const sideColor = isSelected
+  const priorityBorderColor = PRIORITY_BORDER_COLOR[task.priority] ?? 'transparent';
+  const overdueDate = task.dueDate ? isOverdue(task.dueDate) : false;
+  const hasCover = !!(task.coverImage && showCoverImages);
+  const hasAssignees = !!(task.assignees && task.assignees.length > 0);
+
+  const cardBg = isMultiSelected ? 'var(--color-accent-soft)' : '#ffffff';
+  const cardBorderColor = isSelected || isMultiSelected
     ? 'var(--color-accent, #6366f1)'
     : isHovered
-    ? 'var(--color-border-hover, var(--color-border))'
-    : 'var(--color-border)';
+    ? 'var(--color-border-hover, #cbd5e1)'
+    : 'var(--color-border, #e2e8f0)';
 
   const cycleStatus = useCallback(
     (e: React.MouseEvent) => {
@@ -175,6 +360,8 @@ export function TaskCard({
     [onDelete],
   );
 
+  const statusBlockColor = STATUS_BLOCK_COLOR[task.status];
+
   return (
     <div
       draggable={draggable}
@@ -182,234 +369,325 @@ export function TaskCard({
       onDragOver={onDragOver}
       onDrop={onDrop}
       onDragEnd={onDragEnd}
-      onClick={onSelect}
-      onMouseEnter={() => setIsHovered(true)}
+      onClick={(e) => onSelect(e)}
+      onMouseEnter={() => { setIsHovered(true); onMouseEnterProp?.(); }}
       onMouseLeave={() => {
         setIsHovered(false);
         setShowMoreMenu(false);
+        onMouseLeaveProp?.();
       }}
       style={{
         position: 'relative',
-        backgroundColor: 'var(--color-bg-elevated)',
-        borderTop: `1px solid ${sideColor}`,
-        borderRight: `1px solid ${sideColor}`,
-        borderBottom: `1px solid ${sideColor}`,
-        borderLeft: `3px solid ${borderColor}`,
+        backgroundColor: cardBg,
         borderRadius: '12px',
-        boxShadow: isHovered ? 'var(--shadow-md)' : 'var(--shadow-sm)',
-        padding: '12px 14px',
+        border: `1px solid ${cardBorderColor}`,
+        borderLeft: priorityBorderColor !== 'transparent'
+          ? `3px solid ${priorityBorderColor}`
+          : `1px solid ${cardBorderColor}`,
+        boxShadow: isHovered
+          ? '0 4px 16px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)'
+          : '0 1px 3px rgba(0,0,0,0.06)',
         cursor: draggable ? 'grab' : 'pointer',
         transition: 'box-shadow 0.15s ease, border-color 0.15s ease',
         userSelect: 'none',
-        outline: isSelected ? '2px solid var(--color-accent, #6366f1)' : 'none',
+        outline: (isSelected || isMultiSelected) ? '2px solid var(--color-accent, #6366f1)' : 'none',
         outlineOffset: '2px',
+        overflow: 'hidden',
       }}
     >
-      {/* Quick action buttons — visible on hover, absolute top-right */}
-      {isHovered && (
+      {/* ── Cover Image ───────────────────────────────────────────────────── */}
+      {hasCover && (
         <div
           style={{
-            position: 'absolute',
-            top: '8px',
-            right: '8px',
-            display: 'flex',
-            gap: '4px',
-            alignItems: 'center',
-            zIndex: 10,
+            width: '100%',
+            height: '110px',
+            overflow: 'hidden',
+            borderRadius: '11px 11px 0 0',
+            flexShrink: 0,
           }}
         >
-          {/* Status cycle */}
-          <ActionButton onClick={cycleStatus} title={`Status: ${STATUS_LABELS[task.status]} → next`}>
-            ↻
-          </ActionButton>
-
-          {/* Priority cycle */}
-          <ActionButton
-            onClick={cyclePriority}
-            title={`Priority: ${PRIORITY_LABELS[task.priority]}`}
-          >
-            <span
-              style={{
-                display: 'inline-block',
-                width: '8px',
-                height: '8px',
-                borderRadius: '2px',
-                backgroundColor: borderColor === 'transparent'
-                  ? 'var(--color-text-muted)'
-                  : borderColor,
-                transform: 'rotate(45deg)',
-              }}
-            />
-          </ActionButton>
-
-          {/* More menu */}
-          <div style={{ position: 'relative' }}>
-            <ActionButton
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowMoreMenu((v) => !v);
-              }}
-              title="More options"
-            >
-              ···
-            </ActionButton>
-            {showMoreMenu && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '28px',
-                  right: 0,
-                  backgroundColor: 'var(--color-bg-elevated)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '8px',
-                  boxShadow: 'var(--shadow-md)',
-                  minWidth: '120px',
-                  zIndex: 100,
-                  overflow: 'hidden',
-                }}
-              >
-                <MoreMenuButton onClick={handleDelete} danger>
-                  🗑 Delete
-                </MoreMenuButton>
-              </div>
-            )}
-          </div>
+          <img
+            src={task.coverImage}
+            alt="Task cover"
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              display: 'block',
+            }}
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).parentElement!.style.display = 'none';
+            }}
+          />
         </div>
       )}
 
-      {/* Title */}
-      <div
-        style={{
-          fontSize: '14px',
-          fontWeight: 500,
-          color: 'var(--color-text-primary)',
-          lineHeight: '1.4',
-          marginBottom: task.dueDate || task.tags.length > 0 || subtaskProgress ? '8px' : 0,
-          paddingRight: isHovered ? '84px' : '0',
-          ...(({
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-          } as React.CSSProperties)),
-        }}
-      >
-        {task.title}
-      </div>
+      {/* ── Card Body ─────────────────────────────────────────────────────── */}
+      <div style={{ padding: DENSITY_PADDING[density] }}>
 
-      {/* Metadata row */}
-      {(task.dueDate || task.tags.length > 0 || subtaskProgress) && (
+        {/* Quick action buttons — visible on hover */}
+        {isHovered && (
+          <div
+            style={{
+              position: 'absolute',
+              top: hasCover ? '118px' : '8px',
+              right: '8px',
+              display: 'flex',
+              gap: '4px',
+              alignItems: 'center',
+              zIndex: 10,
+            }}
+          >
+            <ActionButton onClick={cycleStatus} title={`Status: ${STATUS_LABELS[task.status]} → next`}>
+              ↻
+            </ActionButton>
+            <ActionButton onClick={cyclePriority} title={`Priority: ${PRIORITY_LABELS[task.priority]}`}>
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '2px',
+                  backgroundColor: priorityBorderColor === 'transparent' ? 'var(--color-text-muted)' : priorityBorderColor,
+                  transform: 'rotate(45deg)',
+                }}
+              />
+            </ActionButton>
+            <div style={{ position: 'relative' }}>
+              <ActionButton
+                onClick={(e) => { e.stopPropagation(); setShowMoreMenu((v) => !v); }}
+                title="More options"
+              >
+                ···
+              </ActionButton>
+              {showMoreMenu && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '28px',
+                    right: 0,
+                    backgroundColor: 'var(--color-bg-elevated)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '8px',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                    minWidth: '120px',
+                    zIndex: 100,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <MoreMenuButton onClick={handleDelete} danger>
+                    🗑 Delete
+                  </MoreMenuButton>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Issue Key + Tags row ─────────────────────────────────────── */}
+        {(showIssueKeys && task.issueKey || task.tags.length > 0) && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '5px',
+              marginBottom: '7px',
+            }}
+          >
+            {/* Issue key */}
+            {showIssueKeys && task.issueKey && (
+              <span
+                style={{
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  color: 'var(--color-text-muted)',
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                  marginRight: '2px',
+                }}
+              >
+                {task.issueKey}
+              </span>
+            )}
+
+            {/* Tags — solid vibrant pills */}
+            {task.tags.slice(0, 3).map((tag) => {
+              const label = normalizeTagLabel(tag);
+              const style = getTagStyle(label);
+              return (
+                <span
+                  key={tag}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '2px 7px',
+                    borderRadius: '999px',
+                    fontSize: '9px',
+                    fontWeight: 800,
+                    backgroundColor: style.bg,
+                    color: style.text,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    lineHeight: 1.5,
+                    flexShrink: 0,
+                  }}
+                >
+                  {label}
+                </span>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Title ────────────────────────────────────────────────────── */}
         <div
           style={{
+            fontSize: DENSITY_FONT_SIZE[density],
+            fontWeight: 600,
+            color: 'var(--color-text-primary)',
+            lineHeight: '1.45',
+            marginBottom: '10px',
+            paddingRight: isHovered ? '88px' : '0',
             display: 'flex',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '6px',
+            alignItems: 'flex-start',
+            gap: 5,
           }}
         >
-          {/* Due date */}
-          {task.dueDate && (
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '3px',
-                fontSize: '11px',
-                color: overdueDate
-                  ? 'var(--color-danger, #ef4444)'
-                  : 'var(--color-text-muted)',
-                fontWeight: overdueDate ? 600 : 400,
-                backgroundColor: overdueDate
-                  ? 'var(--color-danger-soft, rgba(239,68,68,0.08))'
-                  : 'transparent',
-                padding: overdueDate ? '1px 5px' : '0',
-                borderRadius: '4px',
-              }}
-            >
-              📅 {formatDate(task.dueDate)}
+          {isBlocked && (
+            <span title="Blocked by unfinished tasks" style={{ flexShrink: 0, marginTop: 2 }}>
+              <LockIcon size={12} color="#ef4444" />
             </span>
           )}
+          <span
+            style={({
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            } as React.CSSProperties)}
+          >
+            {task.title}
+          </span>
+        </div>
 
-          {/* Tags — up to 3 */}
-          {task.tags.slice(0, 3).map((tag) => {
-            const label = normalizeTagLabel(tag);
-            const color = getTagColor(label);
-            return (
+        {/* ── Status execution-stage block ──────────────────────────── */}
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '5px',
+            padding: '3px 10px',
+            borderRadius: '6px',
+            backgroundColor: statusBlockColor,
+            marginBottom: '10px',
+          }}
+        >
+          <span
+            style={{
+              fontSize: '10px',
+              fontWeight: 700,
+              color: '#ffffff',
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              lineHeight: 1.4,
+            }}
+          >
+            {STATUS_LABELS[task.status]}
+          </span>
+        </div>
+
+        {/* ── Metadata row: due date, subtask progress ──────────────── */}
+        {(task.dueDate || subtaskProgress) && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '6px',
+              marginBottom: hasAssignees ? '8px' : '0',
+            }}
+          >
+            {task.dueDate && (
               <span
-                key={tag}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  padding: '1px 6px',
-                  borderRadius: '999px',
-                  fontSize: '11px',
-                  fontWeight: 500,
-                  backgroundColor: `${color}20`,
-                  color,
-                  border: `1px solid ${color}40`,
-                  lineHeight: 1.6,
+                  gap: '3px',
+                  fontSize: DENSITY_META_FONT_SIZE[density],
+                  color: overdueDate ? '#ef4444' : 'var(--color-text-muted)',
+                  fontWeight: overdueDate ? 700 : 400,
+                  backgroundColor: overdueDate ? 'rgba(239,68,68,0.08)' : 'transparent',
+                  padding: overdueDate ? '2px 6px' : '0',
+                  borderRadius: '4px',
                 }}
               >
-                {label}
+                📅 {formatDate(task.dueDate)}
               </span>
-            );
-          })}
+            )}
 
-          {/* Subtask progress */}
-          {subtaskProgress && subtaskProgress.total > 0 && (
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '3px',
-                fontSize: '11px',
-                marginLeft: 'auto',
-                color:
-                  subtaskProgress.done === subtaskProgress.total
-                    ? 'var(--color-success, #4ade80)'
-                    : 'var(--color-text-muted)',
-              }}
-            >
-              📎 {subtaskProgress.done}/{subtaskProgress.total}
-            </span>
-          )}
-        </div>
-      )}
+            {subtaskProgress && subtaskProgress.total > 0 && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  marginLeft: 'auto',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: DENSITY_META_FONT_SIZE[density],
+                    color: subtaskProgress.done === subtaskProgress.total
+                      ? '#22c55e'
+                      : 'var(--color-text-muted)',
+                  }}
+                >
+                  📎 {subtaskProgress.done}/{subtaskProgress.total}
+                </span>
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: '40px',
+                    height: '4px',
+                    borderRadius: '999px',
+                    backgroundColor: 'var(--color-bg-tertiary)',
+                    overflow: 'hidden',
+                    flexShrink: 0,
+                  }}
+                >
+                  <span
+                    style={{
+                      display: 'block',
+                      height: '100%',
+                      borderRadius: '999px',
+                      backgroundColor: subtaskProgress.done === subtaskProgress.total
+                        ? '#22c55e'
+                        : 'var(--color-accent, #6366f1)',
+                      width: `${Math.round((subtaskProgress.done / subtaskProgress.total) * 100)}%`,
+                      transition: 'width 0.3s ease',
+                    }}
+                  />
+                </span>
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* ── Assignee avatars ─────────────────────────────────────── */}
+        {hasAssignees && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              marginTop: '6px',
+            }}
+          >
+            <AssigneeAvatars urls={task.assignees!} />
+          </div>
+        )}
+      </div>
     </div>
-  );
-}
-
-function MoreMenuButton({
-  onClick,
-  children,
-  danger,
-}: {
-  onClick: (e: React.MouseEvent) => void;
-  children: React.ReactNode;
-  danger?: boolean;
-}) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display: 'block',
-        width: '100%',
-        padding: '8px 12px',
-        textAlign: 'left',
-        fontSize: '13px',
-        color: danger ? 'var(--color-danger, #ef4444)' : 'var(--color-text-primary)',
-        background: hovered ? 'var(--color-bg-hover)' : 'none',
-        border: 'none',
-        cursor: 'pointer',
-        transition: 'background-color 0.1s ease',
-        whiteSpace: 'nowrap',
-      }}
-    >
-      {children}
-    </button>
   );
 }
 

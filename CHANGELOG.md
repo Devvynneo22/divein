@@ -4,6 +4,227 @@ Session-by-session record of all development work. AI agents: **append to this f
 
 ---
 
+## Session 19 — Phase 4.2: Visual Overhaul — Vibrant TaskCard & Column Redesign (2026-03-29, SGT)
+
+**Coding agent:** Claude Sonnet 4.6 sub-agent
+
+### Objective
+Transform the Tasks Board from a functional-but-plain UI into a visually stunning, information-rich board inspired by Monday.com / Trello / Jira.
+
+### Changes
+
+#### `src/shared/types/task.ts`
+- Added `coverImage?: string` — Unsplash image URL for rich card visuals
+- Added `issueKey?: string` — sequential project key (e.g. `DIV-1040`)
+- Added `assignees?: string[]` — array of avatar URLs (Pravatar)
+
+#### `src/shared/lib/taskService.ts`
+- Added `generateMockTasks()` function that seeds 10 rich mock tasks with:
+  - 8 unique Unsplash cover images (tech/work/design themes)
+  - Sequential `issueKey`s from `DIV-1040` to `DIV-1049`
+  - Up to 3 overlapping Pravatar avatar URLs per task
+  - Varied statuses, priorities, tags, and due dates (overdue/today/next week/null)
+- `loadTasks()` now seeds mock data if storage is empty or if stored tasks lack `issueKey` (upgrade path for existing installs)
+- `create()` initialises new tasks with `coverImage: undefined`, `issueKey: undefined`, `assignees: []`
+
+#### `src/shared/stores/appSettingsStore.ts`
+- Added `showCoverImages: boolean` (default `true`) to `AppSettings`
+- Added `showIssueKeys: boolean` (default `true`) to `AppSettings`
+
+#### `src/modules/tasks/components/TaskBoardColumn.tsx` — full overhaul
+- **Header redesign:**
+  - 3px solid accent color bar at the very top of the column (status-specific color)
+  - Status emoji prefix before the column title (📋 📥 📌 ⏳ 🔍 ✅ 🚫)
+  - Vibrant pill-shaped count badge with status-specific bg/text colors
+  - `+` button (shows accent color on hover) and `···` more-options button on the right
+- **Drag-over state** now uses the status accent color for border + shadow glow instead of generic indigo
+
+#### `src/modules/tasks/components/TaskCard.tsx` — full overhaul
+- **Cover image:** Edge-to-edge image (`110px` tall, `object-cover`) at the top of the card when `task.coverImage` exists and `showCoverImages` is enabled. Hides gracefully on `onError`.
+- **Issue key:** Rendered in `10px font-weight:700 uppercase muted` text above tags when `showIssueKeys` is enabled.
+- **Tags:** Completely replaced faint outline pills with **solid vibrant solid-color pills** — white text on opaque colored backgrounds. Named tags map to specific colors (iOS→purple, Mobile→blue, Development→green, Bug→red, etc.); unknown tags use a stable hash into a 10-color palette. All tags are `uppercase`, `font-weight: 800`, `letter-spacing: 0.06em`.
+- **Execution Stage block:** A full-width (inline-flex) colored rounded rectangle below the title showing the status name in white uppercase text, using the status's specific solid color (blue for In Progress, purple for In Review, green for Done, etc.).
+- **Assignee avatars:** Overlapping avatar row in the bottom-right corner — `22px` circles with `2px white border` and `−7px` negative margin for the overlap effect. Shows a `+N` overflow badge for >4 assignees.
+- **Card structure:** `overflow: hidden` on the card itself ensures cover image is clipped to `border-radius: 12px`. Priority left border (3px solid) preserved. Improved shadow on hover.
+
+### TypeScript
+`tsc --noEmit` — **zero errors**.
+
+---
+
+## Session 18 — Phase 4 Batch 4: Saved Views, Swimlanes & Custom Workflow States (2026-03-29, SGT)
+
+**Coding agent:** Claude Sonnet 4.6 sub-agent
+
+### Changes
+
+#### 8. Saved Custom Views
+- `src/shared/stores/taskSettingsStore.ts` (new): Standalone Zustand store persisting to `localStorage` with two keys:
+  - `divein-task-saved-views` — array of `SavedView` objects (`id`, `name`, `filters`, `groupBy?`, `sortBy?`).
+  - `divein-task-custom-statuses` — array of `CustomStatus` objects (see feature 10 below).
+- `TasksPage.tsx`:
+  - Imports and reads `useTaskSettingsStore` for `savedViews`, `addSavedView`, `removeSavedView`.
+  - Adds `showSaveViewInput` / `saveViewName` state.
+  - Adds `applyView(viewId)` callback: looks up the saved view by ID, restores its `filters`, `groupBy`, `sortBy` into local state.
+  - Adds `handleSaveView()` callback: calls `addSavedView` with the current filter/group/sort snapshot.
+  - Renders saved views as inline tabs in the header alongside the built-in view tabs (Board / List / Today / Backlog). Each tab shows a 🔖 bookmark prefix. Hovering reveals an ✕ remove button.
+  - Renders a **"Save View"** button (with `BookmarkPlus` icon) after the tabs. Clicking expands an inline name input; pressing Enter (or clicking "Save") commits the view.
+
+#### 9. Swimlanes (Matrix Board Grouping)
+- `TasksPage.tsx`:
+  - Adds `swimlaneBy?: string` state (default `undefined`).
+  - Renders a **"Swimlane"** select (with `Layers` icon) in the header bar next to the Board tab — visible only when `activeView === 'board'`. Options: None / By Priority / By Project.
+  - Passes `swimlaneBy` down to `<TaskBoard>`.
+- `TaskBoard.tsx` (overhauled):
+  - Accepts new optional `swimlaneBy?: string` prop.
+  - Reads `customStatuses` from `useTaskSettingsStore` to build column order and labels dynamically.
+  - In **swimlane mode**: groups tasks into `SwimlaneRow[]` by the chosen dimension (priority → ordered 4→0; project → unique project IDs). Renders:
+    - A sticky column-header row at the top (status dot + name for each visible status).
+    - Per swimlane: a left-rail header (colored vertical bar, row label, task count) followed by a row of mini `TaskBoardColumn` cells (one per visible status), each containing only tasks matching that swimlane + status intersection.
+  - In **standard mode**: unchanged scrollable horizontal board, but now uses `customStatuses` for column labels.
+  - Adds `SwimlaneCell` internal component: thin wrapper around `TaskBoardColumn` with `hideHeader=true` and `compactMode=true`.
+- `TaskBoardColumn.tsx`:
+  - Added `hideHeader?: boolean` prop — when `true`, suppresses the column header div.
+  - Added `compactMode?: boolean` prop — when `true`, sets column width to `220px` (vs default `296px`) and removes `maxHeight` constraint (swimlane cells grow with content).
+
+#### 10. Custom Workflow States
+- `src/shared/stores/taskSettingsStore.ts`:
+  - Exports `CustomStatus` type: `{ id, name, state: 'unstarted'|'active'|'completed', color, isCore }`.
+  - Exports `DEFAULT_CUSTOM_STATUSES` (7 entries mapping all `TaskStatus` values with sensible names and colors).
+  - `useTaskSettingsStore` actions: `addCustomStatus`, `updateCustomStatus`, `removeCustomStatus` (blocks removal of `isCore` statuses), `resetStatuses`.
+  - On init, merges persisted statuses with defaults to ensure all core statuses are always present.
+- `src/modules/tasks/components/CustomStatusManager.tsx` (new): Modal component for editing workflow statuses.
+  - Lists all statuses with color dot, name, state badge, and (for non-core) a Delete button.
+  - Edit form (shown inline at bottom): color picker (`<input type="color">`), name input, state dropdown. Enter to save, Escape to cancel.
+  - "+ Add Status" button in footer for creating new custom statuses.
+  - "Reset to defaults" button with a two-step confirmation guard.
+- `TaskBoard.tsx`:
+  - Uses `customStatuses` from the store to build `statusLabels` (so renamed statuses appear on column headers).
+- `TasksPage.tsx`:
+  - Adds `showStatusManager` state.
+  - Renders a **"Statuses"** button (with `Settings2` icon) in the header bar, visible only when `activeView === 'board'`.
+  - Mounts `<CustomStatusManager>` as a modal when `showStatusManager === true`.
+
+### Technical Notes
+- `tsc --noEmit` passes with zero errors.
+- The `TaskStatus` union type in `src/shared/types/task.ts` is left unchanged (string literals). Custom statuses with non-core IDs are stored in the settings store but not yet wired to the DB schema — this is intentional to avoid a data migration in this batch.
+- Core statuses (`isCore: true`) cannot be deleted; only their display name, color, and workflow-state label can be edited.
+
+---
+
+## Session 17 — Phase 4 Batch 3: NLP Quick Add & Task Dependencies (2026-03-29, SGT)
+
+**Coding agent:** Claude Sonnet 4.6 sub-agent
+
+### Changes
+
+#### 6. NLP Quick Add
+- `src/modules/tasks/lib/nlpQuickAdd.ts` (new): Utility module that parses natural-language task strings. Uses:
+  - `chrono-node` v2.9.0 to extract natural language dates (e.g. "tomorrow at 5pm", "next Friday").
+  - Regex `/#(\w+)/g` to extract `#tags`.
+  - Regex `/\b(P[1-4])\b/i` to extract priority flags (`P1`→Urgent, `P2`→High, `P3`→Medium, `P4`→Low).
+  - Returns `{ title, dueDate, tags, priority, raw }` — the `title` has the parsed tokens stripped out.
+- `TasksPage.tsx`:
+  - Imports `parseQuickAdd`. The `handleQuickAdd` handler now parses the quick-add input on Enter and creates the task with the extracted `dueDate`, `tags`, and `priority` applied automatically.
+  - Added live `nlpPreview` computed value (via `useMemo`) that shows color-coded chips (📅 date, #tag, ◆ priority) immediately below/beside the input as the user types. Chips appear only when tokens are detected; disappear when the input is empty.
+  - Quick-add input placeholder updated to: `'Quick add: "Task tomorrow #tag P1" (↵)'`.
+  - Input width increased from 200px to 260px to accommodate the hint text.
+
+#### 7. Task Dependencies (Graph)
+- `src/shared/types/task.ts`:
+  - Added `blockedBy?: string[]` and `blocks?: string[]` to the `Task` interface (stores task IDs).
+  - Added `blockedBy?: string[]` and `blocks?: string[]` to `UpdateTaskInput`.
+- `src/shared/lib/taskService.ts`:
+  - `create()`: new tasks get `blockedBy: []` and `blocks: []` initialized.
+  - `update()`: merges `blockedBy`/`blocks` from input (falls back to existing values).
+  - Recurring task copies also get `blockedBy: []` / `blocks: []`.
+- `TaskDetail.tsx`:
+  - Imports `useTasks` to load all tasks for the dependency picker.
+  - Added `DependencySection` component — shows two sub-sections:
+    - **Blocked by**: lists tasks that block this task. Active blockers shown with a red `Lock` icon and red pill styling. Done/cancelled blockers shown in muted style. "+ Add" button opens `TaskPickerPopover`.
+    - **Blocks**: lists tasks this task blocks. Shown as amber/warning pills. "+ Add" button opens `TaskPickerPopover`.
+  - `TaskPickerPopover`: searchable dropdown listing all root tasks (excluding self). Shows check-mark for already-selected tasks. Max 20 items, 180px scrollable list.
+  - `DependencySection` is rendered between the properties section and description.
+- `TaskCard.tsx`:
+  - Added `isBlocked?: boolean` prop.
+  - Added inline `LockIcon` SVG component.
+  - When `isBlocked=true`, a small red lock icon appears before the task title with tooltip "Blocked by unfinished tasks".
+- `TaskListRow.tsx`:
+  - Added `isBlocked?: boolean` prop.
+  - When `isBlocked=true`, a small red lock SVG icon appears before the task title span (with `title` attribute on a wrapper `<span>`).
+- `TaskBoard.tsx` / `TaskBoardColumn.tsx`:
+  - Added `blockedTaskIds?: Set<string>` prop threading.
+  - `TaskBoardColumn` passes `isBlocked={blockedTaskIds?.has(task.id)}` to each `TaskCard`.
+- `TaskList.tsx`:
+  - Added `blockedTaskIds?: Set<string>` prop.
+  - Passes `isBlocked={blockedTaskIds?.has(task.id)}` to each `TaskListRow` (both grouped and flat renders).
+- `TasksPage.tsx`:
+  - Loads `allTasksUnfiltered` via a second `useTasks()` call (no filter arg).
+  - Computes `blockedTaskIds: Set<string>` via `useMemo` — a task is in the set if any of its `blockedBy` IDs reference a task whose status is neither `done` nor `cancelled`.
+  - `handleStatusChange` intercepts moves to `done` for blocked tasks: shows a warning toast ("⚠️ This task has unfinished blockers — complete them first.") while still allowing the move (soft warning, not hard block).
+  - Passes `blockedTaskIds` to `TaskBoard` and `TaskList`.
+
+#### TypeScript
+- `tsc --noEmit` passes with zero errors.
+
+---
+
+## Session 16 — Phase 4 Batch 2: Multi-Select & Batch FAB, Contextual Cmd+K Palette (2026-03-29, SGT)
+
+**Coding agent:** Claude Sonnet 4.6 sub-agent
+
+### Changes
+
+#### 4. Multi-Select & Batch Actions
+- `TasksPage.tsx`: Added `selectedTaskIds: string[]` state. Added `handleToggleSelect` which activates when Shift/Cmd/Ctrl is held on click, adding/removing tasks from the multi-selection set. Single-click without modifiers still opens the detail panel as before.
+- `TaskList.tsx`: Extended `TaskListProps` with `selectedTaskIds`, `onToggleSelect`, and `onHoverTask`. Passes these to each `TaskListRow`.
+- `TaskListRow.tsx`: Extended props with `isMultiSelected`, new `onSelect(e: MouseEvent)` signature, `onMouseEnter`, `onMouseLeave`. Multi-selected rows get `var(--color-accent-muted)` background and accent left-border.
+- `TaskBoard.tsx` / `TaskBoardColumn.tsx` / `TaskCard.tsx`: Same prop threading — all accept `selectedTaskIds`, `onToggleSelect`, `onHoverTask`, `isMultiSelected`. Cards with `isMultiSelected=true` get accent outline + `var(--color-accent-soft)` background.
+- `TaskBatchFAB.tsx` (new): Floating Action Bar component rendered at `position: fixed; bottom: 28px; left: 50%`. Shows `X tasks selected`, with popover buttons for **Set Status**, **Set Priority**, **Set Due Date**, and **Delete**. Animates in with a spring (`fab-rise` keyframe). Closes on outside click or Escape. Due date sub-menu has a date input with Apply/Clear buttons.
+- Batch operations in `TasksPage.tsx`: `handleBatchSetStatus`, `handleBatchSetPriority`, `handleBatchSetDueDate`, `handleBatchDelete` — all iterate over `selectedTaskIds`, call `taskService` directly, then invalidate the React Query `tasks` cache.
+
+#### 5. Contextual Cmd+K Command Palette
+- `TaskCommandPalette.tsx` (new): Full-featured command palette using the `cmdk` package (`<Command>` component). Opens centered at 30% viewport height with backdrop blur overlay. Contains a breadcrumb header, task context preview (title + status icon), `<Command.Input>` search field, and sub-pages for:
+  - **Root**: Set Status…, Set Priority…, Set Due Date…, Delete.
+  - **Status sub-page**: All 7 statuses with `StatusIcon` and "Current" badge.
+  - **Priority sub-page**: All 5 priorities with `PriorityIcon` and "Current" badge.
+  - **Due Date sub-page**: Date input + Apply/Clear buttons.
+  - Keyboard: `↑↓` navigate, `↵` select, `⌫` (backspace on empty input) goes back to root, `Esc` closes.
+- `TasksPage.tsx`: Added `commandPaletteTaskId` state and `hoveredTaskId` state. The global `keydown` handler catches `Cmd+K` / `Ctrl+K` (not inside inputs) and opens the palette for the `selectedTaskId ?? hoveredTaskId`. Updates are applied via `useUpdateTask` mutation. Delete goes through `handleDelete` (with undo toast).
+
+#### TypeScript
+- `tsc --noEmit` passes with zero errors.
+
+---
+
+## Session 15 — Phase 4 Batch 1: Display Density, WIP Limits, Subtask Progress Bar (2026-03-29, SGT)
+
+**Coding agent:** Claude Sonnet 4.6 sub-agent
+
+### Changes
+
+#### 1. Display Density Controls
+- Added `taskDensity: 'compact' | 'default' | 'spacious'` to `AppSettings` in `src/shared/stores/appSettingsStore.ts` (default: `'default'`).
+- `TaskCard.tsx`: Reads density from store; adjusts card padding (`8px 10px` / `12px 14px` / `18px 18px`) and font sizes for title and metadata accordingly.
+- `TaskListRow.tsx`: Reads density from store; adjusts row height (`34px` / `44px` / `56px`) and font sizes for title, badges, and due date.
+- `TaskBoardColumn.tsx`: Reads density from store; adjusts card gap and column padding based on density.
+- `TaskToolbar.tsx`: Added a **Density** dropdown (Compact / Default / Spacious) next to Sort. Writes directly to `appSettingsStore` so the setting persists in localStorage.
+
+#### 2. Column WIP Limits
+- `TaskBoardColumn.tsx`: Soft WIP limit hardcoded at `3` tasks per column (`WIP_LIMIT = 3`).
+- When `tasks.length > WIP_LIMIT`, the column header gradient switches to a reddish tint (`var(--color-danger-soft)`), the column label text turns danger-red, a ⚠️ icon appears next to the label (with tooltip), and the task count badge highlights in red. The bottom border of the header also changes to danger-red.
+- All transitions are CSS-animated (0.2s ease) for a polished feel.
+
+#### 3. Interactive Subtask Progress Bar
+- `TaskCard.tsx`: Replaced plain `📎 2/3` text with a count + a small inline progress bar.
+- Progress bar: `40px wide`, `4px tall`, `rounded-full`, background uses `var(--color-bg-tertiary)`.
+- Inner fill: `var(--color-accent)` in progress, switches to `var(--color-success)` when all subtasks complete. Width animated with `transition: width 0.3s ease`.
+
+#### TypeScript
+- `tsc --noEmit` passes with zero errors.
+
+---
+
 ## Session 14 — Rebrand, Theme System, Full UI Overhaul, and Tasks Rewrite (2026-03-29, ~11:39–13:18 SGT)
 
 **Coordinator:** Work Claw (planning / orchestration / auditing)  

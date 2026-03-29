@@ -3,11 +3,17 @@ import { isToday, isPast, format, parseISO } from 'date-fns';
 import type { Task, TaskStatus } from '@/shared/types/task';
 import { StatusIcon } from './StatusIcon';
 import { PriorityIcon } from './PriorityIcon';
+import { useAppSettingsStore } from '@/shared/stores/appSettingsStore';
+import type { TaskDensity } from '@/shared/stores/appSettingsStore';
 
 interface TaskListRowProps {
   task: Task;
   isSelected: boolean;
-  onSelect: () => void;
+  isMultiSelected?: boolean;
+  isBlocked?: boolean; // true if task has active (non-done) blockers
+  onSelect: (e: React.MouseEvent<HTMLDivElement>) => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
   onStatusChange: (status: TaskStatus) => void;
   onDelete: () => void;
 }
@@ -52,14 +58,37 @@ function formatDueDate(dateStr: string): string {
   return format(d, 'MMM d');
 }
 
+const DENSITY_ROW_HEIGHT: Record<TaskDensity, number> = {
+  compact: 34,
+  default: 44,
+  spacious: 56,
+};
+
+const DENSITY_FONT_SIZE: Record<TaskDensity, number> = {
+  compact: 13,
+  default: 14,
+  spacious: 15,
+};
+
+const DENSITY_BADGE_FONT_SIZE: Record<TaskDensity, number> = {
+  compact: 10,
+  default: 11,
+  spacious: 12,
+};
+
 export function TaskListRow({
   task,
   isSelected,
+  isMultiSelected = false,
+  isBlocked = false,
   onSelect,
+  onMouseEnter: onMouseEnterProp,
+  onMouseLeave: onMouseLeaveProp,
   onStatusChange,
   onDelete,
 }: TaskListRowProps) {
   const [hovered, setHovered] = useState(false);
+  const density = useAppSettingsStore((s) => s.app.taskDensity);
 
   const isDone = task.status === 'done' || task.status === 'cancelled';
   const isOverdue = task.dueDate
@@ -76,26 +105,33 @@ export function TaskListRow({
     ? 'var(--color-accent, #6366f1)'
     : 'var(--color-text-muted)';
 
-  const rowBg = isSelected
+  const rowBg = isMultiSelected
+    ? 'var(--color-accent-muted)'
+    : isSelected
     ? 'var(--color-accent-soft)'
     : hovered
     ? 'var(--color-bg-hover)'
     : 'transparent';
 
-  const rowBorderLeft = isSelected ? '2px solid var(--color-accent)' : '2px solid transparent';
+  const rowBorderLeft =
+    isMultiSelected
+      ? '2px solid var(--color-accent)'
+      : isSelected
+      ? '2px solid var(--color-accent)'
+      : '2px solid transparent';
 
   return (
     <div
       role="row"
-      aria-selected={isSelected}
-      onClick={onSelect}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      aria-selected={isSelected || isMultiSelected}
+      onClick={(e) => onSelect(e)}
+      onMouseEnter={() => { setHovered(true); onMouseEnterProp?.(); }}
+      onMouseLeave={() => { setHovered(false); onMouseLeaveProp?.(); }}
       style={{
         display: 'flex',
         alignItems: 'center',
         gap: 8,
-        height: 44,
+        height: DENSITY_ROW_HEIGHT[density],
         padding: '0 12px',
         cursor: 'pointer',
         backgroundColor: rowBg,
@@ -137,16 +173,33 @@ export function TaskListRow({
       <span
         style={{
           flex: 1,
-          fontSize: 14,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 5,
+          fontSize: DENSITY_FONT_SIZE[density],
           color: isDone ? 'var(--color-text-muted)' : 'var(--color-text-primary)',
           textDecoration: isDone ? 'line-through' : 'none',
           overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
           lineHeight: '20px',
         }}
       >
-        {task.title}
+        {isBlocked && (
+          <span title="Blocked by unfinished tasks" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 12 12"
+              fill="none"
+              style={{ flexShrink: 0 }}
+            >
+              <rect x="2" y="5.5" width="8" height="5.5" rx="1.2" fill="var(--color-danger, #ef4444)" />
+              <path d="M4 5.5V3.5a2 2 0 0 1 4 0v2" stroke="var(--color-danger, #ef4444)" strokeWidth="1.3" strokeLinecap="round" />
+            </svg>
+          </span>
+        )}
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {task.title}
+        </span>
       </span>
 
       {/* Tags */}
@@ -158,7 +211,7 @@ export function TaskListRow({
               <span
                 key={tag}
                 style={{
-                  fontSize: 11,
+                  fontSize: DENSITY_BADGE_FONT_SIZE[density],
                   padding: '1px 6px',
                   borderRadius: 10,
                   backgroundColor: c.bg,
@@ -174,7 +227,7 @@ export function TaskListRow({
           {overflowCount > 0 && (
             <span
               style={{
-                fontSize: 11,
+                fontSize: DENSITY_BADGE_FONT_SIZE[density],
                 padding: '1px 6px',
                 borderRadius: 10,
                 backgroundColor: 'var(--color-bg-tertiary)',
@@ -192,7 +245,7 @@ export function TaskListRow({
       {task.dueDate && (
         <span
           style={{
-            fontSize: 12,
+            fontSize: DENSITY_BADGE_FONT_SIZE[density],
             color: dueDateColor,
             flexShrink: 0,
             whiteSpace: 'nowrap',
@@ -206,7 +259,7 @@ export function TaskListRow({
       {isDueToday && (
         <span
           style={{
-            fontSize: 10,
+            fontSize: DENSITY_BADGE_FONT_SIZE[density],
             padding: '2px 6px',
             borderRadius: 999,
             backgroundColor: 'var(--color-accent-soft)',

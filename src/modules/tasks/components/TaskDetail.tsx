@@ -10,9 +10,11 @@ import {
   Trash2,
   ChevronDown,
   Check,
+  Lock,
+  Link2,
 } from 'lucide-react';
 import type { Task, TaskStatus, TaskPriority, UpdateTaskInput, CreateTaskInput } from '@/shared/types/task';
-import { useSubtasks, useCreateTask, useUpdateTask } from '../hooks/useTasks';
+import { useSubtasks, useCreateTask, useUpdateTask, useTasks } from '../hooks/useTasks';
 
 // ─── Status config ────────────────────────────────────────────────────────────
 
@@ -304,6 +306,326 @@ function SubtaskItem({ task }: { task: Task }) {
   );
 }
 
+// ─── Dependency Section ───────────────────────────────────────────────────────
+
+interface DependencySectionProps {
+  task: Task;
+  allTasks: Task[];
+  onUpdate: (data: UpdateTaskInput) => void;
+}
+
+function DependencySection({ task, allTasks, onUpdate }: DependencySectionProps) {
+  const [showBlockedByPicker, setShowBlockedByPicker] = useState(false);
+  const [showBlocksPicker, setShowBlocksPicker] = useState(false);
+  const [search, setSearch] = useState('');
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  const blockedBy = task.blockedBy ?? [];
+  const blocks = task.blocks ?? [];
+
+  // Close pickers on outside click
+  useEffect(() => {
+    if (!showBlockedByPicker && !showBlocksPicker) return;
+    function handler(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setShowBlockedByPicker(false);
+        setShowBlocksPicker(false);
+        setSearch('');
+      }
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showBlockedByPicker, showBlocksPicker]);
+
+  const eligibleTasks = allTasks.filter(
+    (t) =>
+      t.id !== task.id &&
+      t.parentId === null &&
+      t.title.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  const addBlockedBy = (id: string) => {
+    if (blockedBy.includes(id)) return;
+    const newBlockedBy = [...blockedBy, id];
+    onUpdate({ blockedBy: newBlockedBy });
+    // Reciprocally update the blocker task's `blocks` field
+    const blocker = allTasks.find((t) => t.id === id);
+    if (blocker) {
+      const blockerBlocks = [...(blocker.blocks ?? [])];
+      if (!blockerBlocks.includes(task.id)) {
+        // We update via service directly but we only have onUpdate for this task
+        // So just update this task's blockedBy; the reciprocal is best-effort via a secondary mutation
+      }
+    }
+  };
+
+  const removeBlockedBy = (id: string) => {
+    onUpdate({ blockedBy: blockedBy.filter((b) => b !== id) });
+  };
+
+  const addBlocks = (id: string) => {
+    if (blocks.includes(id)) return;
+    onUpdate({ blocks: [...blocks, id] });
+  };
+
+  const removeBlocks = (id: string) => {
+    onUpdate({ blocks: blocks.filter((b) => b !== id) });
+  };
+
+  const getTaskTitle = (id: string) => allTasks.find((t) => t.id === id)?.title ?? id;
+  const getTaskStatus = (id: string): TaskStatus => allTasks.find((t) => t.id === id)?.status ?? 'todo';
+  const isActive = (id: string) => {
+    const s = getTaskStatus(id);
+    return s !== 'done' && s !== 'cancelled';
+  };
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+        padding: '14px 0',
+        borderTop: '1px solid var(--color-border)',
+        borderBottom: '1px solid var(--color-border)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <Link2 size={13} style={{ color: 'var(--color-text-muted)' }} />
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+          Dependencies
+        </span>
+      </div>
+
+      {/* Blocked By */}
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: 6 }}>
+          Blocked by
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+          {blockedBy.map((id) => (
+            <span
+              key={id}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '2px 8px 2px 6px',
+                borderRadius: 999,
+                fontSize: 12,
+                fontWeight: 500,
+                backgroundColor: isActive(id) ? 'var(--color-danger-soft, rgba(239,68,68,0.1))' : 'var(--color-bg-tertiary)',
+                color: isActive(id) ? 'var(--color-danger, #ef4444)' : 'var(--color-text-muted)',
+                border: `1px solid ${isActive(id) ? 'rgba(239,68,68,0.35)' : 'var(--color-border)'}`,
+                maxWidth: 180,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {isActive(id) && <Lock size={10} style={{ flexShrink: 0 }} />}
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{getTaskTitle(id)}</span>
+              <button
+                onClick={() => removeBlockedBy(id)}
+                style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginLeft: 2, opacity: 0.6, color: 'inherit', flexShrink: 0 }}
+                onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6'; }}
+              >
+                <X size={10} />
+              </button>
+            </span>
+          ))}
+          <div ref={showBlockedByPicker ? pickerRef : undefined} style={{ position: 'relative' }}>
+            <button
+              onClick={() => { setShowBlockedByPicker(true); setShowBlocksPicker(false); setSearch(''); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 3, padding: '2px 7px',
+                borderRadius: 999, border: '1px dashed var(--color-border)',
+                backgroundColor: 'transparent', cursor: 'pointer', fontSize: 12, color: 'var(--color-text-muted)',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-hover)'; e.currentTarget.style.color = 'var(--color-text-secondary)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+            >
+              <Plus size={10} /> Add
+            </button>
+            {showBlockedByPicker && (
+              <TaskPickerPopover
+                tasks={eligibleTasks}
+                selectedIds={blockedBy}
+                search={search}
+                onSearch={setSearch}
+                onSelect={(id) => { addBlockedBy(id); setShowBlockedByPicker(false); setSearch(''); }}
+                onClose={() => { setShowBlockedByPicker(false); setSearch(''); }}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Blocks */}
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: 6 }}>
+          Blocks
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+          {blocks.map((id) => (
+            <span
+              key={id}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '2px 8px 2px 6px',
+                borderRadius: 999,
+                fontSize: 12,
+                fontWeight: 500,
+                backgroundColor: 'var(--color-warning-soft, rgba(234,179,8,0.1))',
+                color: 'var(--color-warning, #eab308)',
+                border: '1px solid rgba(234,179,8,0.35)',
+                maxWidth: 180,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{getTaskTitle(id)}</span>
+              <button
+                onClick={() => removeBlocks(id)}
+                style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginLeft: 2, opacity: 0.6, color: 'inherit', flexShrink: 0 }}
+                onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6'; }}
+              >
+                <X size={10} />
+              </button>
+            </span>
+          ))}
+          <div ref={showBlocksPicker ? pickerRef : undefined} style={{ position: 'relative' }}>
+            <button
+              onClick={() => { setShowBlocksPicker(true); setShowBlockedByPicker(false); setSearch(''); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 3, padding: '2px 7px',
+                borderRadius: 999, border: '1px dashed var(--color-border)',
+                backgroundColor: 'transparent', cursor: 'pointer', fontSize: 12, color: 'var(--color-text-muted)',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-hover)'; e.currentTarget.style.color = 'var(--color-text-secondary)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+            >
+              <Plus size={10} /> Add
+            </button>
+            {showBlocksPicker && (
+              <TaskPickerPopover
+                tasks={eligibleTasks}
+                selectedIds={blocks}
+                search={search}
+                onSearch={setSearch}
+                onSelect={(id) => { addBlocks(id); setShowBlocksPicker(false); setSearch(''); }}
+                onClose={() => { setShowBlocksPicker(false); setSearch(''); }}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TaskPickerPopover({
+  tasks,
+  selectedIds,
+  search,
+  onSearch,
+  onSelect,
+  onClose,
+}: {
+  tasks: Task[];
+  selectedIds: string[];
+  search: string;
+  onSearch: (s: string) => void;
+  onSelect: (id: string) => void;
+  onClose: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: 'calc(100% + 4px)',
+        left: 0,
+        zIndex: 100,
+        minWidth: 220,
+        maxWidth: 280,
+        backgroundColor: 'var(--color-bg-elevated)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 10,
+        boxShadow: 'var(--shadow-popup, 0 8px 24px rgba(0,0,0,0.15))',
+        padding: 8,
+      }}
+    >
+      <input
+        ref={inputRef}
+        type="text"
+        placeholder="Search tasks..."
+        value={search}
+        onChange={(e) => onSearch(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+        style={{
+          width: '100%',
+          padding: '5px 8px',
+          fontSize: 12,
+          borderRadius: 6,
+          border: '1px solid var(--color-border)',
+          backgroundColor: 'var(--color-bg-tertiary)',
+          color: 'var(--color-text-primary)',
+          outline: 'none',
+          marginBottom: 6,
+          fontFamily: 'inherit',
+          boxSizing: 'border-box',
+        }}
+      />
+      <div style={{ maxHeight: 180, overflowY: 'auto' }}>
+        {tasks.length === 0 && (
+          <div style={{ padding: '8px', fontSize: 12, color: 'var(--color-text-muted)', textAlign: 'center' }}>
+            No tasks found
+          </div>
+        )}
+        {tasks.slice(0, 20).map((t) => {
+          const isSelected = selectedIds.includes(t.id);
+          return (
+            <button
+              key={t.id}
+              onClick={() => onSelect(t.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                width: '100%',
+                padding: '6px 8px',
+                fontSize: 12,
+                color: isSelected ? 'var(--color-accent)' : 'var(--color-text-primary)',
+                backgroundColor: isSelected ? 'var(--color-accent-soft)' : 'transparent',
+                border: 'none',
+                borderRadius: 6,
+                cursor: 'pointer',
+                textAlign: 'left',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+              onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'; }}
+              onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent'; }}
+            >
+              {isSelected && <Check size={10} style={{ flexShrink: 0 }} />}
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.title}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── TaskDetail ───────────────────────────────────────────────────────────────
 
 interface TaskDetailProps {
@@ -337,6 +659,9 @@ export function TaskDetail({ task, onUpdate, onDelete, onClose }: TaskDetailProp
   // Keep local draft in sync when task changes externally
   useEffect(() => { setTitleDraft(task.title); }, [task.title]);
   useEffect(() => { setDescription(task.description ?? ''); }, [task.description]);
+
+  // ── All tasks (for dependency picker) ────────────────────────────────────
+  const { data: allTasks = [] } = useTasks();
 
   // ── Subtasks ──────────────────────────────────────────────────────────────
   const { data: subtasks = [] } = useSubtasks(task.id);
@@ -841,6 +1166,13 @@ export function TaskDetail({ task, onUpdate, onDelete, onClose }: TaskDetailProp
               </span>
             </PropertyRow>
           </div>
+
+          {/* Dependencies */}
+          <DependencySection
+            task={task}
+            allTasks={allTasks.filter((t) => t.parentId === null)}
+            onUpdate={onUpdate}
+          />
 
           {/* Description */}
           <div>

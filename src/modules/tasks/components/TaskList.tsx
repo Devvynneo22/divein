@@ -7,9 +7,13 @@ interface TaskListProps {
   tasks: Task[];
   groupedTasks?: TaskGroup[];
   selectedTaskId: string | null;
+  selectedTaskIds?: string[];
   onSelectTask: (id: string) => void;
+  onToggleSelect?: (id: string, e: React.MouseEvent) => void;
+  onHoverTask?: (id: string | null) => void;
   onStatusChange: (id: string, status: TaskStatus) => void;
   onDelete: (id: string) => void;
+  blockedTaskIds?: Set<string>;
 }
 
 type SortKey = 'title' | 'priority' | 'dueDate' | 'status' | 'createdAt';
@@ -26,9 +30,13 @@ export function TaskList({
   tasks,
   groupedTasks,
   selectedTaskId,
+  selectedTaskIds = [],
   onSelectTask,
+  onToggleSelect,
+  onHoverTask,
   onStatusChange,
   onDelete,
+  blockedTaskIds,
 }: TaskListProps) {
   const [sortKey] = useState<SortKey>('createdAt');
   const [sortDir] = useState<SortDir>('desc');
@@ -180,10 +188,18 @@ export function TaskList({
                   key={task.id}
                   task={task}
                   isSelected={task.id === selectedTaskId || idx === focusedIndex}
-                  onSelect={() => {
-                    setFocusedIndex(idx);
-                    onSelectTask(task.id);
+                  isMultiSelected={selectedTaskIds.includes(task.id)}
+                  isBlocked={blockedTaskIds?.has(task.id) ?? false}
+                  onSelect={(e) => {
+                    if (onToggleSelect && (e.shiftKey || e.metaKey || e.ctrlKey)) {
+                      onToggleSelect(task.id, e);
+                    } else {
+                      setFocusedIndex(idx);
+                      onSelectTask(task.id);
+                    }
                   }}
+                  onMouseEnter={() => onHoverTask?.(task.id)}
+                  onMouseLeave={() => onHoverTask?.(null)}
                   onStatusChange={(status) => onStatusChange(task.id, status)}
                   onDelete={() => onDelete(task.id)}
                 />
@@ -197,10 +213,18 @@ export function TaskList({
             key={task.id}
             task={task}
             isSelected={task.id === selectedTaskId || idx === focusedIndex}
-            onSelect={() => {
-              setFocusedIndex(idx);
-              onSelectTask(task.id);
+            isMultiSelected={selectedTaskIds.includes(task.id)}
+            isBlocked={blockedTaskIds?.has(task.id) ?? false}
+            onSelect={(e) => {
+              if (onToggleSelect && (e.shiftKey || e.metaKey || e.ctrlKey)) {
+                onToggleSelect(task.id, e);
+              } else {
+                setFocusedIndex(idx);
+                onSelectTask(task.id);
+              }
             }}
+            onMouseEnter={() => onHoverTask?.(task.id)}
+            onMouseLeave={() => onHoverTask?.(null)}
             onStatusChange={(status) => onStatusChange(task.id, status)}
             onDelete={() => onDelete(task.id)}
           />

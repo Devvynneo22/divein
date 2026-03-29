@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
 import type { TaskStatus, TaskPriority } from '@/shared/types/task';
 import { TaskFilterChips } from './TaskFilterChips';
+import { useAppSettingsStore } from '@/shared/stores/appSettingsStore';
+import type { TaskDensity } from '@/shared/stores/appSettingsStore';
 
 interface TaskFilters {
   status?: TaskStatus[];
@@ -35,6 +37,12 @@ const SORT_OPTIONS = [
   { value: 'dueDate', label: 'Due Date' },
   { value: 'createdAt', label: 'Created' },
   { value: 'title', label: 'Title' },
+];
+
+const DENSITY_OPTIONS: { value: TaskDensity; label: string }[] = [
+  { value: 'compact', label: 'Compact' },
+  { value: 'default', label: 'Default' },
+  { value: 'spacious', label: 'Spacious' },
 ];
 
 const STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
@@ -96,6 +104,8 @@ export function TaskToolbar({
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
   const [searchFocused, setSearchFocused] = useState(false);
+  const density = useAppSettingsStore((s) => s.app.taskDensity);
+  const updateApp = useAppSettingsStore((s) => s.updateApp);
 
   const filtersActive = hasActiveFilters(filters);
 
@@ -420,6 +430,24 @@ export function TaskToolbar({
             style={selectStyle}
           >
             {SORT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Density */}
+        <div style={{ position: 'relative' }}>
+          <label style={{ fontSize: 12, color: 'var(--color-text-muted)', marginRight: 4 }}>
+            Density:
+          </label>
+          <select
+            value={density}
+            onChange={(e) => updateApp({ taskDensity: e.target.value as TaskDensity })}
+            style={selectStyle}
+          >
+            {DENSITY_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>

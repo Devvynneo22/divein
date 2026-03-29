@@ -19,6 +19,13 @@ export interface Task {
   estimatedMin: number | null;
   createdAt: string;
   updatedAt: string;
+  // Task dependency graph
+  blockedBy?: string[]; // task IDs that must be done before this task
+  blocks?: string[];    // task IDs that this task blocks
+  // Visual enhancement fields
+  coverImage?: string;    // Unsplash image URL
+  issueKey?: string;      // e.g. "DIV-1040"
+  assignees?: string[];   // Array of avatar URLs (Pravatar)
 }
 
 export interface CreateTaskInput {
@@ -51,6 +58,8 @@ export interface UpdateTaskInput {
   estimatedMin?: number | null;
   sortOrder?: number;
   recurrence?: string | null;
+  blockedBy?: string[];
+  blocks?: string[];
 }
 
 export interface TaskFilter {

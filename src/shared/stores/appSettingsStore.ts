@@ -3,6 +3,7 @@ import { create } from 'zustand';
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export type ThemeMode = 'light' | 'dark' | 'system';
+export type TaskDensity = 'compact' | 'default' | 'spacious';
 
 export interface AppSettings {
   theme: ThemeMode;
@@ -10,6 +11,9 @@ export interface AppSettings {
   dateFormat: 'relative' | 'short' | 'long';
   startOfWeek: 0 | 1 | 6;
   accentColor: string;
+  taskDensity: TaskDensity;
+  showCoverImages: boolean;
+  showIssueKeys: boolean;
 }
 
 export interface FlashcardSettings {
@@ -25,6 +29,9 @@ const DEFAULT_APP: AppSettings = {
   dateFormat: 'relative',
   startOfWeek: 1,
   accentColor: '#2383e2',
+  taskDensity: 'default',
+  showCoverImages: true,
+  showIssueKeys: true,
 };
 
 const DEFAULT_FLASHCARD: FlashcardSettings = {
