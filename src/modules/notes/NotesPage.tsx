@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { FileText } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+import { FileText, ChevronRight, ChevronLeft } from 'lucide-react';
 import {
   useNote,
   useNoteAncestors,
@@ -14,13 +14,19 @@ import { NoteEditor } from './components/NoteEditor';
 import { NoteHeader } from './components/NoteHeader';
 import { NoteBreadcrumb } from './components/NoteBreadcrumb';
 import { BacklinksPanel } from './components/BacklinksPanel';
+import { NoteRightPanel } from './components/NoteRightPanel';
 import { TemplatePickerModal, type NoteTemplate } from './components/TemplatePickerModal';
+import { useNoteEditor } from './hooks/useNoteEditor';
+
 
 export function NotesPage() {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [rightPanelOpen, setRightPanelOpen] = useState(false);
+  const [zenMode, setZenMode] = useState(false);
+
 
   const { data: selectedNote } = useNote(selectedNoteId);
   const { data: ancestors = [] } = useNoteAncestors(selectedNoteId);
@@ -30,6 +36,59 @@ export function NotesPage() {
   const createNote = useCreateNote();
   const updateNote = useUpdateNote();
   const trashNote = useTrashNote();
+
+  // ─── Editor (lifted from NoteEditor into this level) ─────────────────────
+
+  const handleEditorUpdate = useCallback(
+    (content: string, textContent: string, wordCount: number) => {
+      if (selectedNoteId) {
+        updateNote.mutate({
+          id: selectedNoteId,
+          data: { content, contentText: textContent, wordCount },
+        });
+      }
+    },
+    [selectedNoteId, updateNote],
+  );
+
+  const { editor, fileInputRef, triggerFileInput, handleFileChange } = useNoteEditor({
+    content: selectedNote?.content ?? null,
+    onUpdate: handleEditorUpdate,
+    onNavigateToNote: (id) => setSelectedNoteId(id),
+  });
+
+  // ─── Auto-show right panel when note has headings ─────────────────────────
+
+  useEffect(() => {
+    if (!editor || !selectedNote) return;
+    const checkHeadings = () => {
+      const hasHeadings = editor
+        .getJSON()
+        .content?.some((n) => n.type === 'heading') ?? false;
+      setRightPanelOpen(hasHeadings);
+    };
+    checkHeadings();
+    editor.on('update', checkHeadings);
+    return () => {
+      editor.off('update', checkHeadings);
+    };
+  }, [editor, selectedNote]);
+
+  // ─── Zen mode keyboard shortcut ───────────────────────────────────────────
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'F') {
+        e.preventDefault();
+        setZenMode((v) => !v);
+      }
+      if (e.key === 'Escape' && zenMode) {
+        setZenMode(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [zenMode]);
 
   // ─── Navigation ──────────────────────────────────────────────────
 
@@ -71,7 +130,7 @@ export function NotesPage() {
       });
       setSelectedNoteId(note.id);
     },
-    [createNote]
+    [createNote],
   );
 
   const handleCreateChild = useCallback(
@@ -80,19 +139,10 @@ export function NotesPage() {
       setExpandedIds((prev) => new Set([...prev, parentId]));
       setSelectedNoteId(note.id);
     },
-    [createNote]
+    [createNote],
   );
 
   // ─── Update ──────────────────────────────────────────────────────
-
-  const handleEditorUpdate = useCallback(
-    (content: string, textContent: string, wordCount: number) => {
-      if (selectedNoteId) {
-        updateNote.mutate({ id: selectedNoteId, data: { content, contentText: textContent, wordCount } });
-      }
-    },
-    [selectedNoteId, updateNote]
-  );
 
   const handleTitleChange = useCallback(
     (title: string) => {
@@ -100,7 +150,7 @@ export function NotesPage() {
         updateNote.mutate({ id: selectedNoteId, data: { title: title.trim() } });
       }
     },
-    [selectedNoteId, updateNote]
+    [selectedNoteId, updateNote],
   );
 
   const handleIconChange = useCallback(
@@ -109,7 +159,7 @@ export function NotesPage() {
         updateNote.mutate({ id: selectedNoteId, data: { icon } });
       }
     },
-    [selectedNoteId, updateNote]
+    [selectedNoteId, updateNote],
   );
 
   const handleCoverChange = useCallback(
@@ -118,14 +168,14 @@ export function NotesPage() {
         updateNote.mutate({ id: selectedNoteId, data: { coverColor: cover } });
       }
     },
-    [selectedNoteId, updateNote]
+    [selectedNoteId, updateNote],
   );
 
   const handleTogglePin = useCallback(
     (id: string, isPinned: boolean) => {
       updateNote.mutate({ id, data: { isPinned: !isPinned } });
     },
-    [updateNote]
+    [updateNote],
   );
 
   // ─── Trash ───────────────────────────────────────────────────────
@@ -135,7 +185,7 @@ export function NotesPage() {
       if (selectedNoteId === id) setSelectedNoteId(null);
       trashNote.mutate(id);
     },
-    [selectedNoteId, trashNote]
+    [selectedNoteId, trashNote],
   );
 
   // ─── Rename (inline in sidebar) ──────────────────────────────────
@@ -145,69 +195,125 @@ export function NotesPage() {
     setSelectedNoteId(id);
   }, []);
 
-  // suppress unused warning — renamingId is passed to sidebar
+  // suppress unused warning
   void renamingId;
 
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* Sidebar */}
-      <NotesSidebar
-        selectedId={selectedNoteId}
-        expandedIds={expandedIds}
-        onSelect={handleSelect}
-        onToggleExpand={handleToggleExpand}
-        onCreateRoot={handleCreateRoot}
-        onCreateChild={handleCreateChild}
-        onTrash={handleTrash}
-        onTogglePin={handleTogglePin}
-        onRename={handleRename}
-        onShowTemplates={() => setShowTemplatePicker(true)}
-      />
+    <div
+      className="flex h-full overflow-hidden"
+      style={{ position: 'relative' }}
+    >
+      {/* Sidebar (hidden in zen mode) */}
+      {!zenMode && (
+        <NotesSidebar
+          selectedId={selectedNoteId}
+          expandedIds={expandedIds}
+          onSelect={handleSelect}
+          onToggleExpand={handleToggleExpand}
+          onCreateRoot={handleCreateRoot}
+          onCreateChild={handleCreateChild}
+          onTrash={handleTrash}
+          onTogglePin={handleTogglePin}
+          onRename={handleRename}
+          onShowTemplates={() => setShowTemplatePicker(true)}
+        />
+      )}
 
       {/* Main editor area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {selectedNote ? (
           <>
-            {/* Breadcrumb bar */}
-            <div
-              className="flex items-center px-8 py-2 shrink-0"
-              style={{
-                borderBottom: '1px solid var(--color-border)',
-                backgroundColor: 'var(--color-bg-primary)',
-              }}
-            >
-              <NoteBreadcrumb
-                ancestors={ancestors}
-                currentNote={selectedNote}
-                onNavigate={handleSelect}
-                onHome={handleHome}
-              />
-            </div>
+            {/* Breadcrumb bar (hidden in zen mode) */}
+            {!zenMode && (
+              <div
+                className="flex items-center px-8 py-2 shrink-0"
+                style={{
+                  borderBottom: '1px solid var(--color-border)',
+                  backgroundColor: 'var(--color-bg-primary)',
+                }}
+              >
+                <NoteBreadcrumb
+                  ancestors={ancestors}
+                  currentNote={selectedNote}
+                  onNavigate={handleSelect}
+                  onHome={handleHome}
+                />
+                {/* Right panel toggle */}
+                <button
+                  onClick={() => setRightPanelOpen((v) => !v)}
+                  className="ml-auto p-1 rounded transition-colors"
+                  title={rightPanelOpen ? 'Hide panel' : 'Show panel'}
+                  style={{ color: 'var(--color-text-muted)' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+                    e.currentTarget.style.color = 'var(--color-text-primary)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = 'var(--color-text-muted)';
+                  }}
+                >
+                  {rightPanelOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+                </button>
+              </div>
+            )}
 
-            {/* Scrollable content — seamless page feel */}
-            <div className="flex-1 overflow-y-auto">
-              {/* Page header */}
-              <NoteHeader
-                note={selectedNote}
-                childCount={children.length}
-                onTitleChange={handleTitleChange}
-                onIconChange={handleIconChange}
-                onCoverChange={handleCoverChange}
-              />
+            {/* 3-column layout: editor + right panel */}
+            <div className="flex flex-1 min-h-0 overflow-hidden">
+              {/* Editor column */}
+              <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                <div className="flex-1 overflow-y-auto">
+                  {/* Page header */}
+                  {!zenMode && (
+                    <NoteHeader
+                      note={selectedNote}
+                      childCount={children.length}
+                      onTitleChange={handleTitleChange}
+                      onIconChange={handleIconChange}
+                      onCoverChange={handleCoverChange}
+                    />
+                  )}
 
-              {/* Editor fills remaining space, no dividing border */}
-              <NoteEditor
-                content={selectedNote.content}
-                noteId={selectedNote.id}
-                onUpdate={handleEditorUpdate}
-                onNavigateToNote={handleSelect}
-              />
+                  {/* Editor */}
+                  <NoteEditor
+                    editor={editor}
+                    fileInputRef={fileInputRef}
+                    triggerFileInput={triggerFileInput}
+                    handleFileChange={handleFileChange}
+                    noteId={selectedNote.id}
+                    note={selectedNote}
+                    onNavigateToNote={handleSelect}
+                    zenMode={zenMode}
+                    onToggleZen={() => setZenMode((v) => !v)}
+                  />
 
-              {/* Backlinks panel */}
-              <BacklinksPanel
-                backlinks={backlinks}
-                onNavigate={handleSelect}
-              />
+                  {/* Backlinks panel */}
+                  {!zenMode && (
+                    <BacklinksPanel
+                      backlinks={backlinks}
+                      onNavigate={handleSelect}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Right panel */}
+              {!zenMode && rightPanelOpen && (
+                <div
+                  className="shrink-0 overflow-hidden flex flex-col"
+                  style={{
+                    width: 240,
+                    borderLeft: '1px solid var(--color-border)',
+                    transition: 'width 0.2s ease',
+                  }}
+                >
+                  <NoteRightPanel
+                    editor={editor}
+                    note={selectedNote}
+                    onNavigateToHeading={() => {}}
+                  />
+                </div>
+              )}
             </div>
           </>
         ) : (
@@ -250,7 +356,8 @@ function EmptyState({ onCreateRoot }: { onCreateRoot: () => void }) {
             className="text-sm max-w-xs mx-auto leading-relaxed"
             style={{ color: 'var(--color-text-muted)' }}
           >
-            Select a page from the sidebar to start reading or editing, or create a fresh page to get started.
+            Select a page from the sidebar to start reading or editing, or create a fresh page
+            to get started.
           </p>
         </div>
         <button

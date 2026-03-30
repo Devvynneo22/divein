@@ -12,6 +12,9 @@ import {
   Quote,
   Minus,
   AlertCircle,
+  Columns2,
+  Table,
+  StickyNote as StickyNoteIcon,
 } from 'lucide-react';
 
 interface SlashCommand {
@@ -93,7 +96,7 @@ const COMMANDS: SlashCommand[] = [
     label: 'Quote',
     description: 'Blockquote callout',
     icon: <Quote size={16} />,
-    keywords: ['quote', 'blockquote', 'callout'],
+    keywords: ['quote', 'blockquote'],
     action: (editor) => { editor.chain().focus().toggleBlockquote().run(); },
   },
   {
@@ -105,11 +108,142 @@ const COMMANDS: SlashCommand[] = [
     action: (editor) => { editor.chain().focus().setHorizontalRule().run(); },
   },
   {
+    id: 'divider-dots',
+    label: 'Ornamental Divider',
+    description: 'Decorative ⋆ ⋆ ⋆ divider',
+    icon: <span className="text-sm">⋆</span>,
+    keywords: ['divider', 'dots', 'ornamental', 'separator'],
+    action: (editor) => {
+      editor.chain().focus().insertContent({
+        type: 'paragraph',
+        attrs: { class: 'divider-ornamental' },
+        content: [{ type: 'text', text: '⋆ ⋆ ⋆' }],
+      }).run();
+    },
+  },
+  {
+    id: 'divider-wave',
+    label: 'Wave Divider',
+    description: 'Decorative 〰 divider',
+    icon: <span className="text-sm">〰</span>,
+    keywords: ['divider', 'wave', 'separator'],
+    action: (editor) => {
+      editor.chain().focus().insertContent({
+        type: 'paragraph',
+        attrs: { class: 'divider-ornamental' },
+        content: [{ type: 'text', text: '〰〰〰' }],
+      }).run();
+    },
+  },
+  // ── Callouts ──────────────────────────────────────────────────────────────
+  {
     id: 'callout',
     label: 'Callout',
+    description: 'Info callout block',
+    icon: <span className="text-sm">ℹ️</span>,
+    keywords: ['callout', 'info', 'note', 'alert', 'box'],
+    action: (editor) => { editor.chain().focus().insertCallout('info').run(); },
+  },
+  {
+    id: 'callout-info',
+    label: 'Info Callout',
+    description: 'Blue info callout',
+    icon: <span className="text-sm">ℹ️</span>,
+    keywords: ['info', 'callout'],
+    action: (editor) => { editor.chain().focus().insertCallout('info').run(); },
+  },
+  {
+    id: 'callout-warning',
+    label: 'Warning Callout',
+    description: 'Yellow warning callout',
+    icon: <span className="text-sm">⚠️</span>,
+    keywords: ['warning', 'callout', 'caution'],
+    action: (editor) => { editor.chain().focus().insertCallout('warning').run(); },
+  },
+  {
+    id: 'callout-success',
+    label: 'Success Callout',
+    description: 'Green success callout',
+    icon: <span className="text-sm">✅</span>,
+    keywords: ['success', 'callout', 'ok', 'done'],
+    action: (editor) => { editor.chain().focus().insertCallout('success').run(); },
+  },
+  {
+    id: 'callout-danger',
+    label: 'Danger Callout',
+    description: 'Red danger callout',
+    icon: <span className="text-sm">🚨</span>,
+    keywords: ['danger', 'callout', 'error', 'alert'],
+    action: (editor) => { editor.chain().focus().insertCallout('danger').run(); },
+  },
+  {
+    id: 'callout-note',
+    label: 'Note Callout',
+    description: 'Neutral note callout',
+    icon: <span className="text-sm">📝</span>,
+    keywords: ['note', 'callout', 'neutral'],
+    action: (editor) => { editor.chain().focus().insertCallout('note').run(); },
+  },
+  // ── Columns ───────────────────────────────────────────────────────────────
+  {
+    id: 'columns',
+    label: '2 Columns',
+    description: 'Two-column layout',
+    icon: <Columns2 size={16} />,
+    keywords: ['columns', '2col', 'layout', 'grid', 'column'],
+    action: (editor) => { editor.chain().focus().insertColumns().run(); },
+  },
+  // ── Table ─────────────────────────────────────────────────────────────────
+  {
+    id: 'table',
+    label: 'Table',
+    description: 'Insert a 3×3 table with headers',
+    icon: <Table size={16} />,
+    keywords: ['table', 'grid', 'spreadsheet'],
+    action: (editor) => {
+      editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+    },
+  },
+  // ── Sticky notes ──────────────────────────────────────────────────────────
+  {
+    id: 'sticky',
+    label: 'Sticky Note',
+    description: 'Yellow sticky note block',
+    icon: <StickyNoteIcon size={16} />,
+    keywords: ['sticky', 'note', 'post-it', 'yellow'],
+    action: (editor) => { editor.chain().focus().insertStickyNote('yellow').run(); },
+  },
+  {
+    id: 'sticky-pink',
+    label: 'Pink Sticky Note',
+    description: 'Pink sticky note block',
+    icon: <span className="text-sm">🌸</span>,
+    keywords: ['sticky', 'pink', 'note'],
+    action: (editor) => { editor.chain().focus().insertStickyNote('pink').run(); },
+  },
+  {
+    id: 'sticky-blue',
+    label: 'Blue Sticky Note',
+    description: 'Blue sticky note block',
+    icon: <span className="text-sm">💙</span>,
+    keywords: ['sticky', 'blue', 'note'],
+    action: (editor) => { editor.chain().focus().insertStickyNote('blue').run(); },
+  },
+  {
+    id: 'sticky-green',
+    label: 'Green Sticky Note',
+    description: 'Green sticky note block',
+    icon: <span className="text-sm">💚</span>,
+    keywords: ['sticky', 'green', 'note'],
+    action: (editor) => { editor.chain().focus().insertStickyNote('green').run(); },
+  },
+  // ── Old callout as blockquote (keep backward compat) ──────────────────────
+  {
+    id: 'alert',
+    label: 'Alert',
     description: 'Styled info/note box',
     icon: <AlertCircle size={16} />,
-    keywords: ['callout', 'info', 'note', 'warning', 'alert', 'box'],
+    keywords: ['alert', 'blockquote', 'info'],
     action: (editor) => { editor.chain().focus().toggleBlockquote().run(); },
   },
 ];
@@ -151,7 +285,7 @@ export function SlashCommandMenu({
       cmd.action(editor, triggerFileInput);
       onClose();
     },
-    [editor, query, onClose, triggerFileInput]
+    [editor, query, onClose, triggerFileInput],
   );
 
   useEffect(() => {
@@ -211,14 +345,25 @@ export function SlashCommandMenu({
             onMouseEnter={() => setSelectedIndex(idx)}
             className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors"
             style={{
-              backgroundColor: idx === selectedIndex ? 'var(--color-accent-soft)' : 'transparent',
-              color: idx === selectedIndex ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+              backgroundColor:
+                idx === selectedIndex ? 'var(--color-accent-soft)' : 'transparent',
+              color:
+                idx === selectedIndex
+                  ? 'var(--color-text-primary)'
+                  : 'var(--color-text-secondary)',
             }}
           >
-            <span className="shrink-0" style={{ color: 'var(--color-text-muted)' }}>{cmd.icon}</span>
+            <span className="shrink-0" style={{ color: 'var(--color-text-muted)' }}>
+              {cmd.icon}
+            </span>
             <div className="min-w-0">
               <div className="text-sm font-medium leading-tight">{cmd.label}</div>
-              <div className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>{cmd.description}</div>
+              <div
+                className="text-xs truncate"
+                style={{ color: 'var(--color-text-muted)' }}
+              >
+                {cmd.description}
+              </div>
             </div>
           </button>
         ))}

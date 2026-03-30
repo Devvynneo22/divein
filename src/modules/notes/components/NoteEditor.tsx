@@ -1,25 +1,4 @@
-import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import Placeholder from '@tiptap/extension-placeholder';
-import Link from '@tiptap/extension-link';
-import Underline from '@tiptap/extension-underline';
-import Highlight from '@tiptap/extension-highlight';
-import { TextStyle } from '@tiptap/extension-text-style';
-import { Color } from '@tiptap/extension-color';
-import Image from '@tiptap/extension-image';
-import TaskList from '@tiptap/extension-task-list';
-import TaskItem from '@tiptap/extension-task-item';
-import Dropcursor from '@tiptap/extension-dropcursor';
-import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
-import { createLowlight } from 'lowlight';
-import javascript from 'highlight.js/lib/languages/javascript';
-import typescript from 'highlight.js/lib/languages/typescript';
-import python from 'highlight.js/lib/languages/python';
-import css from 'highlight.js/lib/languages/css';
-import xml from 'highlight.js/lib/languages/xml';
-import json from 'highlight.js/lib/languages/json';
-import sql from 'highlight.js/lib/languages/sql';
-import bash from 'highlight.js/lib/languages/bash';
+import { EditorContent } from '@tiptap/react';
 import { useEffect, useRef, useCallback, useState } from 'react';
 import {
   Bold,
@@ -41,28 +20,23 @@ import {
   CheckSquare,
   Code2,
   Brain,
+  Search,
+  Columns2,
+  Table as TableIcon,
+  StickyNote as StickyNoteIcon,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Maximize2,
+  Trash2,
 } from 'lucide-react';
 import { SlashCommandMenu } from './SlashCommandMenu';
 import { EditorBubbleMenu } from './EditorBubbleMenu';
 import { EmojiPicker } from './EmojiPicker';
 import { WikiLinkSuggestion } from './WikiLinkSuggestion';
 import { CreateFlashcardModal } from './CreateFlashcardModal';
-import { WikiLink } from '../extensions/WikiLink';
-import { noteService } from '@/shared/lib/noteService';
+import { FindReplaceBar } from './FindReplaceBar';
 import type { Note } from '@/shared/types/note';
-
-// ─── Lowlight setup ──────────────────────────────────────────────────────────
-
-const lowlight = createLowlight();
-lowlight.register('javascript', javascript);
-lowlight.register('typescript', typescript);
-lowlight.register('python', python);
-lowlight.register('css', css);
-lowlight.register('html', xml);
-lowlight.register('xml', xml);
-lowlight.register('json', json);
-lowlight.register('sql', sql);
-lowlight.register('bash', bash);
 
 // ─── Text color palette ──────────────────────────────────────────────────────
 
@@ -78,13 +52,30 @@ const TEXT_COLORS = [
   { color: '#ec4899', label: 'Pink' },
 ];
 
+const CODE_LANGUAGES = [
+  'plaintext',
+  'javascript',
+  'typescript',
+  'python',
+  'css',
+  'html',
+  'sql',
+  'bash',
+  'json',
+];
+
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 interface NoteEditorProps {
-  content: string | null;
+  editor: ReturnType<typeof import('@tiptap/react').useEditor>;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  triggerFileInput: () => void;
+  handleFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   noteId?: string;
-  onUpdate: (content: string, textContent: string, wordCount: number) => void;
+  note?: Note;
   onNavigateToNote?: (noteId: string) => void;
+  zenMode?: boolean;
+  onToggleZen?: () => void;
 }
 
 // ─── Slash command state ─────────────────────────────────────────────────────
@@ -95,8 +86,6 @@ interface SlashMenuState {
   position: { top: number; left: number };
 }
 
-// ─── Wiki-link menu state ────────────────────────────────────────────────────
-
 interface WikiLinkMenuState {
   open: boolean;
   query: string;
@@ -105,10 +94,19 @@ interface WikiLinkMenuState {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: NoteEditorProps) {
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+export function NoteEditor({
+  editor,
+  fileInputRef,
+  triggerFileInput,
+  handleFileChange,
+  noteId,
+  onNavigateToNote,
+  zenMode = false,
+  onToggleZen,
+}: NoteEditorProps) {
   const editorWrapRef = useRef<HTMLDivElement>(null);
+  const colorPickerRef = useRef<HTMLDivElement>(null);
+
   const [flashcardModal, setFlashcardModal] = useState<{ open: boolean; text: string }>({
     open: false,
     text: '',
@@ -127,9 +125,17 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
   const [wikiLinkNotes, setWikiLinkNotes] = useState<Note[]>([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
-  const colorPickerRef = useRef<HTMLDivElement>(null);
+  const [showFindReplace, setShowFindReplace] = useState(false);
+  const [showReplaceField, setShowReplaceField] = useState(false);
 
-  // Close color picker on outside click
+  // Word count & last saved
+  const [wordCount, setWordCount] = useState(0);
+  const [readingTime, setReadingTime] = useState(1);
+  const [lastSavedText, setLastSavedText] = useState<string>('');
+  const lastSavedRef = useRef<Date | null>(null);
+
+  // ─── Close color picker on outside click ──────────────────────────────────
+
   useEffect(() => {
     if (!showColorPicker) return;
     function handler(e: MouseEvent) {
@@ -141,143 +147,8 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
     return () => document.removeEventListener('mousedown', handler);
   }, [showColorPicker]);
 
-  // ─── Insert image from file ─────────────────────────────────────────────
+  // ─── Selection tracking ───────────────────────────────────────────────────
 
-  const triggerFileInput = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
-
-  const handleFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file || !file.type.startsWith('image/')) return;
-      if (!editorInstance.current) return; // guard against null editor
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const src = ev.target?.result as string;
-        if (src) {
-          editorInstance.current?.chain().focus().setImage({ src }).run();
-        }
-      };
-      reader.readAsDataURL(file);
-      // Reset so same file can be picked again
-      e.target.value = '';
-    },
-    []
-  );
-
-  // We need a stable ref to the editor for use in callbacks
-  const editorInstance = useRef<ReturnType<typeof useEditor>>(null);
-
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: { levels: [1, 2, 3] },
-        // disable built-in code block since we use lowlight
-        codeBlock: false,
-      }),
-      Placeholder.configure({
-        placeholder: "Press '/' for commands or start typing...",
-      }),
-      Link.configure({
-        openOnClick: true,
-        autolink: true,
-      }),
-      Underline,
-      Highlight.configure({ multicolor: true }),
-      TextStyle,
-      Color,
-      Image.configure({
-        inline: false,
-        allowBase64: true,
-      }),
-      TaskList,
-      TaskItem.configure({ nested: true }),
-      Dropcursor,
-      CodeBlockLowlight.configure({ lowlight }),
-      WikiLink,
-    ],
-    content: content ? (() => { try { return JSON.parse(content) as object; } catch (e) { console.warn('NoteEditor: failed to parse initial content JSON', e); return undefined; } })() : undefined,
-    editorProps: {
-      attributes: {
-        class:
-          'prose prose-invert prose-base max-w-none focus:outline-none px-1 leading-relaxed',
-        style: 'min-height: calc(100vh - 200px); line-height: 1.75;',
-      },
-      handleClick(view, _pos, event) {
-        const target = event.target as HTMLElement;
-        const wikiLink = target.closest('[data-wiki-link]');
-        if (wikiLink) {
-          const noteId = wikiLink.getAttribute('data-note-id');
-          if (noteId && onNavigateToNote) {
-            onNavigateToNote(noteId);
-          }
-          return true;
-        }
-        return false;
-      },
-      handleDrop(view, event) {
-        const files = event.dataTransfer?.files;
-        if (!files || files.length === 0) return false;
-        const imageFile = Array.from(files).find((f) => f.type.startsWith('image/'));
-        if (!imageFile) return false;
-
-        event.preventDefault();
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          const src = ev.target?.result as string;
-          if (src) {
-            const { schema } = view.state;
-            const node = schema.nodes.image.create({ src });
-            const transaction = view.state.tr.replaceSelectionWith(node);
-            view.dispatch(transaction);
-          }
-        };
-        reader.readAsDataURL(imageFile);
-        return true;
-      },
-      handlePaste(view, event) {
-        const items = event.clipboardData?.items;
-        if (!items) return false;
-        for (const item of Array.from(items)) {
-          if (item.type.startsWith('image/')) {
-            event.preventDefault();
-            const file = item.getAsFile();
-            if (!file) continue;
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-              const src = ev.target?.result as string;
-              if (src) {
-                const { schema } = view.state;
-                const node = schema.nodes.image.create({ src });
-                const transaction = view.state.tr.replaceSelectionWith(node);
-                view.dispatch(transaction);
-              }
-            };
-            reader.readAsDataURL(file);
-            return true;
-          }
-        }
-        return false;
-      },
-    },
-    onUpdate: ({ editor: ed }) => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        const json = JSON.stringify(ed.getJSON());
-        const text = ed.getText();
-        const wordCount = text.split(/\s+/).filter(Boolean).length;
-        onUpdate(json, text, wordCount);
-      }, 500);
-    },
-  });
-
-  // Keep the stable ref in sync
-  useEffect(() => {
-    editorInstance.current = editor;
-  }, [editor]);
-
-  // Track text selection state for toolbar flashcard button
   useEffect(() => {
     if (!editor) return;
     const updateSelection = () => {
@@ -290,22 +161,43 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
     };
   }, [editor]);
 
-  // Sync content when note changes
+  // ─── Word count tracking ──────────────────────────────────────────────────
+
   useEffect(() => {
-    if (editor && content && content !== '') {
-      const currentContent = JSON.stringify(editor.getJSON());
-      if (currentContent !== content) {
-        try {
-          editor.commands.setContent(JSON.parse(content) as object);
-        } catch (e) {
-          console.warn('NoteEditor: failed to parse content JSON on sync', e);
-          editor.commands.clearContent();
-        }
+    if (!editor) return;
+    const updateCounts = () => {
+      const text = editor.getText();
+      const wc = text.split(/\s+/).filter(Boolean).length;
+      setWordCount(wc);
+      setReadingTime(Math.max(1, Math.round(wc / 200)));
+      lastSavedRef.current = new Date();
+      setLastSavedText(formatTime(new Date()));
+    };
+    editor.on('update', updateCounts);
+    // Initialize
+    updateCounts();
+    return () => {
+      editor.off('update', updateCounts);
+    };
+  }, [editor]);
+
+  // ─── Ctrl+F / Ctrl+H keyboard shortcut ───────────────────────────────────
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        setShowFindReplace(true);
+        setShowReplaceField(false);
+      } else if (e.ctrlKey && e.key === 'h') {
+        e.preventDefault();
+        setShowFindReplace(true);
+        setShowReplaceField(true);
       }
-    } else if (editor && (!content || content === '')) {
-      editor.commands.clearContent();
-    }
-  }, [content, editor]);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   // ─── Slash command & wiki-link detection via keydown ─────────────────────
 
@@ -316,7 +208,6 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
       if (!editor) return;
 
       if (slashMenu.open || wikiLinkMenu.open) {
-        // Navigation handled inside respective menus via window listener
         lastKeyRef.current = e.key;
         return;
       }
@@ -328,9 +219,10 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
           const range = selection.getRangeAt(0);
           const rect = range.getBoundingClientRect();
           if (rect) {
-            // Load notes for the suggestion list
-            noteService.list({ isTrashed: false }).then((allNotes) => {
-              setWikiLinkNotes(allNotes);
+            import('@/shared/lib/noteService').then(({ noteService }) => {
+              noteService.list({ isTrashed: false }).then((allNotes) => {
+                setWikiLinkNotes(allNotes);
+              });
             });
             setWikiLinkMenu({
               open: true,
@@ -349,13 +241,11 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
       lastKeyRef.current = e.key;
 
       if (e.key === '/') {
-        // Determine caret position for menu
         const selection = window.getSelection();
         if (selection && selection.rangeCount > 0) {
           const range = selection.getRangeAt(0);
           const rect = range.getBoundingClientRect();
-          const wrapRect = editorWrapRef.current?.getBoundingClientRect();
-          if (rect && wrapRect) {
+          if (rect) {
             setSlashMenu({
               open: true,
               query: '',
@@ -368,34 +258,28 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
         }
       }
     },
-    [editor, slashMenu.open, wikiLinkMenu.open]
+    [editor, slashMenu.open, wikiLinkMenu.open],
   );
 
-  // Track typed query after '/' and close menu on backspace past '/'
+  // Track slash query
   useEffect(() => {
     if (!editor || !slashMenu.open) return;
-
     const update = () => {
       const { from, $from } = editor.state.selection;
       const lineStart = $from.start();
       const textBeforeCursor = editor.state.doc.textBetween(lineStart, from);
       const slashIdx = textBeforeCursor.lastIndexOf('/');
-
       if (slashIdx === -1) {
         setSlashMenu((prev) => ({ ...prev, open: false }));
         return;
       }
-
       const query = textBeforeCursor.slice(slashIdx + 1);
-      // If there's a space in the query, close the menu
       if (query.includes(' ')) {
         setSlashMenu((prev) => ({ ...prev, open: false }));
         return;
       }
-
       setSlashMenu((prev) => ({ ...prev, query }));
     };
-
     editor.on('update', update);
     editor.on('selectionUpdate', update);
     return () => {
@@ -404,31 +288,25 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
     };
   }, [editor, slashMenu.open]);
 
-  // Track typed query after '[[' and close menu on backspace past '[['
+  // Track wiki-link query
   useEffect(() => {
     if (!editor || !wikiLinkMenu.open) return;
-
     const update = () => {
       const { from, $from } = editor.state.selection;
       const lineStart = $from.start();
       const textBeforeCursor = editor.state.doc.textBetween(lineStart, from);
       const triggerIdx = textBeforeCursor.lastIndexOf('[[');
-
       if (triggerIdx === -1) {
         setWikiLinkMenu((prev) => ({ ...prev, open: false }));
         return;
       }
-
       const query = textBeforeCursor.slice(triggerIdx + 2);
-      // If there's a newline or ]] in the query, close the menu
       if (query.includes('\n') || query.includes(']]')) {
         setWikiLinkMenu((prev) => ({ ...prev, open: false }));
         return;
       }
-
       setWikiLinkMenu((prev) => ({ ...prev, query }));
     };
-
     editor.on('update', update);
     editor.on('selectionUpdate', update);
     return () => {
@@ -455,225 +333,353 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
 
   if (!editor) return null;
 
+  // Context checks
+  const isInCodeBlock = editor.isActive('codeBlock');
+  const isInTable = editor.isActive('table');
+  const isImageSelected = editor.isActive('image');
+
   return (
     <div className="flex flex-col h-full relative">
-      {/* ─── Toolbar ─────────────────────────────────────────────────── */}
-      <div
-        className="flex items-center gap-0.5 px-3 py-1.5 flex-wrap shrink-0"
-        style={{
-          borderBottom: '1px solid var(--color-border)',
-          backgroundColor: 'var(--color-bg-primary)',
-        }}
-      >
-        {/* Undo / Redo */}
-        <ToolbarButton
-          onClick={() => editor.chain().focus().undo().run()}
-          active={false}
-          icon={<Undo size={14} />}
-          title="Undo (Ctrl+Z)"
-        />
-        <ToolbarButton
-          onClick={() => editor.chain().focus().redo().run()}
-          active={false}
-          icon={<Redo size={14} />}
-          title="Redo (Ctrl+Shift+Z)"
-        />
+      {/* ─── Styles injected ─────────────────────────────────────────── */}
+      <style>{EDITOR_STYLES}</style>
 
-        <Divider />
+      {/* ─── Toolbar (hidden in zen mode) ────────────────────────────── */}
+      {!zenMode && (
+        <div
+          className="flex items-center gap-0.5 px-3 py-1.5 flex-wrap shrink-0"
+          style={{
+            borderBottom: '1px solid var(--color-border)',
+            backgroundColor: 'var(--color-bg-primary)',
+            minHeight: 40,
+          }}
+        >
+          {/* History group */}
+          <ToolbarButton
+            onClick={() => editor.chain().focus().undo().run()}
+            active={false}
+            icon={<Undo size={14} />}
+            title="Undo (Ctrl+Z)"
+          />
+          <ToolbarButton
+            onClick={() => editor.chain().focus().redo().run()}
+            active={false}
+            icon={<Redo size={14} />}
+            title="Redo (Ctrl+Shift+Z)"
+          />
 
-        {/* Text formatting */}
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          active={editor.isActive('bold')}
-          icon={<Bold size={14} />}
-          title="Bold (Ctrl+B)"
-        />
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          active={editor.isActive('italic')}
-          icon={<Italic size={14} />}
-          title="Italic (Ctrl+I)"
-        />
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
-          active={editor.isActive('underline')}
-          icon={<UnderlineIcon size={14} />}
-          title="Underline (Ctrl+U)"
-        />
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleStrike().run()}
-          active={editor.isActive('strike')}
-          icon={<Strikethrough size={14} />}
-          title="Strikethrough"
-        />
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleHighlight({ color: '#fef08a' }).run()}
-          active={editor.isActive('highlight')}
-          icon={<Highlighter size={14} />}
-          title="Highlight"
-        />
+          <Divider />
 
-        {/* Text color picker */}
-        <div className="relative" ref={colorPickerRef}>
-          <button
-            onClick={() => setShowColorPicker((v) => !v)}
-            title="Text color"
-            className="p-1.5 rounded transition-colors flex items-center gap-0.5"
-            style={{ color: 'var(--color-text-muted)' }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = 'var(--color-text-primary)';
-              e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = 'var(--color-text-muted)';
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            <span className="text-xs font-bold" style={{ color: editor.getAttributes('textStyle').color as string | undefined ?? 'inherit' }}>
-              A
-            </span>
-            <span className="text-[10px] leading-none">▾</span>
-          </button>
-          {showColorPicker && (
-            <div
-              className="absolute top-full left-0 mt-1 z-50 p-2 rounded-xl flex gap-1 flex-wrap"
-              style={{
-                width: 120,
-                backgroundColor: 'var(--color-bg-elevated)',
-                border: '1px solid var(--color-border)',
-                boxShadow: 'var(--shadow-popup)',
+          {/* Formatting group */}
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleBold().run()}
+            active={editor.isActive('bold')}
+            icon={<Bold size={14} />}
+            title="Bold (Ctrl+B)"
+          />
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleItalic().run()}
+            active={editor.isActive('italic')}
+            icon={<Italic size={14} />}
+            title="Italic (Ctrl+I)"
+          />
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleUnderline().run()}
+            active={editor.isActive('underline')}
+            icon={<UnderlineIcon size={14} />}
+            title="Underline (Ctrl+U)"
+          />
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleStrike().run()}
+            active={editor.isActive('strike')}
+            icon={<Strikethrough size={14} />}
+            title="Strikethrough"
+          />
+          <ToolbarButton
+            onClick={() =>
+              editor.chain().focus().toggleHighlight({ color: '#fef08a' }).run()
+            }
+            active={editor.isActive('highlight')}
+            icon={<Highlighter size={14} />}
+            title="Highlight"
+          />
+
+          {/* Text color picker */}
+          <div className="relative" ref={colorPickerRef}>
+            <button
+              onClick={() => setShowColorPicker((v) => !v)}
+              title="Text color"
+              className="p-1.5 rounded transition-colors flex items-center gap-0.5"
+              style={{ color: 'var(--color-text-muted)' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = 'var(--color-text-primary)';
+                e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'var(--color-text-muted)';
+                e.currentTarget.style.backgroundColor = 'transparent';
               }}
             >
-              {TEXT_COLORS.map(({ color, label }) => (
+              <span
+                className="text-xs font-bold"
+                style={{
+                  color:
+                    (editor.getAttributes('textStyle').color as string | undefined) ??
+                    'inherit',
+                }}
+              >
+                A
+              </span>
+              <span className="text-[10px] leading-none">▾</span>
+            </button>
+            {showColorPicker && (
+              <div
+                className="absolute top-full left-0 mt-1 z-50 p-2 rounded-xl flex gap-1 flex-wrap"
+                style={{
+                  width: 120,
+                  backgroundColor: 'var(--color-bg-elevated)',
+                  border: '1px solid var(--color-border)',
+                  boxShadow: 'var(--shadow-popup)',
+                }}
+              >
+                {TEXT_COLORS.map(({ color, label }) => (
+                  <button
+                    key={color}
+                    title={label}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      editor.chain().focus().setColor(color).run();
+                      setShowColorPicker(false);
+                    }}
+                    className="w-5 h-5 rounded border border-black/20 hover:scale-110 transition-transform"
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
                 <button
-                  key={color}
-                  title={label}
                   onMouseDown={(e) => {
                     e.preventDefault();
-                    editor.chain().focus().setColor(color).run();
+                    editor.chain().focus().unsetColor().run();
                     setShowColorPicker(false);
                   }}
-                  className="w-5 h-5 rounded border border-black/20 hover:scale-110 transition-transform"
-                  style={{ backgroundColor: color }}
-                />
-              ))}
-              <button
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  editor.chain().focus().unsetColor().run();
-                  setShowColorPicker(false);
-                }}
-                className="w-full text-xs mt-1 transition-colors"
-                style={{ color: 'var(--color-text-muted)' }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
-              >
-                Reset
-              </button>
-            </div>
-          )}
-        </div>
+                  className="w-full text-xs mt-1 transition-colors"
+                  style={{ color: 'var(--color-text-muted)' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = 'var(--color-text-primary)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = 'var(--color-text-muted)';
+                  }}
+                >
+                  Reset
+                </button>
+              </div>
+            )}
+          </div>
 
-        <Divider />
+          <Divider />
 
-        {/* Headings */}
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-          active={editor.isActive('heading', { level: 1 })}
-          icon={<Heading1 size={14} />}
-          title="Heading 1"
-        />
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          active={editor.isActive('heading', { level: 2 })}
-          icon={<Heading2 size={14} />}
-          title="Heading 2"
-        />
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-          active={editor.isActive('heading', { level: 3 })}
-          icon={<Heading3 size={14} />}
-          title="Heading 3"
-        />
-
-        <Divider />
-
-        {/* Lists */}
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-          active={editor.isActive('bulletList')}
-          icon={<List size={14} />}
-          title="Bullet List"
-        />
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          active={editor.isActive('orderedList')}
-          icon={<ListOrdered size={14} />}
-          title="Ordered List"
-        />
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleTaskList().run()}
-          active={editor.isActive('taskList')}
-          icon={<CheckSquare size={14} />}
-          title="Task List"
-        />
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          active={editor.isActive('blockquote')}
-          icon={<Quote size={14} />}
-          title="Blockquote"
-        />
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-          active={editor.isActive('codeBlock')}
-          icon={<Code2 size={14} />}
-          title="Code Block"
-        />
-        <ToolbarButton
-          onClick={() => editor.chain().focus().setHorizontalRule().run()}
-          active={false}
-          icon={<Minus size={14} />}
-          title="Divider"
-        />
-
-        <Divider />
-
-        {/* Image */}
-        <ToolbarButton
-          onClick={triggerFileInput}
-          active={false}
-          icon={<ImageIcon size={14} />}
-          title="Insert image"
-        />
-
-        {/* Emoji */}
-        <div className="relative">
+          {/* Headings */}
           <ToolbarButton
-            onClick={() => setShowEmojiPicker((v) => !v)}
-            active={showEmojiPicker}
-            icon={<SmilePlus size={14} />}
-            title="Insert emoji"
+            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+            active={editor.isActive('heading', { level: 1 })}
+            icon={<Heading1 size={14} />}
+            title="Heading 1"
           />
-          {showEmojiPicker && (
-            <EmojiPicker
-              onSelect={(emoji) => {
-                editor.chain().focus().insertContent(emoji).run();
-              }}
-              onClose={() => setShowEmojiPicker(false)}
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+            active={editor.isActive('heading', { level: 2 })}
+            icon={<Heading2 size={14} />}
+            title="Heading 2"
+          />
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+            active={editor.isActive('heading', { level: 3 })}
+            icon={<Heading3 size={14} />}
+            title="Heading 3"
+          />
+
+          <Divider />
+
+          {/* Block types */}
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleBulletList().run()}
+            active={editor.isActive('bulletList')}
+            icon={<List size={14} />}
+            title="Bullet List"
+          />
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleOrderedList().run()}
+            active={editor.isActive('orderedList')}
+            icon={<ListOrdered size={14} />}
+            title="Ordered List"
+          />
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleTaskList().run()}
+            active={editor.isActive('taskList')}
+            icon={<CheckSquare size={14} />}
+            title="Task List"
+          />
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleBlockquote().run()}
+            active={editor.isActive('blockquote')}
+            icon={<Quote size={14} />}
+            title="Blockquote"
+          />
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+            active={editor.isActive('codeBlock')}
+            icon={<Code2 size={14} />}
+            title="Code Block"
+          />
+          <ToolbarButton
+            onClick={() => editor.chain().focus().setHorizontalRule().run()}
+            active={false}
+            icon={<Minus size={14} />}
+            title="Divider"
+          />
+
+          <Divider />
+
+          {/* Insert group */}
+          <ToolbarButton
+            onClick={triggerFileInput}
+            active={false}
+            icon={<ImageIcon size={14} />}
+            title="Insert image"
+          />
+
+          <div className="relative">
+            <ToolbarButton
+              onClick={() => setShowEmojiPicker((v) => !v)}
+              active={showEmojiPicker}
+              icon={<SmilePlus size={14} />}
+              title="Insert emoji"
             />
+            {showEmojiPicker && (
+              <EmojiPicker
+                onSelect={(emoji) => {
+                  editor.chain().focus().insertContent(emoji).run();
+                }}
+                onClose={() => setShowEmojiPicker(false)}
+              />
+            )}
+          </div>
+
+          <ToolbarButton
+            onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+            active={editor.isActive('table')}
+            icon={<TableIcon size={14} />}
+            title="Insert table"
+          />
+
+          <ToolbarButton
+            onClick={() => editor.chain().focus().insertColumns().run()}
+            active={false}
+            icon={<Columns2 size={14} />}
+            title="Two columns"
+          />
+
+          <ToolbarButton
+            onClick={() => editor.chain().focus().insertCallout('info').run()}
+            active={false}
+            icon={<span className="text-xs">ℹ️</span>}
+            title="Insert callout"
+          />
+
+          <ToolbarButton
+            onClick={() => editor.chain().focus().insertStickyNote('yellow').run()}
+            active={false}
+            icon={<StickyNoteIcon size={14} />}
+            title="Insert sticky note"
+          />
+
+          <Divider />
+
+          {/* Tools group */}
+          <ToolbarButton
+            onClick={() => {
+              setShowFindReplace((v) => !v);
+              setShowReplaceField(false);
+            }}
+            active={showFindReplace}
+            icon={<Search size={14} />}
+            title="Find & Replace (Ctrl+F)"
+          />
+
+          <ToolbarButton
+            onClick={() => handleCreateFlashcard()}
+            active={false}
+            icon={<Brain size={14} />}
+            title={
+              hasSelection
+                ? 'Create Flashcard from Selection'
+                : 'Select text first to create a flashcard'
+            }
+          />
+
+          <ToolbarButton
+            onClick={() => onToggleZen?.()}
+            active={zenMode}
+            icon={<Maximize2 size={14} />}
+            title="Zen mode (Ctrl+Shift+F)"
+          />
+
+          {/* Context-sensitive: Code block language selector */}
+          {isInCodeBlock && (
+            <>
+              <Divider />
+              <select
+                value={(editor.getAttributes('codeBlock').language as string) ?? 'plaintext'}
+                onChange={(e) => {
+                  editor
+                    .chain()
+                    .focus()
+                    .updateAttributes('codeBlock', { language: e.target.value })
+                    .run();
+                }}
+                className="text-xs rounded px-1.5 py-1 ml-1"
+                style={{
+                  backgroundColor: 'var(--color-bg-tertiary)',
+                  border: '1px solid var(--color-border)',
+                  color: 'var(--color-text-secondary)',
+                  outline: 'none',
+                }}
+                title="Code language"
+              >
+                {CODE_LANGUAGES.map((lang) => (
+                  <option key={lang} value={lang}>
+                    {lang}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
+
+          {/* Context-sensitive: Table controls */}
+          {isInTable && (
+            <>
+              <Divider />
+              <TableControls editor={editor} />
+            </>
+          )}
+
+          {/* Context-sensitive: Image alignment */}
+          {isImageSelected && (
+            <>
+              <Divider />
+              <ImageAlignControls editor={editor} />
+            </>
           )}
         </div>
+      )}
 
-        <Divider />
-
-        {/* Create Flashcard from selection */}
-        <ToolbarButton
-          onClick={() => handleCreateFlashcard()}
-          active={false}
-          icon={<Brain size={14} />}
-          title={hasSelection ? 'Create Flashcard from Selection' : 'Select text first to create a flashcard'}
+      {/* ─── Find & Replace bar ───────────────────────────────────────── */}
+      {showFindReplace && (
+        <FindReplaceBar
+          editor={editor}
+          onClose={() => setShowFindReplace(false)}
+          showReplace={showReplaceField}
         />
-      </div>
+      )}
 
       {/* Hidden file input */}
       <input
@@ -684,19 +690,56 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
         onChange={handleFileChange}
       />
 
+      {/* ─── Image alignment floating toolbar (shown when image active) ─ */}
+      {isImageSelected && (
+        <ImageFloatingToolbar editor={editor} />
+      )}
+
       {/* ─── Editor area ─────────────────────────────────────────────── */}
       <div
         ref={editorWrapRef}
-        className="flex-1 overflow-y-auto px-8 py-8"
+        className="flex-1 overflow-y-auto"
+        style={{
+          paddingLeft: zenMode ? undefined : undefined,
+          paddingRight: zenMode ? undefined : undefined,
+        }}
         onKeyDown={handleKeyDown}
       >
-        <div className="max-w-3xl mx-auto">
+        <div
+          className="mx-auto py-8"
+          style={{
+            maxWidth: zenMode ? 680 : 768,
+            paddingLeft: zenMode ? 32 : 32,
+            paddingRight: zenMode ? 32 : 32,
+          }}
+        >
           {/* Bubble menu */}
           <EditorBubbleMenu editor={editor} onCreateFlashcard={handleCreateFlashcard} />
 
           {/* Content */}
           <EditorContent editor={editor} />
         </div>
+      </div>
+
+      {/* ─── Status bar (word count) ──────────────────────────────────── */}
+      <div
+        className="shrink-0 px-4 py-1 flex items-center gap-2"
+        style={{
+          borderTop: '1px solid var(--color-border)',
+          color: 'var(--color-text-muted)',
+          backgroundColor: 'var(--color-bg-primary)',
+          fontSize: 11,
+        }}
+      >
+        <span>{wordCount} words</span>
+        <span style={{ color: 'var(--color-border)' }}>·</span>
+        <span>~{readingTime} min read</span>
+        {lastSavedText && (
+          <>
+            <span style={{ color: 'var(--color-border)' }}>·</span>
+            <span>Saved {lastSavedText}</span>
+          </>
+        )}
       </div>
 
       {/* ─── Slash command menu ───────────────────────────────────────── */}
@@ -729,6 +772,153 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
           onClose={() => setFlashcardModal({ open: false, text: '' })}
         />
       )}
+
+      {/* ─── Zen mode exit button ────────────────────────────────────── */}
+      {zenMode && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50">
+          <button
+            onClick={() => onToggleZen?.()}
+            className="px-4 py-2 rounded-full text-sm font-medium transition-opacity hover:opacity-90"
+            style={{
+              backgroundColor: 'var(--color-bg-elevated)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-secondary)',
+              boxShadow: 'var(--shadow-popup)',
+            }}
+          >
+            Exit Zen Mode (Esc)
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Image floating toolbar ───────────────────────────────────────────────────
+
+function ImageFloatingToolbar({ editor }: { editor: NonNullable<ReturnType<typeof import('@tiptap/react').useEditor>> }) {
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    const { view } = editor;
+    const { from } = editor.state.selection;
+    const coords = view.coordsAtPos(from);
+    setPos({ top: coords.top - 50, left: coords.left });
+  }, [editor]);
+
+  if (!pos) return null;
+
+  const currentAlign = (editor.getAttributes('image').align as string) ?? 'center';
+
+  return (
+    <div
+      className="fixed z-50 flex items-center gap-1 px-2 py-1.5 rounded-lg"
+      style={{
+        top: pos.top,
+        left: pos.left,
+        backgroundColor: 'var(--color-bg-elevated)',
+        border: '1px solid var(--color-border)',
+        boxShadow: 'var(--shadow-popup)',
+      }}
+    >
+      {(
+        [
+          { align: 'left', label: '← Left', icon: <AlignLeft size={12} /> },
+          { align: 'center', label: '↔ Center', icon: <AlignCenter size={12} /> },
+          { align: 'right', label: '→ Right', icon: <AlignRight size={12} /> },
+        ] as const
+      ).map(({ align, label, icon }) => (
+        <button
+          key={align}
+          title={label}
+          onClick={() => editor.chain().focus().updateAttributes('image', { align }).run()}
+          className="p-1.5 rounded transition-colors"
+          style={{
+            backgroundColor:
+              currentAlign === align ? 'var(--color-accent-soft)' : 'transparent',
+            color:
+              currentAlign === align ? 'var(--color-accent)' : 'var(--color-text-muted)',
+          }}
+        >
+          {icon}
+        </button>
+      ))}
+      <div className="w-px h-4" style={{ backgroundColor: 'var(--color-border)' }} />
+      <button
+        title="Remove image"
+        onClick={() => editor.chain().focus().deleteSelection().run()}
+        className="p-1.5 rounded transition-colors"
+        style={{ color: 'var(--color-danger)' }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = 'var(--color-danger-soft)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }}
+      >
+        <Trash2 size={12} />
+      </button>
+    </div>
+  );
+}
+
+// ─── Context-sensitive: Table controls ───────────────────────────────────────
+
+function TableControls({ editor }: { editor: NonNullable<ReturnType<typeof import('@tiptap/react').useEditor>> }) {
+  const btns = [
+    { label: 'Add row ↓', action: () => editor.chain().focus().addRowAfter().run() },
+    { label: 'Add col →', action: () => editor.chain().focus().addColumnAfter().run() },
+    { label: 'Del row', action: () => editor.chain().focus().deleteRow().run() },
+    { label: 'Del col', action: () => editor.chain().focus().deleteColumn().run() },
+    { label: 'Del table', action: () => editor.chain().focus().deleteTable().run() },
+  ];
+  return (
+    <div className="flex items-center gap-1">
+      {btns.map(({ label, action }) => (
+        <button
+          key={label}
+          onClick={action}
+          className="px-2 py-0.5 text-[11px] rounded transition-colors"
+          style={{
+            backgroundColor: 'var(--color-bg-tertiary)',
+            color: 'var(--color-text-secondary)',
+            border: '1px solid var(--color-border)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+          }}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── Context-sensitive: Image alignment ──────────────────────────────────────
+
+function ImageAlignControls({ editor }: { editor: NonNullable<ReturnType<typeof import('@tiptap/react').useEditor>> }) {
+  const currentAlign = (editor.getAttributes('image').align as string) ?? 'center';
+  return (
+    <div className="flex items-center gap-1">
+      {(['left', 'center', 'right'] as const).map((align) => (
+        <button
+          key={align}
+          onClick={() => editor.chain().focus().updateAttributes('image', { align }).run()}
+          className="px-2 py-0.5 text-[11px] rounded capitalize transition-colors"
+          style={{
+            backgroundColor:
+              currentAlign === align ? 'var(--color-accent-soft)' : 'var(--color-bg-tertiary)',
+            color: currentAlign === align ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+            border: '1px solid var(--color-border)',
+          }}
+        >
+          {align}
+        </button>
+      ))}
     </div>
   );
 }
@@ -781,3 +971,160 @@ function ToolbarButton({
     </button>
   );
 }
+
+// ─── Format helpers ───────────────────────────────────────────────────────────
+
+function formatTime(date: Date): string {
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+// ─── Editor styles ────────────────────────────────────────────────────────────
+
+const EDITOR_STYLES = `
+/* ── Callout blocks ────────────────────────────────────────────────────────── */
+.callout {
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 8px 0;
+  border-left: 3px solid;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.callout-icon {
+  flex-shrink: 0;
+  font-size: 16px;
+  line-height: 1.5;
+  user-select: none;
+}
+.callout-content {
+  flex: 1;
+  min-width: 0;
+}
+[data-callout-type="info"] { background: var(--color-accent-soft); border-color: var(--color-accent); }
+[data-callout-type="warning"] { background: var(--color-warning-soft); border-color: var(--color-warning); }
+[data-callout-type="success"] { background: var(--color-success-soft); border-color: var(--color-success); }
+[data-callout-type="danger"] { background: var(--color-danger-soft); border-color: var(--color-danger); }
+[data-callout-type="note"] { background: var(--color-bg-tertiary); border-color: var(--color-border-strong); }
+
+/* ── Two-column layout ─────────────────────────────────────────────────────── */
+.columns-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 8px 0;
+}
+.column {
+  min-height: 40px;
+  padding: 4px;
+  border-radius: 4px;
+}
+.column:focus-within {
+  outline: 1px dashed var(--color-border-hover);
+}
+
+/* ── Table ─────────────────────────────────────────────────────────────────── */
+.ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 8px 0;
+  table-layout: fixed;
+}
+.ProseMirror th, .ProseMirror td {
+  border: 1px solid var(--color-border);
+  padding: 8px 12px;
+  text-align: left;
+  min-width: 80px;
+  vertical-align: top;
+}
+.ProseMirror th {
+  background: var(--color-bg-tertiary);
+  font-weight: 600;
+}
+.ProseMirror .selectedCell {
+  background: var(--color-accent-soft);
+}
+.column-resize-handle {
+  background-color: var(--color-accent);
+  bottom: 0;
+  pointer-events: none;
+  position: absolute;
+  right: -2px;
+  top: 0;
+  width: 4px;
+}
+.tableWrapper {
+  overflow-x: auto;
+}
+
+/* ── Horizontal rule ───────────────────────────────────────────────────────── */
+.ProseMirror hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 16px 0;
+}
+
+/* ── Sticky notes ──────────────────────────────────────────────────────────── */
+.sticky-note {
+  border-radius: 4px;
+  padding: 14px 16px;
+  margin: 8px 0;
+  box-shadow: 2px 3px 8px rgba(0,0,0,0.12);
+  font-family: inherit;
+  position: relative;
+}
+.sticky-note::before {
+  content: '📌';
+  position: absolute;
+  top: -8px;
+  left: 12px;
+  font-size: 14px;
+}
+.sticky-note--yellow { background: #fef3c7; border: 1px solid #d97706; }
+.sticky-note--pink { background: #fce7f3; border: 1px solid #db2777; }
+.sticky-note--blue { background: #dbeafe; border: 1px solid #2563eb; }
+.sticky-note--green { background: #d1fae5; border: 1px solid #059669; }
+.sticky-note--lavender { background: #ede9fe; border: 1px solid #7c3aed; }
+
+/* Dark mode sticky note overrides */
+[data-theme="dark"] .sticky-note--yellow { background: rgba(254,243,199,0.1); border-color: #d97706; }
+[data-theme="dark"] .sticky-note--pink { background: rgba(252,231,243,0.1); border-color: #db2777; }
+[data-theme="dark"] .sticky-note--blue { background: rgba(219,234,254,0.1); border-color: #2563eb; }
+[data-theme="dark"] .sticky-note--green { background: rgba(209,250,229,0.1); border-color: #059669; }
+[data-theme="dark"] .sticky-note--lavender { background: rgba(237,233,254,0.1); border-color: #7c3aed; }
+
+/* ── Image alignment ───────────────────────────────────────────────────────── */
+.image-align-left { margin-right: auto; display: block; }
+.image-align-center { margin: 0 auto; display: block; }
+.image-align-right { margin-left: auto; display: block; }
+.image-align-float-left { float: left; margin: 0 16px 8px 0; }
+.image-align-float-right { float: right; margin: 0 0 8px 16px; }
+
+/* ── Search highlights ─────────────────────────────────────────────────────── */
+.search-match {
+  background-color: #fef08a;
+  border-radius: 2px;
+}
+[data-theme="dark"] .search-match {
+  background-color: rgba(254,240,138,0.3);
+  color: #fef08a;
+}
+.search-match-current {
+  background-color: var(--color-accent);
+  color: white;
+  border-radius: 2px;
+}
+
+/* ── Divider ornamental ────────────────────────────────────────────────────── */
+.divider-ornamental {
+  text-align: center;
+  color: var(--color-text-muted);
+  margin: 12px 0;
+  letter-spacing: 0.5em;
+  user-select: none;
+}
+`;
