@@ -363,11 +363,12 @@ export function NoteEditor({
         onKeyDown={handleKeyDown}
       >
         <div
-          className="mx-auto py-8"
+          className="py-8"
           style={{
-            maxWidth: zenMode ? 680 : 768,
-            paddingLeft: zenMode ? 32 : 32,
-            paddingRight: zenMode ? 32 : 32,
+            maxWidth: zenMode ? 680 : undefined,
+            margin: zenMode ? '0 auto' : undefined,
+            paddingLeft: zenMode ? 32 : 48,
+            paddingRight: zenMode ? 32 : 48,
           }}
         >
           {/* Bubble menu */}

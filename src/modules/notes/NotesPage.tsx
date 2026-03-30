@@ -15,8 +15,11 @@ import { NoteHeader } from './components/NoteHeader';
 import { NoteBreadcrumb } from './components/NoteBreadcrumb';
 import { BacklinksPanel } from './components/BacklinksPanel';
 import { NoteRightPanel } from './components/NoteRightPanel';
+import { NoteCanvas } from './components/NoteCanvas';
 import { TemplatePickerModal, type NoteTemplate } from './components/TemplatePickerModal';
 import { useNoteEditor } from './hooks/useNoteEditor';
+
+type NoteViewMode = 'document' | 'canvas';
 
 
 export function NotesPage() {
@@ -26,6 +29,7 @@ export function NotesPage() {
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [zenMode, setZenMode] = useState(false);
+  const [viewMode, setViewMode] = useState<NoteViewMode>('document');
 
 
   const { data: selectedNote } = useNote(selectedNoteId);
@@ -223,91 +227,143 @@ export function NotesPage() {
                   onNavigate={handleSelect}
                   onHome={handleHome}
                 />
-                {/* Right panel toggle */}
-                <button
-                  onClick={() => setRightPanelOpen((v) => !v)}
-                  className="ml-auto rounded transition-colors"
-                  title={rightPanelOpen ? 'Hide outline' : 'Show outline'}
+
+                {/* View mode toggle: Document / Canvas */}
+                <div
                   style={{
-                    color: 'var(--color-text-muted)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '3px 8px',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
-                    e.currentTarget.style.color = 'var(--color-text-primary)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = 'var(--color-text-muted)';
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 2,
+                    marginLeft: 12,
+                    padding: '2px',
+                    borderRadius: 7,
+                    backgroundColor: 'var(--color-bg-tertiary)',
+                    border: '1px solid var(--color-border)',
+                    flexShrink: 0,
                   }}
                 >
-                  <span style={{ fontSize: 11, fontWeight: 500 }}>
-                    {rightPanelOpen ? '⊟ Outline' : '⊞ Outline'}
-                  </span>
-                </button>
+                  {([
+                    { key: 'document', label: '📄 Doc' },
+                    { key: 'canvas',   label: '🎨 Canvas' },
+                  ] as { key: NoteViewMode; label: string }[]).map(({ key, label }) => (
+                    <button
+                      key={key}
+                      onClick={() => setViewMode(key)}
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 500,
+                        padding: '3px 9px',
+                        borderRadius: 5,
+                        border: 'none',
+                        cursor: 'pointer',
+                        backgroundColor: viewMode === key ? 'var(--color-bg-elevated)' : 'transparent',
+                        color: viewMode === key ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+                        boxShadow: viewMode === key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                        transition: 'all 0.1s ease',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Right panel toggle (document mode only) */}
+                {viewMode === 'document' && (
+                  <button
+                    onClick={() => setRightPanelOpen((v) => !v)}
+                    className="ml-auto rounded transition-colors"
+                    title={rightPanelOpen ? 'Hide outline' : 'Show outline'}
+                    style={{
+                      color: 'var(--color-text-muted)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '3px 8px',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+                      e.currentTarget.style.color = 'var(--color-text-primary)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = 'var(--color-text-muted)';
+                    }}
+                  >
+                    <span style={{ fontSize: 11, fontWeight: 500 }}>
+                      {rightPanelOpen ? '⊟ Outline' : '⊞ Outline'}
+                    </span>
+                  </button>
+                )}
               </div>
             )}
 
-            {/* 3-column layout: editor + right panel */}
+            {/* Main content area */}
             <div className="flex flex-1 min-h-0 overflow-hidden">
-              {/* Editor column */}
-              <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                <div className="flex-1 overflow-y-auto">
-                  {/* Page header */}
-                  {!zenMode && (
-                    <NoteHeader
-                      note={selectedNote}
-                      childCount={children.length}
-                      onTitleChange={handleTitleChange}
-                      onIconChange={handleIconChange}
-                      onCoverChange={handleCoverChange}
-                    />
-                  )}
-
-                  {/* Editor */}
-                  <NoteEditor
-                    editor={editor}
-                    fileInputRef={fileInputRef}
-                    triggerFileInput={triggerFileInput}
-                    handleFileChange={handleFileChange}
-                    noteId={selectedNote.id}
-                    note={selectedNote}
-                    onNavigateToNote={handleSelect}
-                    zenMode={zenMode}
-                    onToggleZen={() => setZenMode((v) => !v)}
-                    rightPanelOpen={rightPanelOpen}
-                    onToggleRightPanel={() => setRightPanelOpen((v) => !v)}
-                  />
-
-                  {/* Backlinks panel */}
-                  {!zenMode && (
-                    <BacklinksPanel
-                      backlinks={backlinks}
-                      onNavigate={handleSelect}
-                    />
-                  )}
+              {viewMode === 'canvas' ? (
+                /* ── Canvas mode ── */
+                <div className="flex-1 min-w-0 overflow-hidden">
+                  <NoteCanvas noteId={selectedNote.id} />
                 </div>
-              </div>
+              ) : (
+                <>
+                  {/* ── Document mode ── */}
+                  <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                    <div className="flex-1 overflow-y-auto">
+                      {/* Page header */}
+                      {!zenMode && (
+                        <NoteHeader
+                          note={selectedNote}
+                          childCount={children.length}
+                          onTitleChange={handleTitleChange}
+                          onIconChange={handleIconChange}
+                          onCoverChange={handleCoverChange}
+                        />
+                      )}
 
-              {/* Right panel */}
-              {!zenMode && rightPanelOpen && (
-                <div
-                  className="shrink-0 overflow-hidden flex flex-col"
-                  style={{
-                    width: 240,
-                    borderLeft: '1px solid var(--color-border)',
-                    transition: 'width 0.2s ease',
-                  }}
-                >
-                  <NoteRightPanel
-                    editor={editor}
-                    note={selectedNote}
-                    onNavigateToHeading={() => {}}
-                  />
-                </div>
+                      {/* Editor */}
+                      <NoteEditor
+                        editor={editor}
+                        fileInputRef={fileInputRef}
+                        triggerFileInput={triggerFileInput}
+                        handleFileChange={handleFileChange}
+                        noteId={selectedNote.id}
+                        note={selectedNote}
+                        onNavigateToNote={handleSelect}
+                        zenMode={zenMode}
+                        onToggleZen={() => setZenMode((v) => !v)}
+                        rightPanelOpen={rightPanelOpen}
+                        onToggleRightPanel={() => setRightPanelOpen((v) => !v)}
+                      />
+
+                      {/* Backlinks panel */}
+                      {!zenMode && (
+                        <BacklinksPanel
+                          backlinks={backlinks}
+                          onNavigate={handleSelect}
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right panel */}
+                  {!zenMode && rightPanelOpen && (
+                    <div
+                      className="shrink-0 overflow-hidden flex flex-col"
+                      style={{
+                        width: 240,
+                        borderLeft: '1px solid var(--color-border)',
+                        transition: 'width 0.2s ease',
+                      }}
+                    >
+                      <NoteRightPanel
+                        editor={editor}
+                        note={selectedNote}
+                        onNavigateToHeading={() => {}}
+                      />
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </>

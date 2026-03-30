@@ -328,7 +328,7 @@ export function TaskCard({
   const hasCover = !!(task.coverImage && showCoverImages);
   const hasAssignees = !!(task.assignees && task.assignees.length > 0);
 
-  const cardBg = isMultiSelected ? 'var(--color-accent-soft)' : '#ffffff';
+  const cardBg = isMultiSelected ? 'var(--color-accent-soft)' : 'var(--color-bg-elevated)';
   const cardBorderColor = isSelected || isMultiSelected
     ? 'var(--color-accent, #6366f1)'
     : isHovered
