@@ -1,4 +1,4 @@
-export type ProjectStatus = 'active' | 'archived';
+export type ProjectStatus = 'active' | 'on_hold' | 'completed' | 'archived';
 
 export interface Project {
   id: string;
@@ -17,6 +17,7 @@ export interface CreateProjectInput {
   description?: string;
   color?: string;
   icon?: string;
+  status?: ProjectStatus;
 }
 
 export interface UpdateProjectInput {
@@ -33,7 +34,6 @@ export interface ProjectStats {
   completedTasks: number;
   totalNotes: number;
   totalTimeSeconds: number;
-  // totalTables: number; // future: when Tables module is built
 }
 
 // ─── Milestones ──────────────────────────────────────────────────────────────
