@@ -355,4 +355,50 @@ export const noteService = {
       trashed: notes.filter((n) => n.isTrashed).length,
     };
   },
+
+  async getDailyNote(dateStr: string): Promise<Note | null> {
+    return (
+      notes.find(
+        (n) =>
+          !n.isTrashed &&
+          !n.isArchived &&
+          n.parentId === null &&
+          n.tags.includes('__daily__') &&
+          n.tags.includes(dateStr)
+      ) ?? null
+    );
+  },
+
+  async createDailyNote(dateStr: string, formattedTitle: string): Promise<Note> {
+    const existing = await noteService.getDailyNote(dateStr);
+    if (existing) return existing;
+
+    const siblings = notes.filter((n) => n.parentId === null && !n.isTrashed);
+    const maxOrder = siblings.length > 0 ? Math.max(...siblings.map((n) => n.sortOrder)) : 0;
+
+    const note: Note = {
+      id: generateId(),
+      title: formattedTitle,
+      content: null,
+      contentText: null,
+      parentId: null,
+      projectId: null,
+      icon: '📅',
+      coverColor: null,
+      isPinned: false,
+      isArchived: false,
+      isTrashed: false,
+      tags: ['__daily__', dateStr],
+      wordCount: 0,
+      sortOrder: maxOrder + 1,
+      depth: 0,
+      hasChildren: false,
+      createdAt: now(),
+      updatedAt: now(),
+    };
+
+    notes.push(note);
+    persist();
+    return note;
+  },
 };

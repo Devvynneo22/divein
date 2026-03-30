@@ -14,11 +14,13 @@ import { NoteEditor } from './components/NoteEditor';
 import { NoteHeader } from './components/NoteHeader';
 import { NoteBreadcrumb } from './components/NoteBreadcrumb';
 import { BacklinksPanel } from './components/BacklinksPanel';
+import { TemplatePickerModal, type NoteTemplate } from './components/TemplatePickerModal';
 
 export function NotesPage() {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
 
   const { data: selectedNote } = useNote(selectedNoteId);
   const { data: ancestors = [] } = useNoteAncestors(selectedNoteId);
@@ -55,10 +57,22 @@ export function NotesPage() {
 
   // ─── Create ──────────────────────────────────────────────────────
 
-  const handleCreateRoot = useCallback(async () => {
-    const note = await createNote.mutateAsync({ title: 'Untitled' });
-    setSelectedNoteId(note.id);
-  }, [createNote]);
+  const handleCreateRoot = useCallback(() => {
+    setShowTemplatePicker(true);
+  }, []);
+
+  const handleCreateFromTemplate = useCallback(
+    async (template: NoteTemplate) => {
+      setShowTemplatePicker(false);
+      const note = await createNote.mutateAsync({
+        title: template.defaultTitle,
+        content: template.content || undefined,
+        tags: template.tags ?? [],
+      });
+      setSelectedNoteId(note.id);
+    },
+    [createNote]
+  );
 
   const handleCreateChild = useCallback(
     async (parentId: string) => {
@@ -93,6 +107,15 @@ export function NotesPage() {
     (icon: string | null) => {
       if (selectedNoteId) {
         updateNote.mutate({ id: selectedNoteId, data: { icon } });
+      }
+    },
+    [selectedNoteId, updateNote]
+  );
+
+  const handleCoverChange = useCallback(
+    (cover: string | null) => {
+      if (selectedNoteId) {
+        updateNote.mutate({ id: selectedNoteId, data: { coverColor: cover } });
       }
     },
     [selectedNoteId, updateNote]
@@ -138,6 +161,7 @@ export function NotesPage() {
         onTrash={handleTrash}
         onTogglePin={handleTogglePin}
         onRename={handleRename}
+        onShowTemplates={() => setShowTemplatePicker(true)}
       />
 
       {/* Main editor area */}
@@ -168,6 +192,7 @@ export function NotesPage() {
                 childCount={children.length}
                 onTitleChange={handleTitleChange}
                 onIconChange={handleIconChange}
+                onCoverChange={handleCoverChange}
               />
 
               {/* Editor fills remaining space, no dividing border */}
@@ -189,6 +214,14 @@ export function NotesPage() {
           <EmptyState onCreateRoot={handleCreateRoot} />
         )}
       </div>
+
+      {/* Template picker modal */}
+      {showTemplatePicker && (
+        <TemplatePickerModal
+          onSelect={handleCreateFromTemplate}
+          onClose={() => setShowTemplatePicker(false)}
+        />
+      )}
     </div>
   );
 }

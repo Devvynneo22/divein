@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Search, Plus, Trash2, Star, FileText, X } from 'lucide-react';
-import { useNoteTree, useFavorites, useNoteSearch, useNoteStats, useDebouncedValue } from '../hooks/useNotes';
+import { useNoteTree, useFavorites, useNoteSearch, useNoteStats, useDebouncedValue, useNotes, useCreateOrOpenDailyNote } from '../hooks/useNotes';
 import { NoteTreeItem } from './NoteTreeItem';
 import { NoteSearchResults } from './NoteSearchResults';
 import { TrashPanel } from './TrashPanel';
@@ -16,6 +16,7 @@ interface NotesSidebarProps {
   onTrash: (id: string) => void;
   onTogglePin: (id: string, pinned: boolean) => void;
   onRename: (id: string) => void;
+  onShowTemplates: () => void;
 }
 
 export function NotesSidebar({
@@ -28,6 +29,7 @@ export function NotesSidebar({
   onTrash,
   onTogglePin,
   onRename,
+  onShowTemplates,
 }: NotesSidebarProps) {
   const [rawQuery, setRawQuery] = useState('');
   const [showTrash, setShowTrash] = useState(false);
@@ -37,6 +39,14 @@ export function NotesSidebar({
   const { data: favorites = [] } = useFavorites();
   const { data: searchResults = [] } = useNoteSearch(searchQuery);
   const { data: stats } = useNoteStats();
+  const { data: allNotes = [] } = useNotes();
+
+  const dailyNoteMutation = useCreateOrOpenDailyNote();
+
+  const dailyNotes = allNotes
+    .filter((n) => n.tags.includes('__daily__') && !n.isTrashed)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 5);
 
   const isSearching = rawQuery.trim().length > 0;
 
@@ -141,6 +151,43 @@ export function NotesSidebar({
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto py-2">
+          {/* Daily Notes — recent */}
+          {dailyNotes.length > 0 && (
+            <div className="mb-3">
+              <SectionHeader icon={<span style={{ fontSize: 10 }}>📅</span>} label="Daily Notes" />
+              {dailyNotes.map((note) => {
+                const dateTag = note.tags.find((t) => /^\d{4}-\d{2}-\d{2}$/.test(t));
+                const shortLabel = dateTag
+                  ? new Date(dateTag + 'T12:00:00').toLocaleDateString('en-US', {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                    })
+                  : note.title;
+                return (
+                  <div
+                    key={note.id}
+                    onClick={() => onSelect(note.id)}
+                    className="group flex items-center gap-2 py-1.5 px-2 mx-2 rounded-lg cursor-pointer transition-colors"
+                    style={{
+                      backgroundColor: note.id === selectedId ? 'var(--color-accent-soft)' : 'transparent',
+                      color: note.id === selectedId ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (note.id !== selectedId) e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (note.id !== selectedId) e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <span className="shrink-0 text-sm leading-none">📅</span>
+                    <span className="text-sm truncate flex-1">{shortLabel}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* Favorites */}
           {favorites.length > 0 && (
             <div className="mb-3">
@@ -209,11 +256,50 @@ export function NotesSidebar({
         </div>
       )}
 
-      {/* Bottom: Trash + New Page */}
+      {/* Bottom actions */}
       <div
         className="p-2 space-y-0.5"
         style={{ borderTop: '1px solid var(--color-border)' }}
       >
+        {/* Daily Note */}
+        <button
+          onClick={async () => {
+            const note = await dailyNoteMutation.mutateAsync();
+            onSelect(note.id);
+          }}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
+          style={{ color: 'var(--color-text-muted)' }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--color-accent)';
+            e.currentTarget.style.backgroundColor = 'var(--color-accent-soft)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--color-text-muted)';
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
+        >
+          <span style={{ fontSize: 14 }}>📅</span>
+          <span>Today's Note</span>
+        </button>
+
+        {/* Templates */}
+        <button
+          onClick={onShowTemplates}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
+          style={{ color: 'var(--color-text-muted)' }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--color-text-secondary)';
+            e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--color-text-muted)';
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
+        >
+          <span style={{ fontSize: 14 }}>📋</span>
+          <span>Templates</span>
+        </button>
+
         <button
           onClick={() => setShowTrash(true)}
           className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"

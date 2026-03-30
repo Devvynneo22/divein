@@ -161,6 +161,26 @@ export function useEmptyTrash() {
   });
 }
 
+export function useCreateOrOpenDailyNote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const today = new Date();
+      const dateStr = today.toISOString().split('T')[0];
+      const formattedTitle = today.toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      });
+      return noteService.createDailyNote(dateStr, formattedTitle);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: NOTES_KEY });
+    },
+  });
+}
+
 // Debounce helper for search
 export function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState<T>(value);

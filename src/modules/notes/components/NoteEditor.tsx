@@ -292,16 +292,17 @@ export function NoteEditor({ content, noteId, onUpdate, onNavigateToNote }: Note
 
   // Sync content when note changes
   useEffect(() => {
-    if (editor && content) {
+    if (editor && content && content !== '') {
       const currentContent = JSON.stringify(editor.getJSON());
       if (currentContent !== content) {
         try {
           editor.commands.setContent(JSON.parse(content) as object);
         } catch (e) {
           console.warn('NoteEditor: failed to parse content JSON on sync', e);
+          editor.commands.clearContent();
         }
       }
-    } else if (editor && !content) {
+    } else if (editor && (!content || content === '')) {
       editor.commands.clearContent();
     }
   }, [content, editor]);
