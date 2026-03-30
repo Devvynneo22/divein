@@ -1,6 +1,6 @@
 # DiveIn — Implementation Status
 
-> Last updated: 2026-03-29 14:10 SGT  
+> Last updated: 2026-03-30 10:50 SGT  
 > Architecture: Electron (planned) + React 19 + TypeScript + Vite  
 > Current mode: Web-only dev (localStorage persistence, no Electron IPC yet)
 
@@ -68,7 +68,7 @@
 | Toolbar sort actually affects rendered task views | ✅ |
 | Toolbar group actually affects list/backlog rendering | ✅ |
 | Status workflow: backlog/inbox/todo/in_progress/in_review/done/cancelled | ✅ |
-| Priority indicators + colored borders | ✅ |
+| Priority indicators — badge pill + colored top border | ✅ |
 | Tags / due date / estimate editing | ✅ |
 | Tag hex-color bug fixed | ✅ | Prevents accidental tags like `#ef4444` |
 | Drag-and-drop between columns | ✅ |
@@ -80,7 +80,10 @@
 | Undo on delete toast | ✅ |
 | Recurring tasks (existing logic retained) | ✅ |
 | Board customization (user-configurable colors/themes) | 📋 |
-| Visual polish vs top-tier tools | 🔨 | Better than before, but still needs screenshot-driven refinement with Devvyn |
+| Tag color picker (global, persisted) | ✅ |
+| Cover image upload on task cards | ✅ |
+| Column accent headers restored + improved | ✅ |
+| Visual polish vs top-tier tools | 🔨 | Ongoing refinement with Devvyn |
 
 ### Notes & Knowledge Base ✅
 | Feature | Status |
@@ -97,6 +100,10 @@
 | Images / task lists / code blocks | ✅ |
 | Export (Markdown/PDF) | ✅ |
 | UI overhaul / theme support | ✅ |
+| **Daily Notes** (📅 Today's Note button + sidebar section) | ✅ |
+| **Templates** (6 types: Blank/Meeting/Weekly Review/Project Brief/Journal/Reading) | ✅ |
+| **Cover banners** (12 gradients + 8 colors + upload + URL) | ✅ |
+| Search results UI — highlight in-flow, no overflow | ✅ |
 
 ### Calendar ✅
 | Feature | Status |
@@ -184,8 +191,8 @@
 ## Still To Do / Next Likely Work
 
 ### Immediate
-1. **Visual QA + refinement pass on Tasks** — compare against Linear/Notion/Jira screenshots and iterate with Devvyn
-2. **Broader screenshot-driven refinement** — continue raising polish bar app-wide
+1. **Broader screenshot-driven refinement** — continue raising polish bar app-wide with Devvyn
+2. **Notes remaining ideas** — Full-screen search modal (Ctrl+P), inline rename on double-click, Focus/Zen mode, tags on notes
 3. **Audit remaining legacy styling patterns** (`bg-[var(...)]` and older color conventions)
 4. **Clean old doc references** — some historical docs/phrasing may still say Nexus
 

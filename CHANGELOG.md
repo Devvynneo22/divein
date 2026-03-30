@@ -4,6 +4,128 @@ Session-by-session record of all development work. AI agents: **append to this f
 
 ---
 
+## Session 21 — Notes Features Trifecta + Sidebar Redesign + Tasks Polish (2026-03-30, SGT)
+
+**Coding agent:** Claude Sonnet 4.6 (main + sub-agents)
+
+### Objective
+Comprehensive quality session: fix Notes search UI bug, redesign the main sidebar, then build 3 major new Notes features (Daily Notes, Templates, Cover Banners). Also addressed several Tasks module visual issues raised in visual QA.
+
+---
+
+### Tasks Module — Visual QA Fixes
+
+#### `src/modules/tasks/components/TaskCard.tsx`
+- Replaced invisible 3px left-border priority indicator with a **prominent priority badge pill** between title and status block (emoji 🔴🟠🟡🔵 + uppercase label URGENT/HIGH/MEDIUM/LOW)
+- Added **3px colored top border** on the card keyed to priority color
+- Removed `PriorityIcon` import (badge is now inline)
+- Tag colors now respect `tagColors` from `taskSettingsStore` — custom colors persist globally
+
+#### `src/modules/tasks/components/TaskBoardColumn.tsx`
+- Restored **top accent color bar** (3px gradient), **gradient header background**, **left accent border strip** per column
+- Restored distinct column visual identity — each status column is now visually differentiated
+- `boxShadow: '0 2px 8px rgba(0,0,0,0.06)'` added for depth
+
+#### `src/modules/tasks/components/TaskDetail.tsx`
+- **TagPill** replaced with new version: visible **colored dot swatch** on left (click → opens native color picker), X button no longer blocked
+- Tag color changes persist globally via `taskSettingsStore.setTagColor`
+- **Cover Image** field upgraded: preview thumbnail with X remove button, `📁 Upload image` file input (stores as base64), URL paste field kept
+- Added `useTaskSettingsStore` import + `tagColors`/`setTagColor` wired
+
+#### `src/shared/types/task.ts`
+- `UpdateTaskInput` extended with `coverImage?: string`
+
+#### `src/shared/stores/taskSettingsStore.ts`
+- Added `tagColors: Record<string, string>` — globally persisted tag→color map
+- Added `setTagColor(tag, color)` and `removeTagColor(tag)` actions
+
+---
+
+### Main Sidebar Redesign
+
+#### `src/app/Sidebar.tsx` — full rewrite
+- **Emoji navigation** — each item now has its own emoji (🏠📝✅📅📁🎯⏱️🃏📊⚙️☀️🌙) replacing Lucide SVG icons
+- **Tighter rows** — padding reduced (`py-1.5 px-2`), icon-text gap reduced (`gap-1.75`)
+- **Font 14px → 13px** — refined, more Notion-like
+- **Active state**: warm neutral (`rgba(0,0,0,0.06)` / `rgba(255,255,255,0.07)`) instead of accent blue highlight
+- **Section headers** — lowercase (Workspace / Tools), lighter muted color
+- **Active dot indicator** — small dot on right edge of active item
+- Search bar tightened (smaller padding, focus ring border color)
+
+#### `src/styles/globals.css`
+- `--sidebar-width: 260px` → `240px`
+
+---
+
+### Notes Module — Search Bug Fix
+
+#### `src/modules/notes/components/NoteSearchResults.tsx` — full rewrite
+- `<mark>` highlight changed to inline element (was causing overflow/protrusion)
+- Yellow highlight: subtle `rgba(234,179,8,0.28)` background, 2px border-radius, no padding bloat
+- Result rows: single-line snippet (no multi-line overflow), truncated with ellipsis
+- Result count header simplified to single muted line (no X button clutter)
+- `HighlightedSnippet` component highlights both title and body snippet
+
+#### `src/modules/notes/components/NotesSidebar.tsx`
+- Search input: tighter padding, focus border accent, no double-border artifact
+- Icon and input left-padding now in sync (no more icon/text overlap)
+
+---
+
+### Notes Module — New Features
+
+#### FEATURE 1: Daily Notes
+**`src/shared/lib/noteService.ts`**
+- Added `getDailyNote(dateStr)` — finds existing daily note by `__daily__` + ISO date tag
+- Added `createDailyNote(dateStr, formattedTitle)` — idempotent; returns existing note if already created today
+
+**`src/modules/notes/hooks/useNotes.ts`**
+- Added `useCreateOrOpenDailyNote()` mutation hook — generates today's date string and full formatted title, calls service
+
+**`src/modules/notes/components/NotesSidebar.tsx`**
+- "📅 Today's Note" button in bottom actions — one-click creates or opens today's note
+- "Daily Notes" section auto-appears in sidebar showing last 5 daily notes with short date labels (Mon, Mar 30)
+- Added `onShowTemplates` prop
+
+#### FEATURE 2: Note Templates
+**`src/modules/notes/components/TemplatePickerModal.tsx`** *(new file)*
+- 6 templates: Blank, Meeting Notes, Weekly Review, Project Brief, Daily Journal, Reading Notes
+- Each pre-fills title + full structured TipTap HTML content (headings, task lists, blockquotes)
+- 2-column grid modal with emoji, name, description; Blank page uses dashed border
+- Escape / backdrop click to close
+
+**`src/modules/notes/NotesPage.tsx`**
+- "New Page" now opens template picker instead of direct creation
+- `handleCreateFromTemplate` creates note with template title + content + tags
+- `onShowTemplates` wired from sidebar bottom "📋 Templates" button
+
+#### FEATURE 3: Cover Image / Gradient Banners
+**`src/modules/notes/components/NoteHeader.tsx`** — major update
+- `onCoverChange` prop added
+- Full-width `CoverBanner` component renders above note content (120px gradients, 220px images)
+- Hover state reveals "Change cover" + "Remove" frosted-glass pill buttons
+- `CoverPickerModal` with 12 gradient presets (Aurora/Sunset/Ocean/Forest/Dusk/Midnight/Peach/Cool/Warm/Steel/Emerald/Lavender), 8 solid color swatches, file upload (→ base64), URL input
+- "🖼️ Add cover" button appears near page top when no cover set
+- `coverColor` field now handles hex colors, CSS gradients, image URLs, and base64 data URLs
+
+**`src/modules/notes/NotesPage.tsx`**
+- `handleCoverChange` callback added, passed to `<NoteHeader>`
+
+**`src/modules/notes/components/NoteEditor.tsx`**
+- Content sync now calls `clearContent()` for empty/null content instead of `setContent('')` — fixes TipTap v3 artifacts when switching between notes
+
+---
+
+### Session 21 Commit History
+```
+e01aeaf feat(notes): daily notes, templates (6 types), cover image/gradient banners
+c235927 fix(notes): clean up search results layout, fix highlight overflow, tighten search input
+1152ce9 feat(sidebar): notion-inspired redesign — emoji nav, tighter rows, warm neutral active states
+cad7291 feat(tasks): priority badges, tag color picker, column accent headers, image upload
+```
+
+---
+
 ## Session 19 — Phase 4.2: Visual Overhaul — Vibrant TaskCard & Column Redesign (2026-03-29, SGT)
 
 **Coding agent:** Claude Sonnet 4.6 sub-agent

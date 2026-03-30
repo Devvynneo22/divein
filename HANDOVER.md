@@ -3,7 +3,7 @@
 **Project:** DiveIn — local-first productivity super-app  
 **Location:** `C:\Users\immer\OneDrive\Desktop\divein\`  
 **Branch:** Develop  
-**Date:** 2026-03-29 14:10 SGT
+**Date:** 2026-03-30 10:50 SGT
 
 ---
 
@@ -11,7 +11,7 @@
 
 Read these files in order:
 1. **`IMPLEMENTATION-STATUS.md`** — what's done, what's planned
-2. **`CHANGELOG.md`** — session history (Session 15 is latest)
+2. **`CHANGELOG.md`** — session history (Session 21 is latest)
 3. **`TASKS-OVERHAUL-SPEC.md`** — Tasks module architecture/spec
 4. **`TASKS-UI-RESEARCH.md`** — market research (Linear, Notion, Jira, Todoist, TickTick, Asana)
 5. **`UI-DESIGN-GUIDE.md`** — design system rules
@@ -23,17 +23,17 @@ Read these files in order:
 | Aspect | Status |
 |--------|--------|
 | **TypeScript** | ✅ Zero errors (`npx tsc --noEmit`) |
-| **Git** | Clean working tree after `9fe3839` |
+| **Git** | Clean working tree after `e01aeaf` |
 | **Theme System** | ✅ Light / Dark / System |
 | **Tasks Module** | ✅ Major overhaul + refinement pass complete |
 
-### Latest Commits on `Develop`
+### Latest Commits on `main`
 ```bash
-9fe3839 fix: Tasks refinement — working group/sort, tag sanitization, in-column reorder, quick dates, Today chip, board polish
-2ffc80d feat: complete Tasks module overhaul — Kanban board, list, today, detail panel
-e37b49e feat: Tasks overhaul foundation — new statuses, status/priority colors, spec
-5abbc93 feat: complete UI overhaul — Flashcards, Tables, Projects, Settings
-aae6e5c feat: DiveIn rebrand + light/dark theme + comprehensive UI overhaul
+e01aeaf feat(notes): daily notes, templates (6 types), cover image/gradient banners
+c235927 fix(notes): clean up search results layout, fix highlight overflow, tighten search input
+1152ce9 feat(sidebar): notion-inspired redesign — emoji nav, tighter rows, warm neutral active states
+cad7291 feat(tasks): priority badges, tag color picker, column accent headers, image upload
+a030955 Merge branch 'main' of https://github.com/Devvynneo22/divein
 ```
 
 ### Run it
@@ -46,7 +46,29 @@ npx vite --port 5174
 
 ---
 
-## What Was Done in Session 15 (latest)
+## What Was Done in Session 21 (latest)
+
+### Tasks — Visual QA Polish
+- Priority now shows as a **badge pill** (🔴🟠🟡🔵 + label) between title and status block, plus 3px colored top border on the card
+- **Tag color picker** — click the colored dot on any tag in detail panel to change its color globally (persisted in `taskSettingsStore`)
+- **Cover image upload** — file upload button (base64) + URL input + preview thumbnail with remove button
+- **Column accent headers restored** — top gradient bar, gradient header bg, left accent border, box-shadow depth
+
+### Sidebar — Notion-inspired Redesign
+- Emoji navigation replacing Lucide icons throughout
+- Tighter rows (13px font, `py-1.5` padding, 7px icon-text gap)
+- Warm neutral active state (no more accent blue highlight)
+- Sidebar width 260px → 240px
+
+### Notes — Search Fix
+- `NoteSearchResults` rewritten: inline `<mark>` highlight (no overflow), single-line snippets, cleaner count header
+
+### Notes — 3 New Features
+- **Daily Notes**: "📅 Today's Note" button, idempotent create (tagged `__daily__` + date), Daily Notes sidebar section (last 5)
+- **Templates**: 6 pre-built templates (Blank/Meeting Notes/Weekly Review/Project Brief/Daily Journal/Reading Notes), template picker modal on New Page
+- **Cover Banners**: full-width gradient/color/image banners per note, 12 gradient presets, file upload, URL paste, hover change/remove controls
+
+## What Was Done in Session 15
 
 ### Bugs Fixed
 1. **Group/Sort toolbar was not wired** — created `taskViewUtils.ts`, now drives actual rendering in List/Backlog views
