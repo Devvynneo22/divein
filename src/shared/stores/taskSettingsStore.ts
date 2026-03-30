@@ -41,6 +41,7 @@ export const DEFAULT_CUSTOM_STATUSES: CustomStatus[] = [
 // ─── Persistence helpers ─────────────────────────────────────────────────────
 
 const VIEWS_KEY    = 'divein-task-saved-views';
+const TAG_COLORS_KEY = 'divein-task-tag-colors';
 const STATUSES_KEY = 'divein-task-custom-statuses';
 
 function load<T>(key: string, defaults: T): T {
@@ -60,6 +61,7 @@ function persist(key: string, value: unknown): void {
 interface TaskSettingsState {
   savedViews: SavedView[];
   customStatuses: CustomStatus[];
+  tagColors: Record<string, string>;
 
   // Saved views
   addSavedView: (view: Omit<SavedView, 'id'>) => void;
@@ -71,6 +73,8 @@ interface TaskSettingsState {
   updateCustomStatus: (id: string, partial: Partial<Omit<CustomStatus, 'id' | 'isCore'>>) => void;
   removeCustomStatus: (id: string) => void;
   resetStatuses: () => void;
+  setTagColor: (tag: string, color: string) => void;
+  removeTagColor: (tag: string) => void;
 }
 
 export const useTaskSettingsStore = create<TaskSettingsState>((set, get) => {
@@ -87,6 +91,7 @@ export const useTaskSettingsStore = create<TaskSettingsState>((set, get) => {
   return {
     savedViews: load<SavedView[]>(VIEWS_KEY, []),
     customStatuses: merged,
+    tagColors: load<Record<string, string>>(TAG_COLORS_KEY, {}),
 
     addSavedView: (view) => {
       const newView: SavedView = { ...view, id: crypto.randomUUID() };
@@ -132,5 +137,19 @@ export const useTaskSettingsStore = create<TaskSettingsState>((set, get) => {
       persist(STATUSES_KEY, DEFAULT_CUSTOM_STATUSES);
       set({ customStatuses: DEFAULT_CUSTOM_STATUSES });
     },
+
+    setTagColor: (tag, color) => {
+      const next = { ...get().tagColors, [tag]: color };
+      persist(TAG_COLORS_KEY, next);
+      set({ tagColors: next });
+    },
+
+    removeTagColor: (tag) => {
+      const next = { ...get().tagColors };
+      delete next[tag];
+      persist(TAG_COLORS_KEY, next);
+      set({ tagColors: next });
+    },
   };
 });
+

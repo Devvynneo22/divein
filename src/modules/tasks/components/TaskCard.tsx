@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import type { Task, TaskStatus, TaskPriority } from '@/shared/types/task';
 import { useAppSettingsStore } from '@/shared/stores/appSettingsStore';
+import { useTaskSettingsStore } from '@/shared/stores/taskSettingsStore';
 import type { TaskDensity } from '@/shared/stores/appSettingsStore';
 
 // Lock icon for blocked tasks
@@ -112,8 +113,9 @@ const TAG_PALETTE: Array<{ bg: string; text: string }> = [
   { bg: '#b45309', text: '#ffffff' },
 ];
 
-function getTagStyle(tag: string): { bg: string; text: string } {
+function getTagStyle(tag: string, tagColors?: Record<string, string>): { bg: string; text: string } {
   const key = tag.toLowerCase().trim();
+  if (tagColors && tagColors[key]) return { bg: tagColors[key], text: '#ffffff' };
   if (TAG_MAP[key]) return TAG_MAP[key];
   // Hash fallback
   let hash = 0;
@@ -319,6 +321,7 @@ export function TaskCard({
   const density = useAppSettingsStore((s) => s.app.taskDensity);
   const showCoverImages = useAppSettingsStore((s) => s.app.showCoverImages);
   const showIssueKeys = useAppSettingsStore((s) => s.app.showIssueKeys);
+  const tagColors = useTaskSettingsStore((s) => s.tagColors);
 
   const priorityBorderColor = PRIORITY_BORDER_COLOR[task.priority] ?? 'transparent';
   const overdueDate = task.dueDate ? isOverdue(task.dueDate) : false;
@@ -380,10 +383,10 @@ export function TaskCard({
         position: 'relative',
         backgroundColor: cardBg,
         borderRadius: '12px',
-        border: `1px solid ${cardBorderColor}`,
-        borderLeft: priorityBorderColor !== 'transparent'
-          ? `3px solid ${priorityBorderColor}`
-          : `1px solid ${cardBorderColor}`,
+        borderTop: task.priority > 0 ? `3px solid ${priorityBorderColor}` : `1px solid ${cardBorderColor}`,
+        borderRight: `1px solid ${cardBorderColor}`,
+        borderBottom: `1px solid ${cardBorderColor}`,
+        borderLeft: `1px solid ${cardBorderColor}`,
         boxShadow: isHovered
           ? '0 4px 16px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)'
           : '0 1px 3px rgba(0,0,0,0.06)',
@@ -514,7 +517,7 @@ export function TaskCard({
             {/* Tags — solid vibrant pills */}
             {task.tags.slice(0, 3).map((tag) => {
               const label = normalizeTagLabel(tag);
-              const style = getTagStyle(label);
+              const style = getTagStyle(label, tagColors);
               return (
                 <span
                   key={tag}
@@ -570,6 +573,38 @@ export function TaskCard({
             {task.title}
           </span>
         </div>
+
+        {/* Priority badge */}
+        {task.priority > 0 && (
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              padding: '3px 9px 3px 7px',
+              borderRadius: '6px',
+              marginBottom: '8px',
+              backgroundColor: `${priorityBorderColor}18`,
+              border: `1px solid ${priorityBorderColor}40`,
+            }}
+          >
+            <span style={{ fontSize: '10px', lineHeight: 1 }}>
+              {task.priority === 4 ? '🔴' : task.priority === 3 ? '🟠' : task.priority === 2 ? '🟡' : '🔵'}
+            </span>
+            <span
+              style={{
+                fontSize: '10px',
+                fontWeight: 700,
+                color: priorityBorderColor,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                lineHeight: 1,
+              }}
+            >
+              {PRIORITY_LABELS[task.priority]}
+            </span>
+          </div>
+        )}
 
         {/* ── Status execution-stage block ──────────────────────────── */}
         <div

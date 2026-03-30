@@ -134,18 +134,13 @@ export function TaskBoardColumn({
         display: 'flex',
         flexDirection: 'column',
         maxHeight: compactMode ? undefined : '100%',
-        borderRadius: '16px',
+        borderRadius: '12px',
         overflow: 'hidden',
-        border: isDragOver
-          ? `2px dashed ${accentColor}`
-          : '1px solid var(--color-border)',
-        transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-        backgroundColor: isDragOver
-          ? `${accentColor}10`
-          : 'var(--color-bg-secondary)',
-        boxShadow: isDragOver
-          ? `0 0 0 3px ${accentColor}30, var(--shadow-md)`
-          : 'var(--shadow-sm)',
+        border: isDragOver ? `2px dashed ${accentColor}` : '1px solid var(--color-border)',
+        borderLeft: `3px solid ${accentColor}60`,
+        transition: 'background-color 0.15s ease, box-shadow 0.15s ease',
+        backgroundColor: isDragOver ? `${accentColor}10` : 'var(--color-bg-secondary)',
+        boxShadow: isDragOver ? `0 0 0 3px ${accentColor}30` : '0 2px 8px rgba(0,0,0,0.06)',
       }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -156,16 +151,16 @@ export function TaskBoardColumn({
         <div
           style={{
             flexShrink: 0,
-            borderBottom: '1px solid var(--color-border)',
-            backgroundColor: 'var(--color-bg-secondary)',
+            borderBottom: '1px solid rgba(0,0,0,0.04)',
+            background: `linear-gradient(135deg, ${accentColor}18 0%, ${accentColor}08 100%)`,
           }}
         >
-          {/* Accent color bar at very top */}
+          {/* Top accent bar */}
           <div
             style={{
               height: '3px',
-              backgroundColor: accentColor,
-              borderRadius: '16px 16px 0 0',
+              background: `linear-gradient(90deg, ${accentColor} 0%, ${accentColor}80 100%)`,
+              borderRadius: '12px 12px 0 0',
             }}
           />
 
@@ -178,17 +173,20 @@ export function TaskBoardColumn({
               padding: '10px 12px 10px 12px',
             }}
           >
-            {/* Emoji + Label */}
-            <span
-              style={{
-                fontSize: '15px',
-                lineHeight: 1,
-                flexShrink: 0,
-                userSelect: 'none',
-              }}
-            >
-              {STATUS_EMOJI[status]}
-            </span>
+            {/* Accent Dot + Emoji */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: accentColor, flexShrink: 0 }} />
+              <span
+                style={{
+                  fontSize: '15px',
+                  lineHeight: 1,
+                  flexShrink: 0,
+                  userSelect: 'none',
+                }}
+              >
+                {STATUS_EMOJI[status]}
+              </span>
+            </div>
             <span
               style={{
                 fontSize: '13px',

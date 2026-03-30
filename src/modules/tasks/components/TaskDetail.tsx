@@ -14,6 +14,7 @@ import {
   Link2,
 } from 'lucide-react';
 import type { Task, TaskStatus, TaskPriority, UpdateTaskInput, CreateTaskInput } from '@/shared/types/task';
+import { useTaskSettingsStore } from '@/shared/stores/taskSettingsStore';
 import { useSubtasks, useCreateTask, useUpdateTask, useTasks } from '../hooks/useTasks';
 
 // ─── Status config ────────────────────────────────────────────────────────────
@@ -50,10 +51,12 @@ function sanitizeTag(tag: string): string {
   return trimmed;
 }
 
-function getTagColor(tag: string): string {
+function getTagColor(tag: string, tagColors?: Record<string, string>): string {
+  const key = tag.toLowerCase().trim();
+  if (tagColors && tagColors[key]) return tagColors[key];
   let hash = 0;
-  for (let i = 0; i < tag.length; i++) {
-    hash = (hash * 31 + tag.charCodeAt(i)) & 0xffffffff;
+  for (let i = 0; i < key.length; i++) {
+    hash = (hash * 31 + key.charCodeAt(i)) & 0xffffffff;
   }
   return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length];
 }
@@ -92,32 +95,95 @@ function offsetDate(days: number): string {
 
 // ─── Tag pill ────────────────────────────────────────────────────────────────
 
-function TagPill({ label, color, onRemove }: { label: string; color?: string; onRemove?: () => void }) {
+function TagPill({
+  label,
+  color,
+  onRemove,
+  onChangeColor,
+}: {
+  label: string;
+  color?: string;
+  onRemove?: () => void;
+  onChangeColor?: (c: string) => void;
+}) {
   const bg = color ?? '#6b7280';
+  const colorInputRef = React.useRef<HTMLInputElement>(null);
   return (
     <span
       style={{
         display: 'inline-flex',
         alignItems: 'center',
         gap: 4,
-        padding: '2px 8px',
+        padding: '3px 8px 3px 5px',
         borderRadius: 9999,
         fontSize: 12,
-        fontWeight: 500,
-        backgroundColor: bg + '33',
+        fontWeight: 600,
+        backgroundColor: bg + '22',
         color: bg,
         border: `1px solid ${bg}55`,
+        userSelect: 'none',
       }}
     >
-      {label}
+      {/* Color swatch dot — click to open color picker */}
+      {onChangeColor ? (
+        <span
+          title="Click to change tag color"
+          onClick={() => colorInputRef.current?.click()}
+          style={{
+            width: 10,
+            height: 10,
+            borderRadius: '50%',
+            backgroundColor: bg,
+            flexShrink: 0,
+            cursor: 'pointer',
+            border: '1.5px solid rgba(255,255,255,0.6)',
+            display: 'inline-block',
+          }}
+        />
+      ) : (
+        <span
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            backgroundColor: bg,
+            flexShrink: 0,
+            display: 'inline-block',
+          }}
+        />
+      )}
+      {/* Hidden color input */}
+      {onChangeColor && (
+        <input
+          ref={colorInputRef}
+          type="color"
+          value={bg}
+          onChange={(e) => onChangeColor(e.target.value)}
+          style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0 }}
+          tabIndex={-1}
+        />
+      )}
+      <span>{label}</span>
       {onRemove && (
         <button
-          onClick={onRemove}
-          style={{ display: 'flex', alignItems: 'center', marginLeft: 2, opacity: 0.7 }}
-          onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.7'; }}
+          onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 14,
+            height: 14,
+            borderRadius: '50%',
+            backgroundColor: bg + '33',
+            color: bg,
+            cursor: 'pointer',
+            border: 'none',
+            padding: 0,
+            flexShrink: 0,
+          }}
+          title="Remove tag"
         >
-          <X size={10} />
+          <X size={9} />
         </button>
       )}
     </span>
@@ -636,6 +702,9 @@ interface TaskDetailProps {
 }
 
 export function TaskDetail({ task, onUpdate, onDelete, onClose }: TaskDetailProps) {
+  const tagColors = useTaskSettingsStore((s) => s.tagColors);
+  const setTagColor = useTaskSettingsStore((s) => s.setTagColor);
+
   // ── Animation state ───────────────────────────────────────────────────────
   const [visible, setVisible] = useState(false);
   useEffect(() => {
@@ -1049,8 +1118,9 @@ export function TaskDetail({ task, onUpdate, onDelete, onClose }: TaskDetailProp
                   <TagPill
                     key={tag}
                     label={tag}
-                    color={getTagColor(tag)}
+                    color={getTagColor(tag, tagColors)}
                     onRemove={() => handleRemoveTag(tag)}
+                    onChangeColor={(c) => setTagColor(tag.toLowerCase().trim(), c)}
                   />
                 ))}
 
@@ -1115,7 +1185,7 @@ export function TaskDetail({ task, onUpdate, onDelete, onClose }: TaskDetailProp
                         }}
                       />
                       <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-                        Press Enter to add a tag name. Tag colors are assigned automatically for now.
+                        Type a tag name and press Enter. Click the color dot on any tag to change its color.
                       </div>
                     </div>
                   )}
@@ -1159,6 +1229,119 @@ export function TaskDetail({ task, onUpdate, onDelete, onClose }: TaskDetailProp
               </PropertyRow>
             )}
 
+            {/* Cover Image */}
+            <PropertyRow label="Cover Image" icon={<span style={{ fontSize: 11 }}>🖼️</span>}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+                {task.coverImage && (
+                  <div style={{ position: 'relative', display: 'inline-block' }}>
+                    <img
+                      src={task.coverImage}
+                      alt="Cover"
+                      style={{
+                        width: '100%',
+                        maxHeight: 100,
+                        objectFit: 'cover',
+                        borderRadius: 8,
+                        border: '1px solid var(--color-border)',
+                        display: 'block',
+                      }}
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                    />
+                    <button
+                      onClick={() => onUpdate({ coverImage: undefined })}
+                      style={{
+                        position: 'absolute',
+                        top: 4,
+                        right: 4,
+                        width: 20,
+                        height: 20,
+                        borderRadius: '50%',
+                        backgroundColor: 'rgba(0,0,0,0.6)',
+                        color: '#fff',
+                        border: 'none',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 12,
+                      }}
+                      title="Remove cover image"
+                    >
+                      <X size={11} />
+                    </button>
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {/* Upload button */}
+                  <label
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      padding: '4px 10px',
+                      borderRadius: 7,
+                      border: '1px solid var(--color-border)',
+                      backgroundColor: 'var(--color-bg-tertiary)',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      color: 'var(--color-text-secondary)',
+                      whiteSpace: 'nowrap',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-hover)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
+                  >
+                    📁 Upload image
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                          const dataUrl = ev.target?.result as string;
+                          if (dataUrl) onUpdate({ coverImage: dataUrl });
+                        };
+                        reader.readAsDataURL(file);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                  {/* URL input */}
+                  <input
+                    type="url"
+                    placeholder="or paste image URL…"
+                    defaultValue={task.coverImage?.startsWith('data:') ? '' : (task.coverImage || '')}
+                    key={task.coverImage?.startsWith('data:') ? 'data' : task.coverImage || 'empty'}
+                    onBlur={(e) => {
+                      const val = e.target.value.trim();
+                      if (val) onUpdate({ coverImage: val });
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const val = (e.target as HTMLInputElement).value.trim();
+                        if (val) onUpdate({ coverImage: val });
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      minWidth: 120,
+                      fontSize: 12,
+                      padding: '4px 8px',
+                      borderRadius: 7,
+                      border: '1px solid var(--color-border)',
+                      backgroundColor: 'var(--color-bg-tertiary)',
+                      color: 'var(--color-text-primary)',
+                      outline: 'none',
+                      fontFamily: 'inherit',
+                    }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent)'; }}
+                    onBlurCapture={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
+                  />
+                </div>
+              </div>
+            </PropertyRow>
             {/* Recurrence */}
             <PropertyRow label="Recurrence" icon={<RefreshCw size={12} />}>
               <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>

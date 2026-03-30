@@ -39,11 +39,13 @@ export interface CreateTaskInput {
   dueDate?: string;
   startDate?: string;
   tags?: string[];
+  coverImage?: string;
   estimatedMin?: number;
   recurrence?: string | null;
 }
 
 export interface UpdateTaskInput {
+  coverImage?: string;
   title?: string;
   description?: string | null;
   status?: TaskStatus;
