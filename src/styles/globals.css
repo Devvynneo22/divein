@@ -89,7 +89,7 @@
   --sidebar-hover: #ebebea;
   --sidebar-active: #e3e3e2;
   --sidebar-section-text: #9b9b9b;
-  --sidebar-width: 260px;
+  --sidebar-width: 240px;
   --sidebar-collapsed-width: 56px;
 
   color-scheme: light;
@@ -175,7 +175,7 @@
   --sidebar-hover: #2f2f2f;
   --sidebar-active: #363636;
   --sidebar-section-text: #6b6b6b;
-  --sidebar-width: 260px;
+  --sidebar-width: 240px;
   --sidebar-collapsed-width: 56px;
 
   color-scheme: dark;

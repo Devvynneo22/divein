@@ -22,6 +22,7 @@ import { useAppSettingsStore } from '@/shared/stores/appSettingsStore';
 interface NavItem {
   path: string;
   label: string;
+  emoji: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
 }
 
@@ -34,25 +35,25 @@ const sections: NavSection[] = [
   {
     title: '',
     items: [
-      { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { path: '/dashboard', label: 'Dashboard', emoji: '🏠', icon: LayoutDashboard },
     ],
   },
   {
-    title: 'WORKSPACE',
+    title: 'Workspace',
     items: [
-      { path: '/tasks', label: 'Tasks', icon: CheckSquare },
-      { path: '/notes', label: 'Notes', icon: FileText },
-      { path: '/calendar', label: 'Calendar', icon: Calendar },
-      { path: '/projects', label: 'Projects', icon: FolderKanban },
+      { path: '/tasks',    label: 'Tasks',    emoji: '✅', icon: CheckSquare },
+      { path: '/notes',    label: 'Notes',    emoji: '📝', icon: FileText },
+      { path: '/calendar', label: 'Calendar', emoji: '📅', icon: Calendar },
+      { path: '/projects', label: 'Projects', emoji: '📁', icon: FolderKanban },
     ],
   },
   {
-    title: 'TOOLS',
+    title: 'Tools',
     items: [
-      { path: '/habits', label: 'Habits', icon: Target },
-      { path: '/timer', label: 'Timer', icon: Timer },
-      { path: '/flashcards', label: 'Flashcards', icon: BookOpen },
-      { path: '/tables', label: 'Tables', icon: Table2 },
+      { path: '/habits',     label: 'Habits',     emoji: '🎯', icon: Target },
+      { path: '/timer',      label: 'Timer',      emoji: '⏱️', icon: Timer },
+      { path: '/flashcards', label: 'Flashcards', emoji: '🃏', icon: BookOpen },
+      { path: '/tables',     label: 'Tables',     emoji: '📊', icon: Table2 },
     ],
   },
 ];
@@ -61,8 +62,8 @@ export function Sidebar() {
   const { app, effectiveTheme, updateApp } = useAppSettingsStore();
   const [collapsed, setCollapsed] = useState(app.sidebarDefault === 'collapsed');
   const location = useLocation();
+  const isDark = effectiveTheme === 'dark';
 
-  // Persist sidebar state
   useEffect(() => {
     updateApp({ sidebarDefault: collapsed ? 'collapsed' : 'expanded' });
   }, [collapsed]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -72,31 +73,77 @@ export function Sidebar() {
     updateApp({ theme: next });
   }
 
+  // Active state: warm neutral, not accent blue
+  const activeItemStyle = {
+    backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)',
+    color: isDark ? '#ebebeb' : '#1a1a1a',
+    fontWeight: 500,
+  };
+  const inactiveItemStyle = {
+    backgroundColor: 'transparent',
+    color: isDark ? '#8a8a8a' : '#6b6b6b',
+    fontWeight: 400,
+  };
+  const hoverItemStyle = {
+    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+    color: isDark ? '#d0d0d0' : '#2a2a2a',
+  };
+
   return (
     <aside
-      className="flex flex-col border-r transition-all duration-200 select-none"
       style={{
         width: collapsed ? 'var(--sidebar-collapsed-width)' : 'var(--sidebar-width)',
         backgroundColor: 'var(--sidebar-bg)',
-        borderColor: 'var(--color-border)',
+        borderRight: '1px solid var(--color-border)',
+        display: 'flex',
+        flexDirection: 'column',
+        transition: 'width 0.2s ease',
+        userSelect: 'none',
+        flexShrink: 0,
       }}
     >
-      {/* ─── App Header ───────────────────────────────────────────────── */}
+      {/* ─── App Header ─────────────────────────────────────────────────── */}
       <div
-        className="flex items-center justify-between px-3 shrink-0"
-        style={{ height: 52, borderBottom: '1px solid var(--color-border)' }}
+        style={{
+          height: 48,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: collapsed ? 'center' : 'space-between',
+          padding: collapsed ? '0' : '0 10px 0 14px',
+          borderBottom: '1px solid var(--color-border)',
+          flexShrink: 0,
+        }}
       >
         {!collapsed && (
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
             <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-sm shrink-0"
-              style={{ background: 'var(--color-accent)' }}
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: 8,
+                background: 'var(--color-accent)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                fontWeight: 700,
+                fontSize: 13,
+                flexShrink: 0,
+                letterSpacing: '-0.02em',
+              }}
             >
               D
             </div>
             <span
-              className="text-sm font-semibold tracking-tight truncate"
-              style={{ color: 'var(--color-text-primary)' }}
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+                color: 'var(--color-text-primary)',
+                letterSpacing: '-0.02em',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
             >
               DiveIn
             </span>
@@ -104,47 +151,76 @@ export function Sidebar() {
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="p-1.5 rounded-md transition-colors"
-          style={{ color: 'var(--color-text-muted)' }}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 6,
+            border: 'none',
+            backgroundColor: 'transparent',
+            color: 'var(--color-text-muted)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'background-color 0.1s ease, color 0.1s ease',
+            flexShrink: 0,
+          }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--sidebar-hover)';
+            e.currentTarget.style.backgroundColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)';
             e.currentTarget.style.color = 'var(--color-text-primary)';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = 'transparent';
             e.currentTarget.style.color = 'var(--color-text-muted)';
           }}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          {collapsed ? <ChevronsRight size={18} /> : <ChevronsLeft size={18} />}
+          {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
         </button>
       </div>
 
-      {/* ─── Search / Command Palette trigger ─────────────────────────── */}
+      {/* ─── Search ────────────────────────────────────────────────────── */}
       {!collapsed && (
-        <div className="px-3 pt-3 pb-1">
+        <div style={{ padding: '10px 10px 4px' }}>
           <button
             onClick={() => {
-              // Trigger Ctrl+K command palette
               document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
             }}
-            className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm transition-colors"
             style={{
-              color: 'var(--color-text-muted)',
-              backgroundColor: 'var(--color-bg-tertiary)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 7,
+              width: '100%',
+              padding: '6px 10px',
+              borderRadius: 7,
+              border: '1px solid var(--color-border)',
+              backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+              color: isDark ? '#6b6b6b' : '#9b9b9b',
+              cursor: 'pointer',
+              fontSize: 13,
+              transition: 'border-color 0.1s ease, background-color 0.1s ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+              e.currentTarget.style.backgroundColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)';
+              e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.15)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+              e.currentTarget.style.backgroundColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)';
+              e.currentTarget.style.borderColor = 'var(--color-border)';
             }}
           >
-            <Search size={15} />
-            <span className="flex-1 text-left">Search...</span>
+            <Search size={13} style={{ flexShrink: 0, opacity: 0.7 }} />
+            <span style={{ flex: 1, textAlign: 'left' }}>Search</span>
             <kbd
-              className="text-[11px] px-1.5 py-0.5 rounded font-mono"
-              style={{ backgroundColor: 'var(--color-bg-primary)', color: 'var(--color-text-muted)' }}
+              style={{
+                fontSize: 11,
+                padding: '1px 5px',
+                borderRadius: 4,
+                fontFamily: 'inherit',
+                backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)',
+                color: isDark ? '#6b6b6b' : '#9b9b9b',
+                border: 'none',
+              }}
             >
               ⌘K
             </kbd>
@@ -152,63 +228,106 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* ─── Navigation ───────────────────────────────────────────────── */}
-      <nav className="flex-1 py-2 overflow-y-auto px-2">
+      {/* ─── Navigation ────────────────────────────────────────────────── */}
+      <nav
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '6px 8px',
+        }}
+      >
         {sections.map((section, sectionIdx) => (
-          <div key={section.title || sectionIdx} className={sectionIdx > 0 ? 'mt-4' : ''}>
-            {/* Section header */}
+          <div key={section.title || sectionIdx} style={{ marginTop: sectionIdx > 0 ? 20 : 4 }}>
+
+            {/* Section label */}
             {section.title && !collapsed && (
               <div
-                className="px-2 pb-1 text-[11px] font-semibold tracking-widest uppercase"
-                style={{ color: 'var(--sidebar-section-text)' }}
+                style={{
+                  padding: '0 8px 4px',
+                  fontSize: 11,
+                  fontWeight: 500,
+                  letterSpacing: '0.04em',
+                  color: isDark ? '#4a4a4a' : '#b0b0b0',
+                  textTransform: 'none',
+                }}
               >
                 {section.title}
               </div>
             )}
 
-            {/* Divider for collapsed mode */}
             {section.title && collapsed && (
               <div
-                className="mx-2 my-2"
-                style={{ borderTop: '1px solid var(--color-border)' }}
+                style={{
+                  margin: '0 8px 8px',
+                  borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)'}`,
+                }}
               />
             )}
 
-            {/* Nav items */}
-            <div className="space-y-0.5">
+            {/* Items */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               {section.items.map((item) => {
-                const Icon = item.icon;
                 const isActive = location.pathname === item.path;
-
                 return (
                   <NavLink
                     key={item.path}
                     to={item.path}
-                    className={`flex items-center rounded-lg transition-colors ${
-                      collapsed ? 'justify-center px-0 py-2.5' : 'gap-2.5 px-2.5 py-2'
-                    }`}
+                    title={collapsed ? item.label : undefined}
                     style={{
-                      backgroundColor: isActive ? 'var(--color-accent-soft)' : 'transparent',
-                      color: isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-                      fontWeight: isActive ? 500 : 400,
-                      fontSize: '0.875rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: collapsed ? 0 : 7,
+                      justifyContent: collapsed ? 'center' : 'flex-start',
+                      padding: collapsed ? '7px 0' : '5px 8px',
+                      borderRadius: 6,
+                      textDecoration: 'none',
+                      fontSize: 13,
+                      transition: 'background-color 0.1s ease, color 0.1s ease',
+                      ...(isActive ? activeItemStyle : inactiveItemStyle),
                     }}
                     onMouseEnter={(e) => {
                       if (!isActive) {
-                        e.currentTarget.style.backgroundColor = 'var(--sidebar-hover)';
-                        e.currentTarget.style.color = 'var(--color-text-primary)';
+                        (e.currentTarget as HTMLElement).style.backgroundColor = hoverItemStyle.backgroundColor;
+                        (e.currentTarget as HTMLElement).style.color = hoverItemStyle.color;
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!isActive) {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                        e.currentTarget.style.color = 'var(--color-text-secondary)';
+                        (e.currentTarget as HTMLElement).style.backgroundColor = inactiveItemStyle.backgroundColor;
+                        (e.currentTarget as HTMLElement).style.color = inactiveItemStyle.color;
                       }
                     }}
-                    title={collapsed ? item.label : undefined}
                   >
-                    <Icon size={18} />
-                    {!collapsed && <span>{item.label}</span>}
+                    {/* Emoji replaces the Lucide icon */}
+                    <span
+                      style={{
+                        fontSize: collapsed ? 17 : 15,
+                        lineHeight: 1,
+                        flexShrink: 0,
+                        opacity: isActive ? 1 : 0.75,
+                        transition: 'opacity 0.1s ease',
+                        width: collapsed ? undefined : 18,
+                        textAlign: 'center',
+                      }}
+                    >
+                      {item.emoji}
+                    </span>
+                    {!collapsed && (
+                      <span style={{ lineHeight: 1.3 }}>{item.label}</span>
+                    )}
+                    {/* Active indicator dot */}
+                    {isActive && !collapsed && (
+                      <span
+                        style={{
+                          marginLeft: 'auto',
+                          width: 5,
+                          height: 5,
+                          borderRadius: '50%',
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
+                          flexShrink: 0,
+                        }}
+                      />
+                    )}
                   </NavLink>
                 );
               })}
@@ -217,65 +336,103 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* ─── Bottom actions ───────────────────────────────────────────── */}
+      {/* ─── Bottom actions ─────────────────────────────────────────────── */}
       <div
-        className="px-2 py-2 space-y-0.5"
-        style={{ borderTop: '1px solid var(--color-border)' }}
+        style={{
+          padding: '6px 8px',
+          borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)'}`,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 1,
+        }}
       >
         {/* Theme toggle */}
         <button
           onClick={toggleTheme}
-          className={`flex items-center rounded-lg transition-colors w-full ${
-            collapsed ? 'justify-center px-0 py-2.5' : 'gap-2.5 px-2.5 py-2'
-          }`}
+          title={collapsed ? `Switch to ${effectiveTheme === 'dark' ? 'light' : 'dark'} mode` : undefined}
           style={{
-            color: 'var(--color-text-secondary)',
-            fontSize: '0.875rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: collapsed ? 0 : 7,
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            padding: collapsed ? '7px 0' : '5px 8px',
+            borderRadius: 6,
+            border: 'none',
+            backgroundColor: 'transparent',
+            color: isDark ? '#8a8a8a' : '#6b6b6b',
+            cursor: 'pointer',
+            fontSize: 13,
+            width: '100%',
+            transition: 'background-color 0.1s ease, color 0.1s ease',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--sidebar-hover)';
-            e.currentTarget.style.color = 'var(--color-text-primary)';
+            e.currentTarget.style.backgroundColor = hoverItemStyle.backgroundColor;
+            e.currentTarget.style.color = hoverItemStyle.color;
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.color = 'var(--color-text-secondary)';
+            e.currentTarget.style.color = isDark ? '#8a8a8a' : '#6b6b6b';
           }}
-          title={collapsed ? `Switch to ${effectiveTheme === 'dark' ? 'light' : 'dark'} mode` : undefined}
         >
-          {effectiveTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          <span style={{ fontSize: collapsed ? 17 : 15, lineHeight: 1, flexShrink: 0, opacity: 0.75, width: collapsed ? undefined : 18, textAlign: 'center' }}>
+            {effectiveTheme === 'dark' ? '☀️' : '🌙'}
+          </span>
           {!collapsed && (
-            <span>{effectiveTheme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+            <span style={{ lineHeight: 1.3 }}>
+              {effectiveTheme === 'dark' ? 'Light mode' : 'Dark mode'}
+            </span>
           )}
         </button>
 
         {/* Settings */}
         <NavLink
           to="/settings"
-          className={`flex items-center rounded-lg transition-colors ${
-            collapsed ? 'justify-center px-0 py-2.5' : 'gap-2.5 px-2.5 py-2'
-          }`}
+          title={collapsed ? 'Settings' : undefined}
           style={{
-            backgroundColor: location.pathname === '/settings' ? 'var(--color-accent-soft)' : 'transparent',
-            color: location.pathname === '/settings' ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-            fontWeight: location.pathname === '/settings' ? 500 : 400,
-            fontSize: '0.875rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: collapsed ? 0 : 7,
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            padding: collapsed ? '7px 0' : '5px 8px',
+            borderRadius: 6,
+            textDecoration: 'none',
+            fontSize: 13,
+            transition: 'background-color 0.1s ease, color 0.1s ease',
+            ...(location.pathname === '/settings' ? activeItemStyle : inactiveItemStyle),
           }}
           onMouseEnter={(e) => {
             if (location.pathname !== '/settings') {
-              e.currentTarget.style.backgroundColor = 'var(--sidebar-hover)';
-              e.currentTarget.style.color = 'var(--color-text-primary)';
+              (e.currentTarget as HTMLElement).style.backgroundColor = hoverItemStyle.backgroundColor;
+              (e.currentTarget as HTMLElement).style.color = hoverItemStyle.color;
             }
           }}
           onMouseLeave={(e) => {
             if (location.pathname !== '/settings') {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.color = 'var(--color-text-secondary)';
+              (e.currentTarget as HTMLElement).style.backgroundColor = inactiveItemStyle.backgroundColor;
+              (e.currentTarget as HTMLElement).style.color = inactiveItemStyle.color;
             }
           }}
-          title={collapsed ? 'Settings' : undefined}
         >
-          <Settings size={18} />
-          {!collapsed && <span>Settings</span>}
+          <span style={{ fontSize: collapsed ? 17 : 15, lineHeight: 1, flexShrink: 0, opacity: location.pathname === '/settings' ? 1 : 0.75, width: collapsed ? undefined : 18, textAlign: 'center' }}>
+            ⚙️
+          </span>
+          {!collapsed && (
+            <>
+              <span style={{ lineHeight: 1.3 }}>Settings</span>
+              {location.pathname === '/settings' && (
+                <span
+                  style={{
+                    marginLeft: 'auto',
+                    width: 5,
+                    height: 5,
+                    borderRadius: '50%',
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
+                    flexShrink: 0,
+                  }}
+                />
+              )}
+            </>
+          )}
         </NavLink>
       </div>
     </aside>
