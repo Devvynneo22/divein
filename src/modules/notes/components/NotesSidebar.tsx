@@ -64,36 +64,63 @@ export function NotesSidebar({
     >
       {/* Search */}
       <div
-        className="px-3 py-3"
-        style={{ borderBottom: '1px solid var(--color-border)' }}
+        style={{
+          padding: '8px 10px',
+          borderBottom: '1px solid var(--color-border)',
+        }}
       >
-        <div className="relative">
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
           <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2"
-            style={{ color: 'var(--color-text-muted)' }}
+            size={13}
+            style={{
+              position: 'absolute',
+              left: 9,
+              color: 'var(--color-text-muted)',
+              pointerEvents: 'none',
+              flexShrink: 0,
+            }}
           />
           <input
             type="text"
             value={rawQuery}
             onChange={(e) => setRawQuery(e.target.value)}
             placeholder="Search pages..."
-            className="w-full pl-8 pr-8 py-2 rounded-lg text-sm focus:outline-none transition-colors"
             style={{
+              width: '100%',
+              paddingLeft: 28,
+              paddingRight: rawQuery ? 28 : 10,
+              paddingTop: 6,
+              paddingBottom: 6,
+              borderRadius: 7,
+              fontSize: 13,
               backgroundColor: 'var(--color-bg-tertiary)',
               border: '1px solid var(--color-border)',
               color: 'var(--color-text-primary)',
+              outline: 'none',
+              fontFamily: 'inherit',
+              lineHeight: 1.4,
             }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent)'; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
           />
           {rawQuery && (
             <button
               onClick={() => setRawQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 transition-colors"
-              style={{ color: 'var(--color-text-muted)' }}
+              style={{
+                position: 'absolute',
+                right: 8,
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                color: 'var(--color-text-muted)',
+                display: 'flex',
+                alignItems: 'center',
+              }}
               onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
             >
-              <X size={13} />
+              <X size={12} />
             </button>
           )}
         </div>
