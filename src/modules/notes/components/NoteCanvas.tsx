@@ -1,571 +1,1405 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type CanvasBlockKind = 'text' | 'image' | 'sticky';
-type StickyColor = 'yellow' | 'pink' | 'blue' | 'green' | 'lavender';
+type BlockType = 'text-box' | 'sticky-note' | 'image';
+type Tool = 'select' | 'text' | 'sticky' | 'image';
+type StickyColor = 'yellow' | 'pink' | 'blue' | 'green' | 'lavender' | 'orange';
 
-interface CanvasBlock {
+interface Block {
   id: string;
-  kind: CanvasBlockKind;
+  type: BlockType;
   x: number;
   y: number;
   width: number;
   height: number;
-  content: string;      // text content / image src
-  color?: StickyColor;  // for sticky notes
-  fontSize?: number;
-  bold?: boolean;
+  zIndex: number;
+  content: string;
+  color?: StickyColor;
+  rotation?: number;
 }
 
-const STICKY_COLORS: Record<StickyColor, { bg: string; border: string; text: string }> = {
+interface Pan {
+  x: number;
+  y: number;
+}
+
+interface CanvasData {
+  blocks: Block[];
+  pan: Pan;
+  zoom: number;
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const MIN_ZOOM = 0.15;
+const MAX_ZOOM = 4.0;
+const MAX_HISTORY = 50;
+const STORAGE_PREFIX = 'divein:canvas:v1:';
+
+const STICKY_PALETTE: Record<StickyColor, { bg: string; border: string; text: string }> = {
   yellow:   { bg: '#fef9c3', border: '#ca8a04', text: '#713f12' },
   pink:     { bg: '#fce7f3', border: '#db2777', text: '#831843' },
   blue:     { bg: '#dbeafe', border: '#2563eb', text: '#1e3a8a' },
   green:    { bg: '#d1fae5', border: '#059669', text: '#064e3b' },
   lavender: { bg: '#ede9fe', border: '#7c3aed', text: '#3b0764' },
+  orange:   { bg: '#ffedd5', border: '#ea580c', text: '#7c2d12' },
 };
 
-function genId() { return Math.random().toString(36).slice(2); }
+const COLOR_KEYS: StickyColor[] = ['yellow', 'pink', 'blue', 'green', 'lavender', 'orange'];
 
-// ─── Resizable, draggable block ───────────────────────────────────────────────
+// ─── Storage helpers ──────────────────────────────────────────────────────────
 
-function CanvasItem({
-  block,
-  isSelected,
-  onSelect,
-  onChange,
-  onDelete,
-}: {
-  block: CanvasBlock;
-  isSelected: boolean;
-  onSelect: () => void;
-  onChange: (patch: Partial<CanvasBlock>) => void;
-  onDelete: () => void;
-}) {
-  const dragRef = useRef<{ startX: number; startY: number; bx: number; by: number } | null>(null);
-  const resizeRef = useRef<{ startX: number; startY: number; bw: number; bh: number } | null>(null);
-  const [editing, setEditing] = useState(false);
-  const textRef = useRef<HTMLTextAreaElement>(null);
-  const imgInputRef = useRef<HTMLInputElement>(null);
+function loadCanvas(noteId: string): Partial<CanvasData> {
+  try {
+    const raw = localStorage.getItem(STORAGE_PREFIX + noteId);
+    return raw ? (JSON.parse(raw) as Partial<CanvasData>) : {};
+  } catch {
+    return {};
+  }
+}
 
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+function persistCanvas(noteId: string, data: CanvasData): void {
+  try {
+    localStorage.setItem(STORAGE_PREFIX + noteId, JSON.stringify(data));
+  } catch (e) {
+    console.warn('Canvas: persist failed', e);
+  }
+}
 
-  // ─── Drag ─────────────────────────────────────────────────────────────────
+function uid(): string {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
 
-  const handleDragMouseDown = useCallback((e: React.MouseEvent) => {
-    if (editing) return;
-    e.preventDefault();
-    e.stopPropagation();
-    onSelect();
-    dragRef.current = { startX: e.clientX, startY: e.clientY, bx: block.x, by: block.y };
+// ─── NoteCanvas (main component) ─────────────────────────────────────────────
 
-    function onMove(ev: MouseEvent) {
-      if (!dragRef.current) return;
-      onChange({
-        x: dragRef.current.bx + ev.clientX - dragRef.current.startX,
-        y: dragRef.current.by + ev.clientY - dragRef.current.startY,
-      });
-    }
-    function onUp() {
-      dragRef.current = null;
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    }
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  }, [block.x, block.y, editing, onChange, onSelect]);
+export interface NoteCanvasProps {
+  noteId: string;
+}
 
-  // ─── Resize ───────────────────────────────────────────────────────────────
+export function NoteCanvas({ noteId }: NoteCanvasProps) {
+  // ── Load initial data once ────────────────────────────────────────────────
+  const [initialData] = useState<Partial<CanvasData>>(() => loadCanvas(noteId));
 
-  const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    resizeRef.current = { startX: e.clientX, startY: e.clientY, bw: block.width, bh: block.height };
+  // ── Render state ──────────────────────────────────────────────────────────
+  const [blocks, setBlocks] = useState<Block[]>(initialData.blocks ?? []);
+  const [pan, setPan] = useState<Pan>(initialData.pan ?? { x: 0, y: 0 });
+  const [zoom, setZoom] = useState<number>(initialData.zoom ?? 1);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [tool, setTool] = useState<Tool>('select');
+  const [stickyColor, setStickyColor] = useState<StickyColor>('yellow');
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [historyLen, setHistoryLen] = useState({ past: 0, future: 0 });
+  const [isDark, setIsDark] = useState(
+    () => document.documentElement.getAttribute('data-theme') === 'dark',
+  );
 
-    function onMove(ev: MouseEvent) {
-      if (!resizeRef.current) return;
-      onChange({
-        width: Math.max(160, resizeRef.current.bw + ev.clientX - resizeRef.current.startX),
-        height: Math.max(80, resizeRef.current.bh + ev.clientY - resizeRef.current.startY),
-      });
-    }
-    function onUp() {
-      resizeRef.current = null;
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    }
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  }, [block.width, block.height, onChange]);
+  // ── Synced refs to avoid stale closures in event handlers ─────────────────
+  const panRef = useRef<Pan>(pan);
+  const zoomRef = useRef<number>(zoom);
+  const blocksRef = useRef<Block[]>(blocks);
+  const selectedIdRef = useRef<string | null>(null);
+  const editingIdRef = useRef<string | null>(null);
+  const toolRef = useRef<Tool>('select');
+  const stickyColorRef = useRef<StickyColor>('yellow');
+  const noteIdRef = useRef<string>(noteId);
 
-  // ─── Double-click to edit ─────────────────────────────────────────────────
+  useEffect(() => { panRef.current = pan; }, [pan]);
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+  useEffect(() => { blocksRef.current = blocks; }, [blocks]);
+  useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
+  useEffect(() => { editingIdRef.current = editingId; }, [editingId]);
+  useEffect(() => { toolRef.current = tool; }, [tool]);
+  useEffect(() => { stickyColorRef.current = stickyColor; }, [stickyColor]);
+  useEffect(() => { noteIdRef.current = noteId; }, [noteId]);
 
-  const handleDoubleClick = useCallback(() => {
-    if (block.kind === 'image') {
-      imgInputRef.current?.click();
+  // ── DOM refs ──────────────────────────────────────────────────────────────
+  const containerRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const pendingImageId = useRef<string | null>(null);
+  const saveDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Interaction state refs (never cause re-renders) ───────────────────────
+  const dragState = useRef<{
+    blockId: string;
+    startMouseX: number;
+    startMouseY: number;
+    startBlockX: number;
+    startBlockY: number;
+  } | null>(null);
+
+  const resizeState = useRef<{
+    blockId: string;
+    startMouseX: number;
+    startMouseY: number;
+    startW: number;
+    startH: number;
+  } | null>(null);
+
+  const panDragState = useRef<{
+    startMouseX: number;
+    startMouseY: number;
+    startPanX: number;
+    startPanY: number;
+  } | null>(null);
+
+  const isSpaceDown = useRef<boolean>(false);
+
+  // ── History ───────────────────────────────────────────────────────────────
+  const historyPast = useRef<Block[][]>([]);
+  const historyFuture = useRef<Block[][]>([]);
+
+  const recordSnapshot = useCallback(() => {
+    historyPast.current = [...historyPast.current, [...blocksRef.current]].slice(-MAX_HISTORY);
+    historyFuture.current = [];
+    setHistoryLen({ past: historyPast.current.length, future: 0 });
+  }, []);
+
+  // ── Persist helpers ───────────────────────────────────────────────────────
+  const saveNow = useCallback((
+    b: Block[] = blocksRef.current,
+    p: Pan = panRef.current,
+    z: number = zoomRef.current,
+  ) => {
+    persistCanvas(noteIdRef.current, { blocks: b, pan: p, zoom: z });
+  }, []);
+
+  const scheduleSave = useCallback((
+    b: Block[] = blocksRef.current,
+    p: Pan = panRef.current,
+    z: number = zoomRef.current,
+  ) => {
+    if (saveDebounce.current) clearTimeout(saveDebounce.current);
+    saveDebounce.current = setTimeout(() => persistCanvas(noteIdRef.current, { blocks: b, pan: p, zoom: z }), 300);
+  }, []);
+
+  // ── Undo / Redo ───────────────────────────────────────────────────────────
+  const undo = useCallback(() => {
+    if (historyPast.current.length === 0) return;
+    const snapshot = historyPast.current[historyPast.current.length - 1];
+    historyPast.current = historyPast.current.slice(0, -1);
+    historyFuture.current = [...historyFuture.current, [...blocksRef.current]];
+    blocksRef.current = [...snapshot];
+    setBlocks(snapshot);
+    setHistoryLen({ past: historyPast.current.length, future: historyFuture.current.length });
+    saveNow(snapshot);
+  }, [saveNow]);
+
+  const redo = useCallback(() => {
+    if (historyFuture.current.length === 0) return;
+    const snapshot = historyFuture.current[historyFuture.current.length - 1];
+    historyFuture.current = historyFuture.current.slice(0, -1);
+    historyPast.current = [...historyPast.current, [...blocksRef.current]];
+    blocksRef.current = [...snapshot];
+    setBlocks(snapshot);
+    setHistoryLen({ past: historyPast.current.length, future: historyFuture.current.length });
+    saveNow(snapshot);
+  }, [saveNow]);
+
+  // ── Block mutations ───────────────────────────────────────────────────────
+  const getMaxZ = useCallback((): number => {
+    const bs = blocksRef.current;
+    return bs.length === 0 ? 0 : Math.max(...bs.map((b) => b.zIndex));
+  }, []);
+
+  const addBlock = useCallback((partial: Omit<Block, 'id' | 'zIndex'>): string => {
+    recordSnapshot();
+    const id = uid();
+    const newBlock: Block = { ...partial, id, zIndex: getMaxZ() + 1 };
+    const next = [...blocksRef.current, newBlock];
+    blocksRef.current = next;
+    setBlocks(next);
+    setSelectedId(id);
+    selectedIdRef.current = id;
+    saveNow(next);
+    return id;
+  }, [recordSnapshot, getMaxZ, saveNow]);
+
+  const removeBlock = useCallback((id: string) => {
+    recordSnapshot();
+    const next = blocksRef.current.filter((b) => b.id !== id);
+    blocksRef.current = next;
+    setBlocks(next);
+    if (selectedIdRef.current === id) { setSelectedId(null); selectedIdRef.current = null; }
+    if (editingIdRef.current === id) { setEditingId(null); editingIdRef.current = null; }
+    saveNow(next);
+  }, [recordSnapshot, saveNow]);
+
+  const updateContent = useCallback((id: string, content: string) => {
+    setBlocks((prev) => {
+      const next = prev.map((b) => (b.id === id ? { ...b, content } : b));
+      blocksRef.current = next;
+      return next;
+    });
+    scheduleSave();
+  }, [scheduleSave]);
+
+  const bringToFront = useCallback((id: string) => {
+    const maxZ = getMaxZ();
+    setBlocks((prev) => {
+      const next = prev.map((b) => (b.id === id ? { ...b, zIndex: maxZ + 1 } : b));
+      blocksRef.current = next;
+      return next;
+    });
+  }, [getMaxZ]);
+
+  // ── Coordinate conversion ─────────────────────────────────────────────────
+  const clientToCanvas = useCallback((cx: number, cy: number): Pan => {
+    const el = containerRef.current;
+    if (!el) return { x: 0, y: 0 };
+    const rect = el.getBoundingClientRect();
+    return {
+      x: (cx - rect.left - panRef.current.x) / zoomRef.current,
+      y: (cy - rect.top - panRef.current.y) / zoomRef.current,
+    };
+  }, []);
+
+  const viewCenter = useCallback((): Pan => {
+    const el = containerRef.current;
+    if (!el) return { x: 0, y: 0 };
+    return {
+      x: (el.clientWidth / 2 - panRef.current.x) / zoomRef.current,
+      y: (el.clientHeight / 2 - panRef.current.y) / zoomRef.current,
+    };
+  }, []);
+
+  // ── Add-block helpers ─────────────────────────────────────────────────────
+  const addTextBlock = useCallback((cx?: number, cy?: number) => {
+    const pos = cx !== undefined ? clientToCanvas(cx, cy!) : viewCenter();
+    addBlock({ type: 'text-box', x: pos.x - 150, y: pos.y - 60, width: 300, height: 120, content: '' });
+    setTool('select'); toolRef.current = 'select';
+  }, [clientToCanvas, viewCenter, addBlock]);
+
+  const addStickyBlock = useCallback((cx?: number, cy?: number) => {
+    const pos = cx !== undefined ? clientToCanvas(cx, cy!) : viewCenter();
+    const rotation = Math.random() * 4 - 2;
+    addBlock({
+      type: 'sticky-note',
+      x: pos.x - 100, y: pos.y - 100,
+      width: 200, height: 200,
+      content: '',
+      color: stickyColorRef.current,
+      rotation,
+    });
+    setTool('select'); toolRef.current = 'select';
+  }, [clientToCanvas, viewCenter, addBlock]);
+
+  const addImageBlock = useCallback((cx?: number, cy?: number) => {
+    const pos = cx !== undefined ? clientToCanvas(cx, cy!) : viewCenter();
+    const id = addBlock({ type: 'image', x: pos.x - 150, y: pos.y - 100, width: 300, height: 200, content: '' });
+    pendingImageId.current = id;
+    imageInputRef.current?.click();
+    setTool('select'); toolRef.current = 'select';
+  }, [clientToCanvas, viewCenter, addBlock]);
+
+  // ── Zoom helpers ──────────────────────────────────────────────────────────
+  const applyZoom = useCallback((raw: number, originX: number, originY: number) => {
+    const old = zoomRef.current;
+    let z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, raw));
+    if (Math.abs(z - 1) < 0.05) z = 1;
+    const ratio = z / old;
+    const newPan: Pan = {
+      x: originX - (originX - panRef.current.x) * ratio,
+      y: originY - (originY - panRef.current.y) * ratio,
+    };
+    zoomRef.current = z;
+    panRef.current = newPan;
+    setZoom(z);
+    setPan(newPan);
+    scheduleSave(blocksRef.current, newPan, z);
+  }, [scheduleSave]);
+
+  const zoomIn = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    applyZoom(zoomRef.current * 1.2, el.clientWidth / 2, el.clientHeight / 2);
+  }, [applyZoom]);
+
+  const zoomOut = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    applyZoom(zoomRef.current / 1.2, el.clientWidth / 2, el.clientHeight / 2);
+  }, [applyZoom]);
+
+  const resetZoom = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    applyZoom(1, el.clientWidth / 2, el.clientHeight / 2);
+  }, [applyZoom]);
+
+  const fitView = useCallback(() => {
+    const bs = blocksRef.current;
+    const el = containerRef.current;
+    if (!el || bs.length === 0) return;
+    const minX = Math.min(...bs.map((b) => b.x));
+    const minY = Math.min(...bs.map((b) => b.y));
+    const maxX = Math.max(...bs.map((b) => b.x + b.width));
+    const maxY = Math.max(...bs.map((b) => b.y + b.height));
+    const pad = 80;
+    const vw = el.clientWidth - pad * 2;
+    const vh = el.clientHeight - pad * 2;
+    const cw = maxX - minX || 1;
+    const ch = maxY - minY || 1;
+    let z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.min(vw / cw, vh / ch)));
+    if (Math.abs(z - 1) < 0.05) z = 1;
+    const newPan: Pan = {
+      x: (el.clientWidth - cw * z) / 2 - minX * z,
+      y: (el.clientHeight - ch * z) / 2 - minY * z,
+    };
+    zoomRef.current = z;
+    panRef.current = newPan;
+    setZoom(z);
+    setPan(newPan);
+    scheduleSave(blocksRef.current, newPan, z);
+  }, [scheduleSave]);
+
+  // ── Global mouse/keyboard handlers (registered once, reads from refs) ─────
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      const drag = dragState.current;
+      if (drag) {
+        const dx = (e.clientX - drag.startMouseX) / zoomRef.current;
+        const dy = (e.clientY - drag.startMouseY) / zoomRef.current;
+        setBlocks((prev) => {
+          const next = prev.map((b) =>
+            b.id === drag.blockId ? { ...b, x: drag.startBlockX + dx, y: drag.startBlockY + dy } : b,
+          );
+          blocksRef.current = next;
+          return next;
+        });
+        return;
+      }
+      const resize = resizeState.current;
+      if (resize) {
+        const dx = (e.clientX - resize.startMouseX) / zoomRef.current;
+        const dy = (e.clientY - resize.startMouseY) / zoomRef.current;
+        const nw = Math.max(80, resize.startW + dx);
+        const nh = Math.max(60, resize.startH + dy);
+        setBlocks((prev) => {
+          const next = prev.map((b) =>
+            b.id === resize.blockId ? { ...b, width: nw, height: nh } : b,
+          );
+          blocksRef.current = next;
+          return next;
+        });
+        return;
+      }
+      const ps = panDragState.current;
+      if (ps) {
+        const newPan: Pan = {
+          x: ps.startPanX + (e.clientX - ps.startMouseX),
+          y: ps.startPanY + (e.clientY - ps.startMouseY),
+        };
+        panRef.current = newPan;
+        setPan(newPan);
+      }
+    };
+
+    const onMouseUp = () => {
+      const wasDrag = !!dragState.current;
+      const wasResize = !!resizeState.current;
+      const wasPan = !!panDragState.current;
+      if (wasDrag) dragState.current = null;
+      if (wasResize) resizeState.current = null;
+      if (wasPan) panDragState.current = null;
+      if (wasDrag || wasResize || wasPan) {
+        document.body.style.userSelect = '';
+        persistCanvas(noteIdRef.current, {
+          blocks: blocksRef.current,
+          pan: panRef.current,
+          zoom: zoomRef.current,
+        });
+      }
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
+
+  // ── Wheel event (non-passive, registered imperatively) ────────────────────
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const ox = e.clientX - rect.left;
+      const oy = e.clientY - rect.top;
+
+      if (e.ctrlKey || e.metaKey) {
+        // Pinch-to-zoom or Ctrl+scroll
+        const factor = e.deltaY < 0 ? 1.1 : 0.9;
+        const old = zoomRef.current;
+        let z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, old * factor));
+        if (Math.abs(z - 1) < 0.05) z = 1;
+        const ratio = z / old;
+        const newPan: Pan = {
+          x: ox - (ox - panRef.current.x) * ratio,
+          y: oy - (oy - panRef.current.y) * ratio,
+        };
+        zoomRef.current = z;
+        panRef.current = newPan;
+        setZoom(z);
+        setPan(newPan);
+        if (saveDebounce.current) clearTimeout(saveDebounce.current);
+        saveDebounce.current = setTimeout(() =>
+          persistCanvas(noteIdRef.current, { blocks: blocksRef.current, pan: newPan, zoom: z }), 300);
+      } else {
+        // Two-finger pan
+        const newPan: Pan = {
+          x: panRef.current.x - e.deltaX,
+          y: panRef.current.y - e.deltaY,
+        };
+        panRef.current = newPan;
+        setPan(newPan);
+        if (saveDebounce.current) clearTimeout(saveDebounce.current);
+        saveDebounce.current = setTimeout(() =>
+          persistCanvas(noteIdRef.current, { blocks: blocksRef.current, pan: newPan, zoom: zoomRef.current }), 300);
+      }
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === ' ' && !isSpaceDown.current) {
+        const active = document.activeElement;
+        if (active instanceof HTMLTextAreaElement || active instanceof HTMLInputElement) return;
+        isSpaceDown.current = true;
+        if (containerRef.current) containerRef.current.style.cursor = 'grab';
+        e.preventDefault();
+        return;
+      }
+
+      // Don't intercept when editing a block's text
+      if (editingIdRef.current !== null) return;
+
+      const isMac = navigator.platform.toUpperCase().includes('MAC');
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+
+      if (e.key === 'Escape') {
+        setSelectedId(null);
+        selectedIdRef.current = null;
+        setEditingId(null);
+        editingIdRef.current = null;
+        return;
+      }
+
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIdRef.current) {
+        e.preventDefault();
+        removeBlock(selectedIdRef.current);
+        return;
+      }
+
+      if (mod && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+        return;
+      }
+      if ((mod && e.key === 'z' && e.shiftKey) || (mod && e.key === 'y')) {
+        e.preventDefault();
+        redo();
+        return;
+      }
+
+      if (e.key === '0') {
+        e.preventDefault();
+        resetZoom();
+        return;
+      }
+
+      // Arrow nudge
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key) && selectedIdRef.current) {
+        e.preventDefault();
+        const step = e.shiftKey ? 10 : 1;
+        const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+        const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
+        setBlocks((prev) => {
+          const next = prev.map((b) =>
+            b.id === selectedIdRef.current ? { ...b, x: b.x + dx, y: b.y + dy } : b,
+          );
+          blocksRef.current = next;
+          return next;
+        });
+        scheduleSave();
+        return;
+      }
+
+      // Tool shortcuts
+      if (!mod) {
+        if (e.key === 'v' || e.key === 'V') { setTool('select'); toolRef.current = 'select'; }
+        if (e.key === 't' || e.key === 'T') { setTool('text'); toolRef.current = 'text'; }
+        if (e.key === 's' || e.key === 'S') { setTool('sticky'); toolRef.current = 'sticky'; }
+        if (e.key === 'i' || e.key === 'I') { setTool('image'); toolRef.current = 'image'; }
+      }
+    };
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === ' ') {
+        isSpaceDown.current = false;
+        if (containerRef.current && !panDragState.current) {
+          containerRef.current.style.cursor = '';
+        }
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, [undo, redo, removeBlock, resetZoom, scheduleSave]);
+
+  // ── Dark mode observer ────────────────────────────────────────────────────
+  useEffect(() => {
+    const obs = new MutationObserver(() => {
+      setIsDark(document.documentElement.getAttribute('data-theme') === 'dark');
+    });
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => obs.disconnect();
+  }, []);
+
+  // ── Canvas click (add block or deselect) ──────────────────────────────────
+  const onCanvasMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button === 1 || (e.button === 0 && isSpaceDown.current)) {
+      e.preventDefault();
+      panDragState.current = {
+        startMouseX: e.clientX,
+        startMouseY: e.clientY,
+        startPanX: panRef.current.x,
+        startPanY: panRef.current.y,
+      };
+      document.body.style.userSelect = 'none';
+      if (containerRef.current) containerRef.current.style.cursor = 'grabbing';
       return;
     }
-    setEditing(true);
-    setTimeout(() => textRef.current?.focus(), 20);
-  }, [block.kind]);
 
-  const stickyStyle = block.kind === 'sticky' && block.color
-    ? STICKY_COLORS[block.color]
-    : null;
+    if (e.button !== 0) return;
 
-  const bgColor = stickyStyle
-    ? (isDark ? `${stickyStyle.bg}22` : stickyStyle.bg)
-    : (block.kind === 'text' ? 'var(--color-bg-elevated)' : 'transparent');
+    const currentTool = toolRef.current;
+    if (currentTool === 'text') {
+      addTextBlock(e.clientX, e.clientY);
+      return;
+    }
+    if (currentTool === 'sticky') {
+      addStickyBlock(e.clientX, e.clientY);
+      return;
+    }
+    if (currentTool === 'image') {
+      addImageBlock(e.clientX, e.clientY);
+      return;
+    }
+    // Select tool: deselect
+    setSelectedId(null);
+    selectedIdRef.current = null;
+    setEditingId(null);
+    editingIdRef.current = null;
+    setShowColorPicker(false);
+  }, [addTextBlock, addStickyBlock, addImageBlock]);
 
-  const borderColor = isSelected
-    ? 'var(--color-accent)'
-    : stickyStyle
-    ? stickyStyle.border
-    : 'var(--color-border)';
+  const onCanvasMouseUp = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (panDragState.current) {
+      if (containerRef.current) {
+        containerRef.current.style.cursor = isSpaceDown.current ? 'grab' : '';
+      }
+    }
+  }, []);
 
-  const textColor = stickyStyle
-    ? (isDark ? stickyStyle.bg : stickyStyle.text)
-    : 'var(--color-text-primary)';
+  // ── Block mousedown (drag start) ──────────────────────────────────────────
+  const onBlockMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>, block: Block) => {
+    if (e.button !== 0) return;
+    if (isSpaceDown.current) return; // let canvas handle pan
 
+    e.stopPropagation();
+
+    // Select the block
+    setSelectedId(block.id);
+    selectedIdRef.current = block.id;
+    bringToFront(block.id);
+    setShowColorPicker(false);
+
+    // Don't start drag if editing
+    if (editingIdRef.current === block.id) return;
+
+    dragState.current = {
+      blockId: block.id,
+      startMouseX: e.clientX,
+      startMouseY: e.clientY,
+      startBlockX: block.x,
+      startBlockY: block.y,
+    };
+    document.body.style.userSelect = 'none';
+  }, [bringToFront]);
+
+  // ── Resize handle mousedown ───────────────────────────────────────────────
+  const onResizeMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>, block: Block) => {
+    e.preventDefault();
+    e.stopPropagation();
+    recordSnapshot();
+    resizeState.current = {
+      blockId: block.id,
+      startMouseX: e.clientX,
+      startMouseY: e.clientY,
+      startW: block.width,
+      startH: block.height,
+    };
+    document.body.style.userSelect = 'none';
+  }, [recordSnapshot]);
+
+  // ── Double-click to edit ──────────────────────────────────────────────────
+  const onBlockDblClick = useCallback((e: React.MouseEvent, block: Block) => {
+    e.stopPropagation();
+    if (block.type === 'image') {
+      pendingImageId.current = block.id;
+      imageInputRef.current?.click();
+      return;
+    }
+    setEditingId(block.id);
+    editingIdRef.current = block.id;
+  }, []);
+
+  // ── Image file input ──────────────────────────────────────────────────────
+  const onImageFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const id = pendingImageId.current;
+    if (!file || !id) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      setBlocks((prev) => {
+        const next = prev.map((b) => (b.id === id ? { ...b, content: dataUrl } : b));
+        blocksRef.current = next;
+        saveNow(next);
+        return next;
+      });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+    pendingImageId.current = null;
+  }, [saveNow]);
+
+  // ── Sticky color change ───────────────────────────────────────────────────
+  const onChangeStickyColor = useCallback((id: string, color: StickyColor) => {
+    setBlocks((prev) => {
+      const next = prev.map((b) => (b.id === id ? { ...b, color } : b));
+      blocksRef.current = next;
+      saveNow(next);
+      return next;
+    });
+  }, [saveNow]);
+
+  // ── Derived cursor ────────────────────────────────────────────────────────
+  const canvasCursor =
+    tool === 'text' ? 'crosshair' :
+    tool === 'sticky' ? 'crosshair' :
+    tool === 'image' ? 'crosshair' :
+    'default';
+
+  const pct = Math.round(zoom * 100);
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div
-      style={{
-        position: 'absolute',
-        left: block.x,
-        top: block.y,
-        width: block.width,
-        height: block.height,
-        border: `2px solid ${borderColor}`,
-        borderRadius: block.kind === 'sticky' ? 8 : 10,
-        borderTop: stickyStyle ? `4px solid ${stickyStyle.border}` : `2px solid ${borderColor}`,
-        backgroundColor: bgColor,
-        boxShadow: isSelected
-          ? `0 0 0 3px var(--color-accent-soft), 0 4px 20px rgba(0,0,0,0.15)`
-          : stickyStyle
-          ? '2px 3px 12px rgba(0,0,0,0.12)'
-          : '0 2px 8px rgba(0,0,0,0.08)',
-        display: 'flex',
-        flexDirection: 'column',
-        cursor: editing ? 'text' : 'move',
-        userSelect: editing ? 'auto' : 'none',
-        zIndex: isSelected ? 10 : 1,
-        transition: 'box-shadow 0.15s ease, border-color 0.15s ease',
-        overflow: 'hidden',
-      }}
-      onMouseDown={handleDragMouseDown}
-      onClick={(e) => { e.stopPropagation(); onSelect(); }}
-      onDoubleClick={handleDoubleClick}
-    >
-      {/* ── Delete button (shown when selected) ── */}
-      {isSelected && (
-        <button
-          onMouseDown={(e) => { e.stopPropagation(); onDelete(); }}
-          title="Delete block"
-          style={{
-            position: 'absolute',
-            top: -12,
-            right: -12,
-            width: 24,
-            height: 24,
-            borderRadius: '50%',
-            border: 'none',
-            backgroundColor: '#ef4444',
-            color: '#fff',
-            fontSize: 14,
-            lineHeight: 1,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 20,
-            boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-          }}
-        >
-          ×
-        </button>
-      )}
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      {/* Hidden file input */}
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={onImageFileChange}
+      />
 
-      {/* ── Content ── */}
-      <div style={{ flex: 1, overflow: 'hidden', padding: block.kind === 'image' ? 0 : 10 }}>
-        {block.kind === 'image' ? (
-          <>
-            {block.content ? (
-              <img
-                src={block.content}
-                alt="Canvas image"
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'var(--color-text-muted)',
-                  fontSize: 13,
-                  gap: 6,
-                }}
-              >
-                🖼️ Double-click to add image
-              </div>
-            )}
-            <input
-              ref={imgInputRef}
-              type="file"
-              accept="image/*"
-              style={{ display: 'none' }}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                  if (ev.target?.result) onChange({ content: ev.target.result as string });
-                };
-                reader.readAsDataURL(file);
-                e.target.value = '';
-              }}
-            />
-          </>
-        ) : editing ? (
-          <textarea
-            ref={textRef}
-            value={block.content}
-            onChange={(e) => onChange({ content: e.target.value })}
-            onBlur={() => setEditing(false)}
-            onMouseDown={(e) => e.stopPropagation()}
-            style={{
-              width: '100%',
-              height: '100%',
-              border: 'none',
-              outline: 'none',
-              backgroundColor: 'transparent',
-              resize: 'none',
-              fontSize: block.fontSize ?? (block.kind === 'sticky' ? 14 : 14),
-              fontWeight: block.bold ? 700 : 400,
-              color: textColor,
-              fontFamily: 'inherit',
-              lineHeight: 1.6,
-              cursor: 'text',
-            }}
-            autoFocus
-          />
-        ) : (
-          <div
-            style={{
-              fontSize: block.fontSize ?? (block.kind === 'sticky' ? 14 : 14),
-              fontWeight: block.bold ? 700 : 400,
-              color: textColor,
-              lineHeight: 1.6,
-              whiteSpace: 'pre-wrap',
-              overflowWrap: 'break-word',
-              overflow: 'hidden',
-              height: '100%',
-              cursor: 'move',
-            }}
-          >
-            {block.content || (
-              <span style={{ opacity: 0.4, fontStyle: 'italic' }}>
-                {block.kind === 'sticky' ? 'Double-click to write...' : 'Double-click to edit...'}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
+      {/* ── Toolbar ── */}
+      <CanvasToolbar
+        tool={tool}
+        stickyColor={stickyColor}
+        showColorPicker={showColorPicker}
+        zoom={pct}
+        historyLen={historyLen}
+        isDark={isDark}
+        onSelectTool={(t) => { setTool(t); toolRef.current = t; setShowColorPicker(false); }}
+        onStickyTool={() => {
+          setTool('sticky');
+          toolRef.current = 'sticky';
+          setShowColorPicker((v) => !v);
+        }}
+        onPickColor={(c) => { setStickyColor(c); stickyColorRef.current = c; setShowColorPicker(false); }}
+        onToggleColorPicker={() => setShowColorPicker((v) => !v)}
+        onUndo={undo}
+        onRedo={redo}
+        onZoomIn={zoomIn}
+        onZoomOut={zoomOut}
+        onZoomReset={resetZoom}
+        onFitView={fitView}
+        onAddText={() => addTextBlock()}
+        onAddSticky={() => addStickyBlock()}
+        onAddImage={() => addImageBlock()}
+      />
 
-      {/* ── Resize handle ── */}
+      {/* ── Canvas area ── */}
       <div
-        onMouseDown={handleResizeMouseDown}
+        ref={containerRef}
+        onMouseDown={onCanvasMouseDown}
+        onMouseUp={onCanvasMouseUp}
         style={{
-          position: 'absolute',
-          right: 0,
-          bottom: 0,
-          width: 18,
-          height: 18,
-          cursor: 'se-resize',
-          display: 'flex',
-          alignItems: 'flex-end',
-          justifyContent: 'flex-end',
-          padding: '3px',
-          zIndex: 5,
+          flex: 1,
+          position: 'relative',
+          overflow: 'hidden',
+          cursor: canvasCursor,
+          backgroundColor: 'var(--color-bg-secondary)',
+          backgroundImage: 'radial-gradient(circle, var(--color-border) 1px, transparent 1px)',
+          backgroundSize: `${24 * zoom}px ${24 * zoom}px`,
+          backgroundPosition: `${pan.x}px ${pan.y}px`,
         }}
       >
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-          <path d="M2 8L8 2M5 8L8 5M8 8L8 8" stroke="var(--color-border-strong)" strokeWidth="1.5" strokeLinecap="round"/>
-        </svg>
+        {/* Transform layer */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: 0,
+            height: 0,
+            transformOrigin: '0 0',
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+            willChange: 'transform',
+          }}
+        >
+          {blocks.map((block) => (
+            <CanvasBlock
+              key={block.id}
+              block={block}
+              isSelected={selectedId === block.id}
+              isEditing={editingId === block.id}
+              isDark={isDark}
+              onMouseDown={onBlockMouseDown}
+              onDblClick={onBlockDblClick}
+              onResizeMouseDown={onResizeMouseDown}
+              onDelete={removeBlock}
+              onContentChange={updateContent}
+              onEditEnd={() => { setEditingId(null); editingIdRef.current = null; }}
+              onColorChange={onChangeStickyColor}
+            />
+          ))}
+        </div>
+
+        {/* Empty state */}
+        {blocks.length === 0 && (
+          <EmptyState
+            onAddText={() => addTextBlock()}
+            onAddSticky={() => addStickyBlock()}
+            onAddImage={() => addImageBlock()}
+          />
+        )}
       </div>
     </div>
   );
 }
 
-// ─── Canvas toolbar ───────────────────────────────────────────────────────────
+// ─── Toolbar ──────────────────────────────────────────────────────────────────
+
+interface ToolbarProps {
+  tool: Tool;
+  stickyColor: StickyColor;
+  showColorPicker: boolean;
+  zoom: number;
+  historyLen: { past: number; future: number };
+  isDark: boolean;
+  onSelectTool: (t: Tool) => void;
+  onStickyTool: () => void;
+  onPickColor: (c: StickyColor) => void;
+  onToggleColorPicker: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onZoomReset: () => void;
+  onFitView: () => void;
+  onAddText: () => void;
+  onAddSticky: () => void;
+  onAddImage: () => void;
+}
 
 function CanvasToolbar({
-  onAdd,
-  onClear,
-}: {
-  onAdd: (kind: CanvasBlockKind, color?: StickyColor) => void;
-  onClear: () => void;
-}) {
-  const [showStickyMenu, setShowStickyMenu] = useState(false);
+  tool, stickyColor, showColorPicker, zoom, historyLen, isDark,
+  onSelectTool, onStickyTool, onPickColor,
+  onUndo, onRedo, onZoomIn, onZoomOut, onZoomReset, onFitView,
+}: ToolbarProps) {
+  const btnBase: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 32, height: 32, borderRadius: 6, border: 'none', cursor: 'pointer',
+    fontSize: 13, fontWeight: 600, transition: 'all 0.1s',
+    background: 'none',
+    color: 'var(--color-text-secondary)',
+  };
+  const btnActive: React.CSSProperties = {
+    ...btnBase,
+    backgroundColor: 'var(--color-accent-soft)',
+    color: 'var(--color-accent)',
+  };
+  const btnDisabled: React.CSSProperties = {
+    ...btnBase,
+    opacity: 0.3,
+    cursor: 'default',
+  };
+
+  const swatch = STICKY_PALETTE[stickyColor].bg;
 
   return (
     <div
       style={{
-        position: 'absolute',
-        top: 12,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: 100,
         display: 'flex',
         alignItems: 'center',
-        gap: 6,
-        padding: '6px 10px',
-        borderRadius: 10,
-        backgroundColor: 'var(--color-bg-elevated)',
-        border: '1px solid var(--color-border)',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
-        userSelect: 'none',
+        gap: 4,
+        padding: '6px 12px',
+        borderBottom: '1px solid var(--color-border)',
+        backgroundColor: isDark ? 'var(--color-bg-primary)' : 'var(--color-bg-elevated)',
+        flexShrink: 0,
+        position: 'relative',
+        zIndex: 10,
+        flexWrap: 'wrap',
       }}
     >
-      {/* Text block */}
-      <ToolBtn title="Add text box" onClick={() => onAdd('text')}>
-        Aa
+      {/* Tool buttons */}
+      <ToolBtn active={tool === 'select'} style={tool === 'select' ? btnActive : btnBase} title="Select (V)" onClick={() => onSelectTool('select')}>
+        V
+      </ToolBtn>
+      <ToolBtn active={tool === 'text'} style={tool === 'text' ? btnActive : btnBase} title="Text Box (T)" onClick={() => onSelectTool('text')}>
+        T
       </ToolBtn>
 
-      {/* Image block */}
-      <ToolBtn title="Add image block" onClick={() => onAdd('image')}>
-        🖼️
-      </ToolBtn>
-
-      {/* Sticky note */}
+      {/* Sticky with color picker */}
       <div style={{ position: 'relative' }}>
-        <ToolBtn
-          title="Add sticky note"
-          onClick={() => setShowStickyMenu((v) => !v)}
+        <button
+          title="Sticky Note (S)"
+          style={{
+            ...btnBase,
+            ...(tool === 'sticky' ? { backgroundColor: 'var(--color-accent-soft)', color: 'var(--color-accent)' } : {}),
+            display: 'flex', alignItems: 'center', gap: 3, paddingLeft: 6, paddingRight: 4,
+            width: 'auto',
+          }}
+          onClick={onStickyTool}
         >
-          📌
-        </ToolBtn>
-        {showStickyMenu && (
+          <span>S</span>
+          <span
+            style={{
+              display: 'inline-block',
+              width: 10, height: 10, borderRadius: 2,
+              backgroundColor: swatch,
+              border: '1px solid rgba(0,0,0,0.2)',
+              flexShrink: 0,
+            }}
+          />
+        </button>
+        {showColorPicker && (
           <div
             style={{
               position: 'absolute',
-              top: '100%',
-              left: 0,
-              marginTop: 6,
-              display: 'flex',
-              gap: 6,
-              padding: 8,
+              top: 36, left: 0,
+              display: 'flex', gap: 4, padding: 8,
               borderRadius: 8,
-              backgroundColor: 'var(--color-bg-elevated)',
+              backgroundColor: isDark ? 'var(--color-bg-elevated)' : '#fff',
+              boxShadow: 'var(--shadow-popup)',
               border: '1px solid var(--color-border)',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+              zIndex: 100,
             }}
           >
-            {(Object.entries(STICKY_COLORS) as [StickyColor, typeof STICKY_COLORS[StickyColor]][]).map(([color, style]) => (
+            {COLOR_KEYS.map((c) => (
               <button
-                key={color}
-                title={color}
-                onClick={() => { onAdd('sticky', color); setShowStickyMenu(false); }}
+                key={c}
+                title={c}
+                onClick={() => onPickColor(c)}
                 style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 5,
-                  border: `2px solid ${style.border}`,
-                  backgroundColor: style.bg,
+                  width: 20, height: 20, borderRadius: 4,
+                  backgroundColor: STICKY_PALETTE[c].bg,
+                  border: c === stickyColor ? `2px solid ${STICKY_PALETTE[c].border}` : '1px solid rgba(0,0,0,0.15)',
                   cursor: 'pointer',
-                  transition: 'transform 0.1s',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.15)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
               />
             ))}
           </div>
         )}
       </div>
 
-      {/* Divider */}
-      <div style={{ width: 1, height: 18, backgroundColor: 'var(--color-border)', margin: '0 2px' }} />
-
-      {/* Clear all */}
-      <ToolBtn title="Clear canvas" onClick={onClear} danger>
-        🗑️
+      <ToolBtn active={tool === 'image'} style={tool === 'image' ? btnActive : btnBase} title="Image (I)" onClick={() => onSelectTool('image')}>
+        I
       </ToolBtn>
 
-      {/* Hint */}
+      <Divider />
+
+      {/* Undo / Redo */}
+      <button
+        style={historyLen.past > 0 ? btnBase : btnDisabled}
+        disabled={historyLen.past === 0}
+        onClick={onUndo}
+        title="Undo (Ctrl+Z)"
+      >
+        ↩
+      </button>
+      <button
+        style={historyLen.future > 0 ? btnBase : btnDisabled}
+        disabled={historyLen.future === 0}
+        onClick={onRedo}
+        title="Redo (Ctrl+Shift+Z)"
+      >
+        ↪
+      </button>
+
+      <Divider />
+
+      {/* Zoom */}
+      <button style={btnBase} onClick={onZoomOut} title="Zoom out">−</button>
+      <button
+        style={{
+          ...btnBase,
+          width: 52, fontSize: 12, fontWeight: 600,
+          color: 'var(--color-text-secondary)',
+        }}
+        onClick={onZoomReset}
+        title="Reset zoom to 100%"
+      >
+        {zoom}%
+      </button>
+      <button style={btnBase} onClick={onZoomIn} title="Zoom in">+</button>
+      <button style={btnBase} onClick={onFitView} title="Fit view">⊡</button>
+
+      <Divider />
+
       <span style={{ fontSize: 11, color: 'var(--color-text-muted)', marginLeft: 4 }}>
-        Drag · Double-click to edit · Resize ↘
+        Space+drag to pan · Scroll to zoom
       </span>
     </div>
   );
 }
 
 function ToolBtn({
-  onClick,
-  title,
-  children,
-  danger,
+  children, active, style, title, onClick,
 }: {
-  onClick: () => void;
-  title: string;
   children: React.ReactNode;
-  danger?: boolean;
+  active: boolean;
+  style: React.CSSProperties;
+  title: string;
+  onClick: () => void;
 }) {
+  void active;
   return (
-    <button
-      onClick={onClick}
-      title={title}
-      style={{
-        padding: '4px 10px',
-        borderRadius: 6,
-        border: '1px solid var(--color-border)',
-        backgroundColor: 'transparent',
-        color: danger ? '#ef4444' : 'var(--color-text-secondary)',
-        cursor: 'pointer',
-        fontSize: 13,
-        fontWeight: 500,
-        transition: 'background-color 0.1s ease, color 0.1s ease',
-        whiteSpace: 'nowrap',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = danger ? 'rgba(239,68,68,0.08)' : 'var(--color-bg-tertiary)';
-        e.currentTarget.style.color = danger ? '#ef4444' : 'var(--color-text-primary)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = 'transparent';
-        e.currentTarget.style.color = danger ? '#ef4444' : 'var(--color-text-secondary)';
-      }}
-    >
+    <button style={style} title={title} onClick={onClick}>
       {children}
     </button>
   );
 }
 
-// ─── Main Canvas ──────────────────────────────────────────────────────────────
-
-const STORAGE_KEY_PREFIX = 'divein-canvas-';
-
-interface NoteCanvasProps {
-  noteId: string;
+function Divider() {
+  return (
+    <div
+      style={{
+        width: 1, height: 20,
+        backgroundColor: 'var(--color-border)',
+        margin: '0 4px',
+        flexShrink: 0,
+      }}
+    />
+  );
 }
 
-export function NoteCanvas({ noteId }: NoteCanvasProps) {
-  const storageKey = `${STORAGE_KEY_PREFIX}${noteId}`;
+// ─── CanvasBlock ──────────────────────────────────────────────────────────────
 
-  const [blocks, setBlocks] = useState<CanvasBlock[]>(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) return JSON.parse(raw) as CanvasBlock[];
-    } catch { /* ignore */ }
-    return [];
-  });
+interface CanvasBlockProps {
+  block: Block;
+  isSelected: boolean;
+  isEditing: boolean;
+  isDark: boolean;
+  onMouseDown: (e: React.MouseEvent<HTMLDivElement>, block: Block) => void;
+  onDblClick: (e: React.MouseEvent, block: Block) => void;
+  onResizeMouseDown: (e: React.MouseEvent<HTMLDivElement>, block: Block) => void;
+  onDelete: (id: string) => void;
+  onContentChange: (id: string, content: string) => void;
+  onEditEnd: () => void;
+  onColorChange: (id: string, color: StickyColor) => void;
+}
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const canvasRef = useRef<HTMLDivElement>(null);
+function CanvasBlock({
+  block, isSelected, isEditing, isDark,
+  onMouseDown, onDblClick, onResizeMouseDown,
+  onDelete, onContentChange, onEditEnd, onColorChange,
+}: CanvasBlockProps) {
+  const blockRef = useRef<Block>(block);
+  useEffect(() => { blockRef.current = block; }, [block]);
 
-  // Persist on change
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    onMouseDown(e, blockRef.current);
+  }, [onMouseDown]);
+
+  const handleDblClick = useCallback((e: React.MouseEvent) => {
+    onDblClick(e, blockRef.current);
+  }, [onDblClick]);
+
+  const handleResizeMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    onResizeMouseDown(e, blockRef.current);
+  }, [onResizeMouseDown]);
+
+  const shadow = isSelected
+    ? '0 4px 16px rgba(0,0,0,0.15)'
+    : '0 2px 8px rgba(0,0,0,0.08)';
+
+  const wrapperStyle: React.CSSProperties = {
+    position: 'absolute',
+    left: block.x,
+    top: block.y,
+    width: block.width,
+    height: block.height,
+    overflow: 'visible',
+    zIndex: block.zIndex,
+    transform: block.rotation ? `rotate(${block.rotation}deg)` : undefined,
+    outline: isSelected ? '2px solid var(--color-accent)' : 'none',
+    outlineOffset: 2,
+    borderRadius: block.type === 'sticky-note' ? 2 : 6,
+    boxShadow: block.type === 'sticky-note'
+      ? '2px 3px 8px rgba(0,0,0,0.15), 0 1px 2px rgba(0,0,0,0.1)'
+      : shadow,
+    cursor: 'grab',
+    userSelect: 'none',
+  };
+
+  return (
+    <div
+      style={wrapperStyle}
+      onMouseDown={handleMouseDown}
+      onDoubleClick={handleDblClick}
+    >
+      {/* Content area */}
+      <div style={{ width: '100%', height: '100%', overflow: 'hidden', borderRadius: 'inherit' }}>
+        {block.type === 'text-box' && (
+          <TextBoxContent
+            block={block}
+            isEditing={isEditing}
+            isDark={isDark}
+            onContentChange={onContentChange}
+            onEditEnd={onEditEnd}
+          />
+        )}
+        {block.type === 'sticky-note' && (
+          <StickyNoteContent
+            block={block}
+            isEditing={isEditing}
+            isDark={isDark}
+            onContentChange={onContentChange}
+            onEditEnd={onEditEnd}
+            onColorChange={onColorChange}
+          />
+        )}
+        {block.type === 'image' && (
+          <ImageBlockContent block={block} isDark={isDark} />
+        )}
+      </div>
+
+      {/* Delete button — outside content div */}
+      {isSelected && (
+        <button
+          style={{
+            position: 'absolute', top: -12, right: -12,
+            width: 22, height: 22, borderRadius: '50%',
+            backgroundColor: '#ef4444',
+            border: '2px solid #fff',
+            color: '#fff',
+            fontSize: 13, fontWeight: 700, lineHeight: 1,
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 20,
+            boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); onDelete(block.id); }}
+          title="Delete block"
+        >
+          ×
+        </button>
+      )}
+
+      {/* Resize handle — outside content div */}
+      {isSelected && (
+        <div
+          style={{
+            position: 'absolute', right: -5, bottom: -5,
+            width: 10, height: 10,
+            backgroundColor: '#fff',
+            border: '2px solid var(--color-accent)',
+            borderRadius: 2,
+            cursor: 'se-resize',
+            zIndex: 20,
+          }}
+          onMouseDown={handleResizeMouseDown}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── TextBoxContent ───────────────────────────────────────────────────────────
+
+function TextBoxContent({
+  block, isEditing, isDark, onContentChange, onEditEnd,
+}: {
+  block: Block;
+  isEditing: boolean;
+  isDark: boolean;
+  onContentChange: (id: string, content: string) => void;
+  onEditEnd: () => void;
+}) {
+  const taRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(blocks));
-    } catch { /* ignore */ }
-  }, [blocks, storageKey]);
-
-  const addBlock = useCallback((kind: CanvasBlockKind, color?: StickyColor) => {
-    // Place new block roughly centered with some offset
-    const canvas = canvasRef.current;
-    const cx = canvas ? (canvas.scrollLeft + canvas.clientWidth / 2) : 400;
-    const cy = canvas ? (canvas.scrollTop + canvas.clientHeight / 2) : 300;
-    const newBlock: CanvasBlock = {
-      id: genId(),
-      kind,
-      x: cx - 110 + Math.random() * 60 - 30,
-      y: cy - 80 + Math.random() * 40 - 20,
-      width: kind === 'image' ? 300 : kind === 'text' ? 260 : 220,
-      height: kind === 'image' ? 200 : kind === 'text' ? 160 : 140,
-      content: '',
-      color: kind === 'sticky' ? (color ?? 'yellow') : undefined,
-    };
-    setBlocks((prev) => [...prev, newBlock]);
-    setSelectedId(newBlock.id);
-  }, []);
-
-  const updateBlock = useCallback((id: string, patch: Partial<CanvasBlock>) => {
-    setBlocks((prev) => prev.map((b) => b.id === id ? { ...b, ...patch } : b));
-  }, []);
-
-  const deleteBlock = useCallback((id: string) => {
-    setBlocks((prev) => prev.filter((b) => b.id !== id));
-    setSelectedId(null);
-  }, []);
-
-  const clearCanvas = useCallback(() => {
-    if (confirm('Clear all blocks from this canvas?')) {
-      setBlocks([]);
-      setSelectedId(null);
+    if (isEditing && taRef.current) {
+      taRef.current.focus();
+      taRef.current.selectionStart = taRef.current.value.length;
     }
-  }, []);
+  }, [isEditing]);
 
   return (
     <div
       style={{
-        position: 'relative',
-        width: '100%',
-        height: '100%',
-        overflow: 'auto',
-        backgroundColor: 'var(--color-bg-secondary)',
-        backgroundImage: `radial-gradient(circle, var(--color-border) 1px, transparent 1px)`,
-        backgroundSize: '24px 24px',
-        cursor: 'default',
+        width: '100%', height: '100%',
+        backgroundColor: 'transparent',
+        border: isEditing ? '1.5px solid var(--color-accent)' : '1.5px solid transparent',
+        borderRadius: 6,
+        padding: 4,
+        boxSizing: 'border-box',
       }}
-      onClick={() => setSelectedId(null)}
+      onMouseEnter={(e) => {
+        const el = e.currentTarget;
+        if (!isEditing) el.style.borderColor = 'var(--color-border-hover)';
+      }}
+      onMouseLeave={(e) => {
+        const el = e.currentTarget;
+        if (!isEditing) el.style.borderColor = 'transparent';
+      }}
     >
-      {/* Infinite canvas area */}
-      <div
-        ref={canvasRef}
-        style={{ position: 'relative', width: '3000px', height: '3000px' }}
-      >
-        {blocks.map((block) => (
-          <CanvasItem
-            key={block.id}
-            block={block}
-            isSelected={selectedId === block.id}
-            onSelect={() => setSelectedId(block.id)}
-            onChange={(patch) => updateBlock(block.id, patch)}
-            onDelete={() => deleteBlock(block.id)}
+      {isEditing ? (
+        <textarea
+          ref={taRef}
+          value={block.content}
+          onChange={(e) => onContentChange(block.id, e.target.value)}
+          onBlur={onEditEnd}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === 'Escape') { e.preventDefault(); onEditEnd(); }
+          }}
+          style={{
+            width: '100%', height: '100%',
+            background: 'none', border: 'none', outline: 'none',
+            resize: 'none', padding: 4,
+            fontSize: 14, lineHeight: 1.5,
+            color: isDark ? 'var(--color-text-primary)' : 'var(--color-text-primary)',
+            fontFamily: 'inherit',
+            boxSizing: 'border-box',
+          }}
+          placeholder="Type something..."
+        />
+      ) : (
+        <div
+          style={{
+            padding: 4, fontSize: 14, lineHeight: 1.5,
+            color: 'var(--color-text-primary)',
+            whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+            minHeight: 20,
+          }}
+        >
+          {block.content || (
+            <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+              Double-click to edit
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── StickyNoteContent ────────────────────────────────────────────────────────
+
+function StickyNoteContent({
+  block, isEditing, isDark, onContentChange, onEditEnd, onColorChange,
+}: {
+  block: Block;
+  isEditing: boolean;
+  isDark: boolean;
+  onContentChange: (id: string, content: string) => void;
+  onEditEnd: () => void;
+  onColorChange: (id: string, color: StickyColor) => void;
+}) {
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  const color = (block.color ?? 'yellow') as StickyColor;
+  const palette = STICKY_PALETTE[color];
+
+  useEffect(() => {
+    if (isEditing && taRef.current) {
+      taRef.current.focus();
+      taRef.current.selectionStart = taRef.current.value.length;
+    }
+  }, [isEditing]);
+
+  const textColor = isDark ? palette.border : palette.text;
+
+  return (
+    <div
+      style={{
+        width: '100%', height: '100%',
+        backgroundColor: isDark ? `rgba(0,0,0,0)` : palette.bg,
+        background: isDark
+          ? `linear-gradient(135deg, ${palette.bg}26 0%, ${palette.bg}15 100%)`
+          : palette.bg,
+        borderTop: `3px solid ${palette.border}`,
+        borderRadius: 2,
+        padding: 4,
+        boxSizing: 'border-box',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      {/* Color row */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 4, flexShrink: 0 }}>
+        {COLOR_KEYS.map((c) => (
+          <button
+            key={c}
+            onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+            onClick={(e) => { e.stopPropagation(); onColorChange(block.id, c); }}
+            style={{
+              width: 12, height: 12, borderRadius: 2,
+              backgroundColor: STICKY_PALETTE[c].bg,
+              border: c === color ? `2px solid ${STICKY_PALETTE[c].border}` : '1px solid rgba(0,0,0,0.15)',
+              cursor: 'pointer', flexShrink: 0, padding: 0,
+            }}
           />
         ))}
+      </div>
 
-        {/* Empty state hint */}
-        {blocks.length === 0 && (
+      {/* Content */}
+      <div style={{ flex: 1, overflow: 'hidden' }}>
+        {isEditing ? (
+          <textarea
+            ref={taRef}
+            value={block.content}
+            onChange={(e) => onContentChange(block.id, e.target.value)}
+            onBlur={onEditEnd}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === 'Escape') { e.preventDefault(); onEditEnd(); }
+            }}
+            style={{
+              width: '100%', height: '100%',
+              background: 'none', border: 'none', outline: 'none',
+              resize: 'none', padding: 4,
+              fontSize: 14, lineHeight: 1.5,
+              color: textColor,
+              fontFamily: 'inherit',
+              boxSizing: 'border-box',
+            }}
+            placeholder="Write a note..."
+          />
+        ) : (
           <div
             style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              textAlign: 'center',
-              color: 'var(--color-text-muted)',
-              userSelect: 'none',
-              pointerEvents: 'none',
+              padding: 4, fontSize: 14, lineHeight: 1.5,
+              color: isDark ? palette.border : palette.text,
+              whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+              minHeight: 20,
             }}
           >
-            <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.4 }}>🎨</div>
-            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6, opacity: 0.6 }}>
-              Free canvas
-            </div>
-            <div style={{ fontSize: 13, opacity: 0.5 }}>
-              Add text boxes, sticky notes, and images freely.<br />
-              Use the toolbar above to get started.
-            </div>
+            {block.content || (
+              <span style={{ opacity: 0.5, fontStyle: 'italic', color: isDark ? palette.border : palette.text }}>
+                Double-click to write...
+              </span>
+            )}
           </div>
         )}
       </div>
+    </div>
+  );
+}
 
-      {/* Floating toolbar */}
-      <CanvasToolbar onAdd={addBlock} onClear={clearCanvas} />
+// ─── ImageBlockContent ────────────────────────────────────────────────────────
+
+function ImageBlockContent({ block, isDark }: { block: Block; isDark: boolean }) {
+  void isDark;
+  return (
+    <div
+      style={{
+        width: '100%', height: '100%',
+        borderRadius: 6,
+        border: '1.5px solid var(--color-border)',
+        overflow: 'hidden',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        backgroundColor: 'var(--color-bg-tertiary)',
+        boxSizing: 'border-box',
+      }}
+    >
+      {block.content ? (
+        <img
+          src={block.content}
+          alt="canvas image"
+          draggable={false}
+          style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+        />
+      ) : (
+        <div style={{ textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 13 }}>
+          <div style={{ fontSize: 28, marginBottom: 6 }}>🖼</div>
+          <div>Double-click to upload</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── EmptyState ───────────────────────────────────────────────────────────────
+
+function EmptyState({
+  onAddText, onAddSticky, onAddImage,
+}: {
+  onAddText: () => void;
+  onAddSticky: () => void;
+  onAddImage: () => void;
+}) {
+  const btnStyle: React.CSSProperties = {
+    padding: '8px 16px', borderRadius: 8, border: '1px solid var(--color-border)',
+    backgroundColor: 'var(--color-bg-elevated)',
+    color: 'var(--color-text-secondary)',
+    cursor: 'pointer', fontSize: 13, fontWeight: 500,
+    transition: 'all 0.1s',
+  };
+
+  return (
+    <div
+      style={{
+        position: 'absolute', inset: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        pointerEvents: 'none',
+      }}
+    >
+      <div
+        style={{ textAlign: 'center', pointerEvents: 'auto' }}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div style={{ fontSize: 40, marginBottom: 12 }}>🎨</div>
+        <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 6 }}>
+          Free Canvas
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 20 }}>
+          Add sticky notes, text boxes, and images — place them anywhere.
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+          <button style={btnStyle} onClick={onAddSticky}>+ Sticky Note</button>
+          <button style={btnStyle} onClick={onAddText}>+ Text Box</button>
+          <button style={btnStyle} onClick={onAddImage}>+ Image</button>
+        </div>
+      </div>
     </div>
   );
 }
