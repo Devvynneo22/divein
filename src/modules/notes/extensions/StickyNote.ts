@@ -62,14 +62,13 @@ export const StickyNote = Node.create<StickyNoteOptions>({
     return {
       insertStickyNote:
         (color: StickyNoteColor = 'yellow') =>
-        ({ chain }) => {
-          return chain()
-            .insertContent({
-              type: this.name,
-              attrs: { color },
-              content: [{ type: 'paragraph' }],
-            })
-            .run();
+        ({ commands, state }) => {
+          const { to } = state.selection;
+          return commands.insertContentAt(to, {
+            type: this.name,
+            attrs: { color },
+            content: [{ type: 'paragraph' }],
+          });
         },
     };
   },

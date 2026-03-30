@@ -75,22 +75,15 @@ export const Columns = Node.create<ColumnsOptions>({
     return {
       insertColumns:
         () =>
-        ({ chain }) => {
-          return chain()
-            .insertContent({
-              type: this.name,
-              content: [
-                {
-                  type: 'column',
-                  content: [{ type: 'paragraph' }],
-                },
-                {
-                  type: 'column',
-                  content: [{ type: 'paragraph' }],
-                },
-              ],
-            })
-            .run();
+        ({ commands, state }) => {
+          const { to } = state.selection;
+          return commands.insertContentAt(to, {
+            type: this.name,
+            content: [
+              { type: 'column', content: [{ type: 'paragraph' }] },
+              { type: 'column', content: [{ type: 'paragraph' }] },
+            ],
+          });
         },
     };
   },

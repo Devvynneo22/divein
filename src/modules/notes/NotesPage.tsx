@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { FileText, ChevronRight, ChevronLeft } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import {
   useNote,
   useNoteAncestors,
@@ -57,22 +57,7 @@ export function NotesPage() {
     onNavigateToNote: (id) => setSelectedNoteId(id),
   });
 
-  // ─── Auto-show right panel when note has headings ─────────────────────────
-
-  useEffect(() => {
-    if (!editor || !selectedNote) return;
-    const checkHeadings = () => {
-      const hasHeadings = editor
-        .getJSON()
-        .content?.some((n) => n.type === 'heading') ?? false;
-      setRightPanelOpen(hasHeadings);
-    };
-    checkHeadings();
-    editor.on('update', checkHeadings);
-    return () => {
-      editor.off('update', checkHeadings);
-    };
-  }, [editor, selectedNote]);
+  // Right panel is manual-only — no auto-detect
 
   // ─── Zen mode keyboard shortcut ───────────────────────────────────────────
 
@@ -241,9 +226,15 @@ export function NotesPage() {
                 {/* Right panel toggle */}
                 <button
                   onClick={() => setRightPanelOpen((v) => !v)}
-                  className="ml-auto p-1 rounded transition-colors"
-                  title={rightPanelOpen ? 'Hide panel' : 'Show panel'}
-                  style={{ color: 'var(--color-text-muted)' }}
+                  className="ml-auto rounded transition-colors"
+                  title={rightPanelOpen ? 'Hide outline' : 'Show outline'}
+                  style={{
+                    color: 'var(--color-text-muted)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '3px 8px',
+                  }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
                     e.currentTarget.style.color = 'var(--color-text-primary)';
@@ -253,7 +244,9 @@ export function NotesPage() {
                     e.currentTarget.style.color = 'var(--color-text-muted)';
                   }}
                 >
-                  {rightPanelOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+                  <span style={{ fontSize: 11, fontWeight: 500 }}>
+                    {rightPanelOpen ? '⊟ Outline' : '⊞ Outline'}
+                  </span>
                 </button>
               </div>
             )}
@@ -285,6 +278,8 @@ export function NotesPage() {
                     onNavigateToNote={handleSelect}
                     zenMode={zenMode}
                     onToggleZen={() => setZenMode((v) => !v)}
+                    rightPanelOpen={rightPanelOpen}
+                    onToggleRightPanel={() => setRightPanelOpen((v) => !v)}
                   />
 
                   {/* Backlinks panel */}

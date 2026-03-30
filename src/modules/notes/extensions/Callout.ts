@@ -72,14 +72,13 @@ export const Callout = Node.create<CalloutOptions>({
     return {
       insertCallout:
         (calloutType: CalloutType = 'info') =>
-        ({ chain }) => {
-          return chain()
-            .insertContent({
-              type: this.name,
-              attrs: { calloutType },
-              content: [{ type: 'paragraph' }],
-            })
-            .run();
+        ({ commands, state }) => {
+          const { to } = state.selection;
+          return commands.insertContentAt(to, {
+            type: this.name,
+            attrs: { calloutType },
+            content: [{ type: 'paragraph' }],
+          });
         },
     };
   },

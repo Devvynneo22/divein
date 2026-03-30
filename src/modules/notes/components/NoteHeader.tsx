@@ -375,8 +375,13 @@ export function NoteHeader({ note, childCount, onTitleChange, onIconChange, onCo
 
       {/* Page content */}
       <div
-        className="px-8 pb-6 max-w-3xl mx-auto w-full"
-        style={{ paddingTop: note.coverColor ? 24 : 48 }}
+        className="pb-6 w-full"
+        style={{
+          paddingTop: note.coverColor ? 0 : 48,
+          paddingLeft: 32,
+          paddingRight: 32,
+          maxWidth: 768,
+        }}
       >
         {/* Add cover button — only when no cover */}
         {!note.coverColor && (
@@ -408,12 +413,23 @@ export function NoteHeader({ note, childCount, onTitleChange, onIconChange, onCo
           </button>
         )}
 
-        {/* Icon button */}
-        <div className="mb-4" ref={iconPickerRef} style={{ position: 'relative' }}>
+        {/* Icon button — overlaps cover bottom when cover is present */}
+        <div
+          className="mb-4"
+          ref={iconPickerRef}
+          style={{
+            position: 'relative',
+            zIndex: 1,
+            ...(note.coverColor ? { marginTop: -28 } : {}),
+          }}
+        >
           <button
             onClick={() => setShowIconPicker((v) => !v)}
             className="text-4xl leading-none transition-opacity hover:opacity-70 w-14 h-14 flex items-center justify-center rounded-xl"
-            style={{ backgroundColor: showIconPicker ? 'var(--color-bg-tertiary)' : 'transparent' }}
+            style={{
+              backgroundColor: showIconPicker ? 'var(--color-bg-tertiary)' : 'transparent',
+              boxShadow: note.coverColor ? '0 0 0 2px var(--color-bg-primary)' : 'none',
+            }}
             title="Change icon"
             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
             onMouseLeave={(e) => {

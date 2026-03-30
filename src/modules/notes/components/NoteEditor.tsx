@@ -1,56 +1,14 @@
 import { EditorContent } from '@tiptap/react';
 import { useEffect, useRef, useCallback, useState } from 'react';
-import {
-  Bold,
-  Italic,
-  Strikethrough,
-  Heading1,
-  Heading2,
-  Heading3,
-  List,
-  ListOrdered,
-  Quote,
-  Minus,
-  Undo,
-  Redo,
-  Underline as UnderlineIcon,
-  Highlighter,
-  ImageIcon,
-  SmilePlus,
-  CheckSquare,
-  Code2,
-  Brain,
-  Search,
-  Columns2,
-  Table as TableIcon,
-  StickyNote as StickyNoteIcon,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-  Maximize2,
-  Trash2,
-} from 'lucide-react';
 import { SlashCommandMenu } from './SlashCommandMenu';
 import { EditorBubbleMenu } from './EditorBubbleMenu';
-import { EmojiPicker } from './EmojiPicker';
 import { WikiLinkSuggestion } from './WikiLinkSuggestion';
 import { CreateFlashcardModal } from './CreateFlashcardModal';
 import { FindReplaceBar } from './FindReplaceBar';
+import { NoteEditorRibbon } from './NoteEditorRibbon';
 import type { Note } from '@/shared/types/note';
 
-// ─── Text color palette ──────────────────────────────────────────────────────
-
-const TEXT_COLORS = [
-  { color: '#fafafa', label: 'White' },
-  { color: '#a1a1aa', label: 'Gray' },
-  { color: '#ef4444', label: 'Red' },
-  { color: '#f97316', label: 'Orange' },
-  { color: '#eab308', label: 'Yellow' },
-  { color: '#22c55e', label: 'Green' },
-  { color: '#3b82f6', label: 'Blue' },
-  { color: '#8b5cf6', label: 'Purple' },
-  { color: '#ec4899', label: 'Pink' },
-];
+// ─── Code languages ───────────────────────────────────────────────────────────
 
 const CODE_LANGUAGES = [
   'plaintext',
@@ -76,6 +34,8 @@ interface NoteEditorProps {
   onNavigateToNote?: (noteId: string) => void;
   zenMode?: boolean;
   onToggleZen?: () => void;
+  rightPanelOpen?: boolean;
+  onToggleRightPanel?: () => void;
 }
 
 // ─── Slash command state ─────────────────────────────────────────────────────
@@ -103,9 +63,10 @@ export function NoteEditor({
   onNavigateToNote,
   zenMode = false,
   onToggleZen,
+  rightPanelOpen = false,
+  onToggleRightPanel,
 }: NoteEditorProps) {
   const editorWrapRef = useRef<HTMLDivElement>(null);
-  const colorPickerRef = useRef<HTMLDivElement>(null);
 
   const [flashcardModal, setFlashcardModal] = useState<{ open: boolean; text: string }>({
     open: false,
@@ -124,7 +85,6 @@ export function NoteEditor({
   });
   const [wikiLinkNotes, setWikiLinkNotes] = useState<Note[]>([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showColorPicker, setShowColorPicker] = useState(false);
   const [showFindReplace, setShowFindReplace] = useState(false);
   const [showReplaceField, setShowReplaceField] = useState(false);
 
@@ -133,19 +93,6 @@ export function NoteEditor({
   const [readingTime, setReadingTime] = useState(1);
   const [lastSavedText, setLastSavedText] = useState<string>('');
   const lastSavedRef = useRef<Date | null>(null);
-
-  // ─── Close color picker on outside click ──────────────────────────────────
-
-  useEffect(() => {
-    if (!showColorPicker) return;
-    function handler(e: MouseEvent) {
-      if (colorPickerRef.current && !colorPickerRef.current.contains(e.target as Node)) {
-        setShowColorPicker(false);
-      }
-    }
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [showColorPicker]);
 
   // ─── Selection tracking ───────────────────────────────────────────────────
 
@@ -333,342 +280,57 @@ export function NoteEditor({
 
   if (!editor) return null;
 
-  // Context checks
-  const isInCodeBlock = editor.isActive('codeBlock');
-  const isInTable = editor.isActive('table');
-  const isImageSelected = editor.isActive('image');
-
   return (
     <div className="flex flex-col h-full relative">
       {/* ─── Styles injected ─────────────────────────────────────────── */}
       <style>{EDITOR_STYLES}</style>
 
-      {/* ─── Toolbar (hidden in zen mode) ────────────────────────────── */}
+      {/* ─── Ribbon (hidden in zen mode) ─────────────────────────────── */}
       {!zenMode && (
+        <NoteEditorRibbon
+          editor={editor}
+          triggerFileInput={triggerFileInput}
+          showFindReplace={showFindReplace}
+          onToggleFindReplace={() => { setShowFindReplace((v) => !v); setShowReplaceField(false); }}
+          zenMode={zenMode}
+          onToggleZen={() => onToggleZen?.()}
+          rightPanelOpen={rightPanelOpen}
+          onToggleRightPanel={() => onToggleRightPanel?.()}
+          hasSelection={hasSelection}
+          onCreateFlashcard={() => handleCreateFlashcard()}
+          showEmojiPicker={showEmojiPicker}
+          onToggleEmojiPicker={() => setShowEmojiPicker((v) => !v)}
+        />
+      )}
+
+      {/* ─── Code block language selector (context, outside ribbon) ──── */}
+      {!zenMode && editor.isActive('codeBlock') && (
         <div
-          className="flex items-center gap-0.5 px-3 py-1.5 flex-wrap shrink-0"
+          className="flex items-center px-3 py-1 shrink-0"
           style={{
             borderBottom: '1px solid var(--color-border)',
             backgroundColor: 'var(--color-bg-primary)',
-            minHeight: 40,
           }}
         >
-          {/* History group */}
-          <ToolbarButton
-            onClick={() => editor.chain().focus().undo().run()}
-            active={false}
-            icon={<Undo size={14} />}
-            title="Undo (Ctrl+Z)"
-          />
-          <ToolbarButton
-            onClick={() => editor.chain().focus().redo().run()}
-            active={false}
-            icon={<Redo size={14} />}
-            title="Redo (Ctrl+Shift+Z)"
-          />
-
-          <Divider />
-
-          {/* Formatting group */}
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleBold().run()}
-            active={editor.isActive('bold')}
-            icon={<Bold size={14} />}
-            title="Bold (Ctrl+B)"
-          />
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleItalic().run()}
-            active={editor.isActive('italic')}
-            icon={<Italic size={14} />}
-            title="Italic (Ctrl+I)"
-          />
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleUnderline().run()}
-            active={editor.isActive('underline')}
-            icon={<UnderlineIcon size={14} />}
-            title="Underline (Ctrl+U)"
-          />
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleStrike().run()}
-            active={editor.isActive('strike')}
-            icon={<Strikethrough size={14} />}
-            title="Strikethrough"
-          />
-          <ToolbarButton
-            onClick={() =>
-              editor.chain().focus().toggleHighlight({ color: '#fef08a' }).run()
-            }
-            active={editor.isActive('highlight')}
-            icon={<Highlighter size={14} />}
-            title="Highlight"
-          />
-
-          {/* Text color picker */}
-          <div className="relative" ref={colorPickerRef}>
-            <button
-              onClick={() => setShowColorPicker((v) => !v)}
-              title="Text color"
-              className="p-1.5 rounded transition-colors flex items-center gap-0.5"
-              style={{ color: 'var(--color-text-muted)' }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = 'var(--color-text-primary)';
-                e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = 'var(--color-text-muted)';
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-            >
-              <span
-                className="text-xs font-bold"
-                style={{
-                  color:
-                    (editor.getAttributes('textStyle').color as string | undefined) ??
-                    'inherit',
-                }}
-              >
-                A
-              </span>
-              <span className="text-[10px] leading-none">▾</span>
-            </button>
-            {showColorPicker && (
-              <div
-                className="absolute top-full left-0 mt-1 z-50 p-2 rounded-xl flex gap-1 flex-wrap"
-                style={{
-                  width: 120,
-                  backgroundColor: 'var(--color-bg-elevated)',
-                  border: '1px solid var(--color-border)',
-                  boxShadow: 'var(--shadow-popup)',
-                }}
-              >
-                {TEXT_COLORS.map(({ color, label }) => (
-                  <button
-                    key={color}
-                    title={label}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      editor.chain().focus().setColor(color).run();
-                      setShowColorPicker(false);
-                    }}
-                    className="w-5 h-5 rounded border border-black/20 hover:scale-110 transition-transform"
-                    style={{ backgroundColor: color }}
-                  />
-                ))}
-                <button
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    editor.chain().focus().unsetColor().run();
-                    setShowColorPicker(false);
-                  }}
-                  className="w-full text-xs mt-1 transition-colors"
-                  style={{ color: 'var(--color-text-muted)' }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = 'var(--color-text-primary)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = 'var(--color-text-muted)';
-                  }}
-                >
-                  Reset
-                </button>
-              </div>
-            )}
-          </div>
-
-          <Divider />
-
-          {/* Headings */}
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-            active={editor.isActive('heading', { level: 1 })}
-            icon={<Heading1 size={14} />}
-            title="Heading 1"
-          />
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-            active={editor.isActive('heading', { level: 2 })}
-            icon={<Heading2 size={14} />}
-            title="Heading 2"
-          />
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-            active={editor.isActive('heading', { level: 3 })}
-            icon={<Heading3 size={14} />}
-            title="Heading 3"
-          />
-
-          <Divider />
-
-          {/* Block types */}
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleBulletList().run()}
-            active={editor.isActive('bulletList')}
-            icon={<List size={14} />}
-            title="Bullet List"
-          />
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleOrderedList().run()}
-            active={editor.isActive('orderedList')}
-            icon={<ListOrdered size={14} />}
-            title="Ordered List"
-          />
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleTaskList().run()}
-            active={editor.isActive('taskList')}
-            icon={<CheckSquare size={14} />}
-            title="Task List"
-          />
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleBlockquote().run()}
-            active={editor.isActive('blockquote')}
-            icon={<Quote size={14} />}
-            title="Blockquote"
-          />
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-            active={editor.isActive('codeBlock')}
-            icon={<Code2 size={14} />}
-            title="Code Block"
-          />
-          <ToolbarButton
-            onClick={() => editor.chain().focus().setHorizontalRule().run()}
-            active={false}
-            icon={<Minus size={14} />}
-            title="Divider"
-          />
-
-          <Divider />
-
-          {/* Insert group */}
-          <ToolbarButton
-            onClick={triggerFileInput}
-            active={false}
-            icon={<ImageIcon size={14} />}
-            title="Insert image"
-          />
-
-          <div className="relative">
-            <ToolbarButton
-              onClick={() => setShowEmojiPicker((v) => !v)}
-              active={showEmojiPicker}
-              icon={<SmilePlus size={14} />}
-              title="Insert emoji"
-            />
-            {showEmojiPicker && (
-              <EmojiPicker
-                onSelect={(emoji) => {
-                  editor.chain().focus().insertContent(emoji).run();
-                }}
-                onClose={() => setShowEmojiPicker(false)}
-              />
-            )}
-          </div>
-
-          <ToolbarButton
-            onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
-            active={editor.isActive('table')}
-            icon={<TableIcon size={14} />}
-            title="Insert table"
-          />
-
-          <ToolbarButton
-            onClick={() => editor.chain().focus().insertColumns().run()}
-            active={false}
-            icon={<Columns2 size={14} />}
-            title="Two columns"
-          />
-
-          <ToolbarButton
-            onClick={() => editor.chain().focus().insertCallout('info').run()}
-            active={false}
-            icon={<span className="text-xs">ℹ️</span>}
-            title="Insert callout"
-          />
-
-          <ToolbarButton
-            onClick={() => editor.chain().focus().insertStickyNote('yellow').run()}
-            active={false}
-            icon={<StickyNoteIcon size={14} />}
-            title="Insert sticky note"
-          />
-
-          <Divider />
-
-          {/* Tools group */}
-          <ToolbarButton
-            onClick={() => {
-              setShowFindReplace((v) => !v);
-              setShowReplaceField(false);
+          <span style={{ fontSize: 11, color: 'var(--color-text-muted)', marginRight: 6 }}>Language:</span>
+          <select
+            value={(editor.getAttributes('codeBlock').language as string) ?? 'plaintext'}
+            onChange={(e) => {
+              editor.chain().focus().updateAttributes('codeBlock', { language: e.target.value }).run();
             }}
-            active={showFindReplace}
-            icon={<Search size={14} />}
-            title="Find & Replace (Ctrl+F)"
-          />
-
-          <ToolbarButton
-            onClick={() => handleCreateFlashcard()}
-            active={false}
-            icon={<Brain size={14} />}
-            title={
-              hasSelection
-                ? 'Create Flashcard from Selection'
-                : 'Select text first to create a flashcard'
-            }
-          />
-
-          <ToolbarButton
-            onClick={() => onToggleZen?.()}
-            active={zenMode}
-            icon={<Maximize2 size={14} />}
-            title="Zen mode (Ctrl+Shift+F)"
-          />
-
-          {/* Context-sensitive: Code block language selector */}
-          {isInCodeBlock && (
-            <>
-              <Divider />
-              <select
-                value={(editor.getAttributes('codeBlock').language as string) ?? 'plaintext'}
-                onChange={(e) => {
-                  editor
-                    .chain()
-                    .focus()
-                    .updateAttributes('codeBlock', { language: e.target.value })
-                    .run();
-                }}
-                className="text-xs rounded px-1.5 py-1 ml-1"
-                style={{
-                  backgroundColor: 'var(--color-bg-tertiary)',
-                  border: '1px solid var(--color-border)',
-                  color: 'var(--color-text-secondary)',
-                  outline: 'none',
-                }}
-                title="Code language"
-              >
-                {CODE_LANGUAGES.map((lang) => (
-                  <option key={lang} value={lang}>
-                    {lang}
-                  </option>
-                ))}
-              </select>
-            </>
-          )}
-
-          {/* Context-sensitive: Table controls */}
-          {isInTable && (
-            <>
-              <Divider />
-              <TableControls editor={editor} />
-            </>
-          )}
-
-          {/* Context-sensitive: Image alignment */}
-          {isImageSelected && (
-            <>
-              <Divider />
-              <ImageAlignControls editor={editor} />
-            </>
-          )}
+            className="text-xs rounded px-1.5 py-1"
+            style={{
+              backgroundColor: 'var(--color-bg-tertiary)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-secondary)',
+              outline: 'none',
+            }}
+            title="Code language"
+          >
+            {CODE_LANGUAGES.map((lang) => (
+              <option key={lang} value={lang}>{lang}</option>
+            ))}
+          </select>
         </div>
       )}
 
@@ -689,11 +351,6 @@ export function NoteEditor({
         className="hidden"
         onChange={handleFileChange}
       />
-
-      {/* ─── Image alignment floating toolbar (shown when image active) ─ */}
-      {isImageSelected && (
-        <ImageFloatingToolbar editor={editor} />
-      )}
 
       {/* ─── Editor area ─────────────────────────────────────────────── */}
       <div
@@ -791,184 +448,6 @@ export function NoteEditor({
         </div>
       )}
     </div>
-  );
-}
-
-// ─── Image floating toolbar ───────────────────────────────────────────────────
-
-function ImageFloatingToolbar({ editor }: { editor: NonNullable<ReturnType<typeof import('@tiptap/react').useEditor>> }) {
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
-
-  useEffect(() => {
-    const { view } = editor;
-    const { from } = editor.state.selection;
-    const coords = view.coordsAtPos(from);
-    setPos({ top: coords.top - 50, left: coords.left });
-  }, [editor]);
-
-  if (!pos) return null;
-
-  const currentAlign = (editor.getAttributes('image').align as string) ?? 'center';
-
-  return (
-    <div
-      className="fixed z-50 flex items-center gap-1 px-2 py-1.5 rounded-lg"
-      style={{
-        top: pos.top,
-        left: pos.left,
-        backgroundColor: 'var(--color-bg-elevated)',
-        border: '1px solid var(--color-border)',
-        boxShadow: 'var(--shadow-popup)',
-      }}
-    >
-      {(
-        [
-          { align: 'left', label: '← Left', icon: <AlignLeft size={12} /> },
-          { align: 'center', label: '↔ Center', icon: <AlignCenter size={12} /> },
-          { align: 'right', label: '→ Right', icon: <AlignRight size={12} /> },
-        ] as const
-      ).map(({ align, label, icon }) => (
-        <button
-          key={align}
-          title={label}
-          onClick={() => editor.chain().focus().updateAttributes('image', { align }).run()}
-          className="p-1.5 rounded transition-colors"
-          style={{
-            backgroundColor:
-              currentAlign === align ? 'var(--color-accent-soft)' : 'transparent',
-            color:
-              currentAlign === align ? 'var(--color-accent)' : 'var(--color-text-muted)',
-          }}
-        >
-          {icon}
-        </button>
-      ))}
-      <div className="w-px h-4" style={{ backgroundColor: 'var(--color-border)' }} />
-      <button
-        title="Remove image"
-        onClick={() => editor.chain().focus().deleteSelection().run()}
-        className="p-1.5 rounded transition-colors"
-        style={{ color: 'var(--color-danger)' }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = 'var(--color-danger-soft)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'transparent';
-        }}
-      >
-        <Trash2 size={12} />
-      </button>
-    </div>
-  );
-}
-
-// ─── Context-sensitive: Table controls ───────────────────────────────────────
-
-function TableControls({ editor }: { editor: NonNullable<ReturnType<typeof import('@tiptap/react').useEditor>> }) {
-  const btns = [
-    { label: 'Add row ↓', action: () => editor.chain().focus().addRowAfter().run() },
-    { label: 'Add col →', action: () => editor.chain().focus().addColumnAfter().run() },
-    { label: 'Del row', action: () => editor.chain().focus().deleteRow().run() },
-    { label: 'Del col', action: () => editor.chain().focus().deleteColumn().run() },
-    { label: 'Del table', action: () => editor.chain().focus().deleteTable().run() },
-  ];
-  return (
-    <div className="flex items-center gap-1">
-      {btns.map(({ label, action }) => (
-        <button
-          key={label}
-          onClick={action}
-          className="px-2 py-0.5 text-[11px] rounded transition-colors"
-          style={{
-            backgroundColor: 'var(--color-bg-tertiary)',
-            color: 'var(--color-text-secondary)',
-            border: '1px solid var(--color-border)',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
-          }}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ─── Context-sensitive: Image alignment ──────────────────────────────────────
-
-function ImageAlignControls({ editor }: { editor: NonNullable<ReturnType<typeof import('@tiptap/react').useEditor>> }) {
-  const currentAlign = (editor.getAttributes('image').align as string) ?? 'center';
-  return (
-    <div className="flex items-center gap-1">
-      {(['left', 'center', 'right'] as const).map((align) => (
-        <button
-          key={align}
-          onClick={() => editor.chain().focus().updateAttributes('image', { align }).run()}
-          className="px-2 py-0.5 text-[11px] rounded capitalize transition-colors"
-          style={{
-            backgroundColor:
-              currentAlign === align ? 'var(--color-accent-soft)' : 'var(--color-bg-tertiary)',
-            color: currentAlign === align ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          {align}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ─── Toolbar helpers ──────────────────────────────────────────────────────────
-
-function Divider() {
-  return (
-    <div
-      className="w-px h-4 mx-1"
-      style={{ backgroundColor: 'var(--color-border)' }}
-    />
-  );
-}
-
-function ToolbarButton({
-  onClick,
-  active,
-  icon,
-  title,
-}: {
-  onClick: () => void;
-  active: boolean;
-  icon: React.ReactNode;
-  title: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      title={title}
-      className="p-1.5 rounded transition-colors"
-      style={{
-        backgroundColor: active ? 'var(--color-accent-muted)' : 'transparent',
-        color: active ? 'var(--color-accent)' : 'var(--color-text-muted)',
-      }}
-      onMouseEnter={(e) => {
-        if (!active) {
-          e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
-          e.currentTarget.style.color = 'var(--color-text-primary)';
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!active) {
-          e.currentTarget.style.backgroundColor = 'transparent';
-          e.currentTarget.style.color = 'var(--color-text-muted)';
-        }
-      }}
-    >
-      {icon}
-    </button>
   );
 }
 
@@ -1070,27 +549,19 @@ const EDITOR_STYLES = `
 
 /* ── Sticky notes ──────────────────────────────────────────────────────────── */
 .sticky-note {
-  border-radius: 4px;
+  border-radius: 6px;
   padding: 14px 16px;
-  margin: 8px 0;
-  box-shadow: 2px 3px 8px rgba(0,0,0,0.12);
-  font-family: inherit;
+  margin: 10px 0;
+  box-shadow: 2px 3px 10px rgba(0,0,0,0.10);
   position: relative;
+  border: 1px solid;
+  border-top-width: 3px;
 }
-.sticky-note::before {
-  content: '📌';
-  position: absolute;
-  top: -8px;
-  left: 12px;
-  font-size: 14px;
-}
-.sticky-note--yellow { background: #fef3c7; border: 1px solid #d97706; }
-.sticky-note--pink { background: #fce7f3; border: 1px solid #db2777; }
-.sticky-note--blue { background: #dbeafe; border: 1px solid #2563eb; }
-.sticky-note--green { background: #d1fae5; border: 1px solid #059669; }
-.sticky-note--lavender { background: #ede9fe; border: 1px solid #7c3aed; }
-
-/* Dark mode sticky note overrides */
+.sticky-note--yellow { background: #fef3c7; border-color: #d97706; }
+.sticky-note--pink { background: #fce7f3; border-color: #db2777; }
+.sticky-note--blue { background: #dbeafe; border-color: #2563eb; }
+.sticky-note--green { background: #d1fae5; border-color: #059669; }
+.sticky-note--lavender { background: #ede9fe; border-color: #7c3aed; }
 [data-theme="dark"] .sticky-note--yellow { background: rgba(254,243,199,0.1); border-color: #d97706; }
 [data-theme="dark"] .sticky-note--pink { background: rgba(252,231,243,0.1); border-color: #db2777; }
 [data-theme="dark"] .sticky-note--blue { background: rgba(219,234,254,0.1); border-color: #2563eb; }
