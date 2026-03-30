@@ -137,6 +137,12 @@ export function NoteCanvas({ noteId }: NoteCanvasProps) {
     startH: number;
   } | null>(null);
 
+  const rotateState = useRef<{
+    blockId: string;
+    blockCenterX: number;
+    blockCenterY: number;
+  } | null>(null);
+
   const panDragState = useRef<{
     startMouseX: number;
     startMouseY: number;
@@ -385,6 +391,41 @@ export function NoteCanvas({ noteId }: NoteCanvasProps) {
         });
         return;
       }
+      const rotate = rotateState.current;
+      if (rotate) {
+        const rawAngle =
+          Math.atan2(
+            e.clientY - rotate.blockCenterY,
+            e.clientX - rotate.blockCenterX,
+          ) *
+            (180 / Math.PI) +
+          90;
+        // Snap to 0, 45, 90, 135, 180, 225, 270, 315 when Shift held
+        let angle = rawAngle;
+        if (e.shiftKey) {
+          const snapAngles = [0, 45, 90, 135, 180, 225, 270, 315, 360];
+          // Normalize to 0-360
+          const normalized = ((rawAngle % 360) + 360) % 360;
+          let bestSnap = normalized;
+          let bestDiff = 360;
+          for (const snap of snapAngles) {
+            const diff = Math.abs(normalized - snap);
+            if (diff < bestDiff && diff <= 5) {
+              bestDiff = diff;
+              bestSnap = snap;
+            }
+          }
+          angle = bestSnap;
+        }
+        setBlocks((prev) => {
+          const next = prev.map((b) =>
+            b.id === rotate.blockId ? { ...b, rotation: angle } : b,
+          );
+          blocksRef.current = next;
+          return next;
+        });
+        return;
+      }
       const ps = panDragState.current;
       if (ps) {
         const newPan: Pan = {
@@ -399,11 +440,13 @@ export function NoteCanvas({ noteId }: NoteCanvasProps) {
     const onMouseUp = () => {
       const wasDrag = !!dragState.current;
       const wasResize = !!resizeState.current;
+      const wasRotate = !!rotateState.current;
       const wasPan = !!panDragState.current;
       if (wasDrag) dragState.current = null;
       if (wasResize) resizeState.current = null;
+      if (wasRotate) rotateState.current = null;
       if (wasPan) panDragState.current = null;
-      if (wasDrag || wasResize || wasPan) {
+      if (wasDrag || wasResize || wasRotate || wasPan) {
         document.body.style.userSelect = '';
         persistCanvas(noteIdRef.current, {
           blocks: blocksRef.current,
@@ -656,6 +699,27 @@ export function NoteCanvas({ noteId }: NoteCanvasProps) {
     document.body.style.userSelect = 'none';
   }, [recordSnapshot]);
 
+  // ── Rotate handle mousedown ───────────────────────────────────────────────
+  const onRotateMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>, block: Block) => {
+    e.preventDefault();
+    e.stopPropagation();
+    recordSnapshot();
+    const el = containerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    // Block center in client (screen) coordinates
+    const blockCenterX =
+      rect.left + panRef.current.x + (block.x + block.width / 2) * zoomRef.current;
+    const blockCenterY =
+      rect.top + panRef.current.y + (block.y + block.height / 2) * zoomRef.current;
+    rotateState.current = {
+      blockId: block.id,
+      blockCenterX,
+      blockCenterY,
+    };
+    document.body.style.userSelect = 'none';
+  }, [recordSnapshot]);
+
   // ── Double-click to edit ──────────────────────────────────────────────────
   const onBlockDblClick = useCallback((e: React.MouseEvent, block: Block) => {
     e.stopPropagation();
@@ -785,6 +849,7 @@ export function NoteCanvas({ noteId }: NoteCanvasProps) {
               onMouseDown={onBlockMouseDown}
               onDblClick={onBlockDblClick}
               onResizeMouseDown={onResizeMouseDown}
+              onRotateMouseDown={onRotateMouseDown}
               onDelete={removeBlock}
               onContentChange={updateContent}
               onEditEnd={() => { setEditingId(null); editingIdRef.current = null; }}
@@ -1022,6 +1087,7 @@ interface CanvasBlockProps {
   onMouseDown: (e: React.MouseEvent<HTMLDivElement>, block: Block) => void;
   onDblClick: (e: React.MouseEvent, block: Block) => void;
   onResizeMouseDown: (e: React.MouseEvent<HTMLDivElement>, block: Block) => void;
+  onRotateMouseDown: (e: React.MouseEvent<HTMLDivElement>, block: Block) => void;
   onDelete: (id: string) => void;
   onContentChange: (id: string, content: string) => void;
   onEditEnd: () => void;
@@ -1030,7 +1096,7 @@ interface CanvasBlockProps {
 
 function CanvasBlock({
   block, isSelected, isEditing, isDark,
-  onMouseDown, onDblClick, onResizeMouseDown,
+  onMouseDown, onDblClick, onResizeMouseDown, onRotateMouseDown,
   onDelete, onContentChange, onEditEnd, onColorChange,
 }: CanvasBlockProps) {
   const blockRef = useRef<Block>(block);
@@ -1047,6 +1113,10 @@ function CanvasBlock({
   const handleResizeMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     onResizeMouseDown(e, blockRef.current);
   }, [onResizeMouseDown]);
+
+  const handleRotateMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    onRotateMouseDown(e, blockRef.current);
+  }, [onRotateMouseDown]);
 
   const shadow = isSelected
     ? '0 4px 16px rgba(0,0,0,0.15)'
@@ -1139,6 +1209,44 @@ function CanvasBlock({
           }}
           onMouseDown={handleResizeMouseDown}
         />
+      )}
+
+      {/* Rotation handle — outside content div, top-center */}
+      {isSelected && (
+        <>
+          {/* Connecting line */}
+          <div
+            style={{
+              position: 'absolute',
+              top: -28,
+              left: '50%',
+              width: 1,
+              height: 28,
+              background: 'var(--color-accent)',
+              opacity: 0.5,
+              pointerEvents: 'none',
+              zIndex: 19,
+            }}
+          />
+          {/* Handle circle */}
+          <div
+            style={{
+              position: 'absolute',
+              top: -34,
+              left: 'calc(50% - 6px)',
+              width: 12,
+              height: 12,
+              backgroundColor: '#fff',
+              border: '2px solid var(--color-accent)',
+              borderRadius: '50%',
+              cursor: 'crosshair',
+              zIndex: 21,
+              boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
+            }}
+            onMouseDown={handleRotateMouseDown}
+            title="Rotate"
+          />
+        </>
       )}
     </div>
   );

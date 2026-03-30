@@ -87,9 +87,17 @@ export const NoteTreeItem = memo(function NoteTreeItem({
         </button>
 
         {/* Icon */}
-        <span className="shrink-0 mr-2 text-sm leading-none">
+        <span className="shrink-0 mr-2 text-sm leading-none" style={{ display: 'flex', alignItems: 'center' }}>
           {node.icon ? (
-            node.icon
+            node.icon.startsWith('data:') || node.icon.startsWith('http') ? (
+              <img
+                src={node.icon}
+                alt="icon"
+                style={{ width: 16, height: 16, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+              />
+            ) : (
+              <span>{node.icon}</span>
+            )
           ) : isExpanded && node.hasChildren ? (
             <FolderOpen
               size={15}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Edit, Archive, ArchiveRestore, Trash2 } from 'lucide-react';
+import { Edit, Archive, ArchiveRestore, Trash2, CheckCircle2, PauseCircle, Zap } from 'lucide-react';
 import type { Project } from '@/shared/types/project';
 
 interface ProjectHeaderProps {
@@ -9,6 +9,33 @@ interface ProjectHeaderProps {
   onUnarchive: () => void;
   onDelete: () => void;
 }
+
+const STATUS_CONFIG: Record<string, { label: string; Icon: React.ElementType; bg: string; text: string }> = {
+  active: {
+    label: 'Active',
+    Icon: Zap,
+    bg: 'var(--color-success-soft)',
+    text: 'var(--color-success)',
+  },
+  on_hold: {
+    label: 'On Hold',
+    Icon: PauseCircle,
+    bg: 'var(--color-warning-soft)',
+    text: 'var(--color-warning)',
+  },
+  completed: {
+    label: 'Completed',
+    Icon: CheckCircle2,
+    bg: 'rgba(59,130,246,0.12)',
+    text: '#3b82f6',
+  },
+  archived: {
+    label: 'Archived',
+    Icon: Archive,
+    bg: 'var(--color-bg-tertiary)',
+    text: 'var(--color-text-muted)',
+  },
+};
 
 export function ProjectHeader({
   project,
@@ -20,46 +47,46 @@ export function ProjectHeader({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const accentColor = project.color ?? 'var(--color-accent)';
   const isArchived = project.status === 'archived';
+  const statusCfg = STATUS_CONFIG[project.status] ?? STATUS_CONFIG.active;
+  const StatusIcon = statusCfg.Icon;
 
   return (
     <div className="relative">
-      {/* Color accent bar at top */}
+      {/* Full-width color bar */}
       <div
-        className="h-1.5 rounded-t-none"
-        style={{ backgroundColor: accentColor }}
+        className="h-2 w-full"
+        style={{ background: accentColor }}
       />
 
-      <div className="px-6 py-4 flex items-start justify-between gap-4">
-        {/* Left: icon + name + description + status */}
-        <div className="flex items-start gap-3 min-w-0">
+      <div className="px-6 pt-5 pb-4 flex items-start justify-between gap-4">
+        {/* Left: icon + title + description + status badge */}
+        <div className="flex items-start gap-4 min-w-0">
           {project.icon && (
-            <span className="text-3xl leading-none mt-0.5 flex-shrink-0">
+            <div
+              className="flex-shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-md"
+              style={{ background: accentColor }}
+            >
               {project.icon}
-            </span>
+            </div>
           )}
           <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap mb-1">
               <h1
-                className="text-2xl font-bold break-words"
+                className="text-2xl font-bold leading-tight break-words"
                 style={{ color: 'var(--color-text-primary)' }}
               >
                 {project.name}
               </h1>
-              {isArchived && (
-                <span
-                  className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
-                  style={{
-                    color: 'var(--color-text-muted)',
-                    border: '1px solid var(--color-border)',
-                  }}
-                >
-                  <Archive size={10} />
-                  Archived
-                </span>
-              )}
+              <span
+                className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-semibold flex-shrink-0"
+                style={{ backgroundColor: statusCfg.bg, color: statusCfg.text }}
+              >
+                <StatusIcon size={11} />
+                {statusCfg.label}
+              </span>
             </div>
             {project.description && (
-              <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
                 {project.description}
               </p>
             )}
@@ -69,16 +96,16 @@ export function ProjectHeader({
         {/* Right: action buttons */}
         <div className="flex items-center gap-1 flex-shrink-0">
           <HeaderButton onClick={onEdit} title="Edit project">
-            <Edit size={16} />
+            <Edit size={15} />
           </HeaderButton>
 
           {isArchived ? (
             <HeaderButton onClick={onUnarchive} title="Unarchive project">
-              <ArchiveRestore size={16} />
+              <ArchiveRestore size={15} />
             </HeaderButton>
           ) : (
             <HeaderButton onClick={onArchive} title="Archive project">
-              <Archive size={16} />
+              <Archive size={15} />
             </HeaderButton>
           )}
 
@@ -87,27 +114,21 @@ export function ProjectHeader({
               <span className="text-xs mr-1" style={{ color: 'var(--color-danger)' }}>Delete?</span>
               <button
                 onClick={onDelete}
-                className="px-2.5 py-1 rounded-lg text-xs font-medium transition-colors"
-                style={{
-                  backgroundColor: 'var(--color-danger)',
-                  color: 'var(--color-text-primary)',
-                }}
+                className="px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors"
+                style={{ backgroundColor: 'var(--color-danger)', color: '#fff' }}
                 onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.85'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
               >
-                Yes
+                Yes, delete
               </button>
               <button
                 onClick={() => setConfirmDelete(false)}
                 className="px-2.5 py-1 rounded-lg text-xs transition-colors"
-                style={{
-                  border: '1px solid var(--color-border)',
-                  color: 'var(--color-text-secondary)',
-                }}
+                style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
               >
-                No
+                Cancel
               </button>
             </div>
           ) : (
@@ -125,7 +146,7 @@ export function ProjectHeader({
                 e.currentTarget.style.backgroundColor = 'transparent';
               }}
             >
-              <Trash2 size={16} />
+              <Trash2 size={15} />
             </button>
           )}
         </div>

@@ -89,17 +89,13 @@ export function TimerPage() {
   }, [store.isRunning, refetchEntries, refetchTotal]);
 
   // ─── Handlers ────────────────────────────────────────────────────────────────
-
   function handlePlayPause() {
     if (store.isRunning) {
-      // Pause — just freeze the store (no service call until stop)
       useTimerStore.setState({ isRunning: false, _startEpoch: null });
     } else {
       if (store.currentEntryId) {
-        // Resume existing entry
         store.resumeRun();
       } else {
-        // Start a new entry
         startTimer.mutate(
           {
             description: description.trim() || undefined,
@@ -143,7 +139,7 @@ export function TimerPage() {
   }
 
   function handleModeChange(mode: 'stopwatch' | 'pomodoro') {
-    if (store.isRunning) return; // don't switch mid-session
+    if (store.isRunning) return;
     useTimerStore.setState({
       isPomodoroMode: mode === 'pomodoro',
       phase: 'work',
@@ -190,32 +186,35 @@ export function TimerPage() {
     store.settings.longBreakMin,
   );
 
-  const pomodoroDotsTotal = store.settings.longBreakAfter;
-  const pomodoroDotsCompleted = store.pomodoroCount % store.settings.longBreakAfter;
+  const isSessionLocked = store.isRunning && !!store.currentEntryId;
 
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Main column */}
-      <div className="flex-1 flex flex-col overflow-y-auto">
-        {/* ── Header ─────────────────────────────────────────── */}
-        <div className="px-6 pt-6 pb-2">
-          <h1 className="text-2xl font-bold">Timer</h1>
+      {/* ══════════════════════════════════════════════════════════════════
+          Left panel — Timer hero + controls + settings
+      ══════════════════════════════════════════════════════════════════ */}
+      <div
+        className="flex flex-col overflow-y-auto"
+        style={{ flex: '0 0 480px', minWidth: 0, borderRight: '1px solid var(--color-border)' }}
+      >
+        {/* Page header */}
+        <div className="px-6 pt-6 pb-0">
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
+            Timer
+          </h1>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+            {store.isPomodoroMode ? 'Pomodoro — stay focused, rest well' : 'Track your time freely'}
+          </p>
         </div>
 
-        {/* ── Timer hero section ───────────────────────────────── */}
-        <div className="flex flex-col items-center gap-6 px-6 py-8">
-          {/* Phase indicator */}
-          {store.isPomodoroMode && (
-            <div className={`text-sm font-medium px-3 py-1 rounded-full ${
-              store.phase === 'work'
-                ? 'bg-[var(--color-accent)]/20 text-[var(--color-accent)]'
-                : 'bg-[var(--color-success)]/20 text-[var(--color-success)]'
-            }`}>
-              {store.phase === 'work' ? '🎯 Focus Time' : store.phase === 'short_break' ? '☕ Short Break' : '🌿 Long Break'}
-            </div>
-          )}
-
-          {/* Big timer */}
+        {/* ── Timer ring hero ──────────────────────────────────────────────── */}
+        <div
+          className="flex flex-col items-center gap-6 px-6 py-8"
+          style={{
+            background:
+              'radial-gradient(ellipse 80% 60% at 50% 0%, var(--color-bg-secondary) 0%, transparent 75%)',
+          }}
+        >
           <TimerDisplay
             isPomodoroMode={store.isPomodoroMode}
             isRunning={store.isRunning}
@@ -223,35 +222,15 @@ export function TimerPage() {
             secondsElapsed={store.secondsElapsed}
             secondsRemaining={store.secondsRemaining}
             totalSeconds={totalSeconds}
+            pomodoroCount={store.pomodoroCount}
+            longBreakAfter={store.settings.longBreakAfter}
           />
 
-          {/* Pomodoro count dots */}
-          {store.isPomodoroMode && (
-            <div className="flex items-center gap-2">
-              {Array.from({ length: pomodoroDotsTotal }).map((_, i) => (
-                <span
-                  key={i}
-                  className="text-lg"
-                  style={{
-                    color:
-                      i < pomodoroDotsCompleted
-                        ? 'var(--color-accent)'
-                        : 'var(--color-bg-tertiary)',
-                  }}
-                >
-                  ●
-                </span>
-              ))}
-              <span className="text-xs text-[var(--color-text-muted)] ml-1">
-                {pomodoroDotsCompleted}/{pomodoroDotsTotal}
-              </span>
-            </div>
-          )}
-
-          {/* Controls */}
           <TimerControls
             isRunning={store.isRunning}
             isPomodoroMode={store.isPomodoroMode}
+            phase={store.phase}
+            hasActiveEntry={!!store.currentEntryId}
             onPlayPause={handlePlayPause}
             onStop={handleStop}
             onSkip={handleSkip}
@@ -259,26 +238,73 @@ export function TimerPage() {
           />
         </div>
 
-        {/* ── Session info ──────────────────────────────────────── */}
-        <div className="px-6 pb-4">
-          <div className="p-4 rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border)] flex flex-col gap-3">
+        {/* ── Session label + task link ─────────────────────────────────────── */}
+        <div className="px-5 pb-4">
+          <div
+            className="rounded-xl p-4 flex flex-col gap-3"
+            style={{
+              backgroundColor: 'var(--color-bg-secondary)',
+              border: '1px solid var(--color-border)',
+              boxShadow: 'var(--shadow-sm)',
+            }}
+          >
+            {/* "What are you working on?" description */}
+            <div>
+              <input
+                type="text"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                disabled={isSessionLocked}
+                placeholder="What are you working on?"
+                className="w-full text-sm font-medium bg-transparent focus:outline-none disabled:opacity-50"
+                style={{
+                  color: 'var(--color-text-primary)',
+                  caretColor: 'var(--color-accent)',
+                }}
+              />
+              {description === '' && !isSessionLocked && (
+                <div
+                  className="h-px mt-2"
+                  style={{ backgroundColor: 'var(--color-border)' }}
+                />
+              )}
+            </div>
+
             {/* Task selector */}
             <div>
-              <label className="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
+              <label
+                className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
+                style={{ color: 'var(--color-text-muted)' }}
+              >
                 Link to task
               </label>
               <div className="relative" ref={taskDropdownRef}>
                 {selectedTask ? (
-                  <div className="flex items-center gap-2 text-sm text-[var(--color-text-primary)]">
-                    <ListTodo size={14} className="shrink-0 text-[var(--color-accent)]" />
+                  <div
+                    className="flex items-center gap-2 text-sm rounded-lg px-2.5 py-1.5"
+                    style={{
+                      backgroundColor: 'var(--color-bg-tertiary)',
+                      color: 'var(--color-text-primary)',
+                    }}
+                  >
+                    <ListTodo size={13} className="shrink-0" style={{ color: 'var(--color-accent)' }} />
                     <span className="truncate flex-1">{selectedTask.title}</span>
                     <button
                       onClick={() => {
                         setSelectedTaskId(null);
                         setTaskSearch('');
                       }}
-                      disabled={store.isRunning && !!store.currentEntryId}
-                      className="shrink-0 w-5 h-5 rounded flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] transition-colors disabled:opacity-50"
+                      disabled={isSessionLocked}
+                      className="shrink-0 w-5 h-5 rounded flex items-center justify-center transition-colors disabled:opacity-50"
+                      style={{ color: 'var(--color-text-muted)' }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.color =
+                          'var(--color-text-primary)';
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.color =
+                          'var(--color-text-muted)';
+                      }}
                       title="Remove linked task"
                     >
                       <X size={12} />
@@ -294,12 +320,22 @@ export function TimerPage() {
                         if (!taskDropdownOpen) setTaskDropdownOpen(true);
                       }}
                       onFocus={() => setTaskDropdownOpen(true)}
-                      disabled={store.isRunning && !!store.currentEntryId}
+                      disabled={isSessionLocked}
                       placeholder="Search tasks… (optional)"
-                      className="w-full bg-transparent text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none disabled:opacity-50"
+                      className="w-full bg-transparent text-sm focus:outline-none disabled:opacity-50"
+                      style={{
+                        color: 'var(--color-text-primary)',
+                      }}
                     />
                     {taskDropdownOpen && filteredTasks.length > 0 && (
-                      <div className="absolute z-10 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] shadow-lg">
+                      <div
+                        className="absolute z-20 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-xl"
+                        style={{
+                          border: '1px solid var(--color-border)',
+                          backgroundColor: 'var(--color-bg-elevated)',
+                          boxShadow: 'var(--shadow-popup)',
+                        }}
+                      >
                         {filteredTasks.map((task) => (
                           <button
                             key={task.id}
@@ -308,9 +344,22 @@ export function TimerPage() {
                               setTaskSearch('');
                               setTaskDropdownOpen(false);
                             }}
-                            className="w-full text-left px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] transition-colors flex items-center gap-2"
+                            className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors"
+                            style={{ color: 'var(--color-text-primary)' }}
+                            onMouseEnter={(e) => {
+                              (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                                'var(--color-bg-tertiary)';
+                            }}
+                            onMouseLeave={(e) => {
+                              (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                                'transparent';
+                            }}
                           >
-                            <ListTodo size={13} className="shrink-0 text-[var(--color-text-muted)]" />
+                            <ListTodo
+                              size={13}
+                              className="shrink-0"
+                              style={{ color: 'var(--color-text-muted)' }}
+                            />
                             <span className="truncate">{task.title}</span>
                           </button>
                         ))}
@@ -320,46 +369,58 @@ export function TimerPage() {
                 )}
               </div>
             </div>
-
-            {/* Description */}
-            <div>
-              <label className="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
-                What are you working on?
-              </label>
-              <input
-                type="text"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                disabled={store.isRunning && !!store.currentEntryId}
-                placeholder="Describe your session…"
-                className="w-full bg-transparent text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none disabled:opacity-50"
-              />
-            </div>
           </div>
         </div>
 
-        {/* ── Pomodoro settings ─────────────────────────────────── */}
+        {/* ── Pomodoro settings ─────────────────────────────────────────────── */}
         {store.isPomodoroMode && (
-          <div className="px-6 pb-4">
-            <PomodoroSettings
-              settings={store.settings}
-              onChange={store.updateSettings}
-            />
+          <div className="px-5 pb-6">
+            <PomodoroSettings settings={store.settings} onChange={store.updateSettings} />
           </div>
         )}
+      </div>
 
-        {/* ── Today's entries ───────────────────────────────────── */}
-        <div className="px-6 pb-6 flex-1">
-          <div className="mb-3 flex items-center justify-between">
-            <span />
-            <button
-              onClick={handleAddManualEntry}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] transition-colors"
-            >
-              <Plus size={13} />
-              Manual entry
-            </button>
+      {/* ══════════════════════════════════════════════════════════════════
+          Right panel — Today's time entries
+      ══════════════════════════════════════════════════════════════════ */}
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* Panel header */}
+        <div
+          className="px-6 pt-6 pb-3 flex items-center justify-between shrink-0"
+          style={{ borderBottom: '1px solid var(--color-border)' }}
+        >
+          <div>
+            <h2 className="text-base font-bold" style={{ color: 'var(--color-text-primary)' }}>
+              Today's Log
+            </h2>
+            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              All time tracked today
+            </p>
           </div>
+          <button
+            onClick={handleAddManualEntry}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+            style={{
+              color: 'var(--color-text-secondary)',
+              backgroundColor: 'var(--color-bg-secondary)',
+              border: '1px solid var(--color-border)',
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                'var(--color-bg-tertiary)';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                'var(--color-bg-secondary)';
+            }}
+          >
+            <Plus size={13} />
+            Manual entry
+          </button>
+        </div>
+
+        {/* Entry list — scrollable */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
           <TimeEntryList
             entries={todayEntries}
             todayTotalSec={todayTotalSec}

@@ -12,17 +12,22 @@ interface HabitFormProps {
 const PRESET_COLORS = [
   '#3b82f6', // blue
   '#22c55e', // green
-  '#f59e0b', // amber
+  '#f97316', // orange
   '#ef4444', // red
   '#a855f7', // purple
   '#ec4899', // pink
   '#06b6d4', // cyan
-  '#f97316', // orange
-  '#84cc16', // lime
-  '#6366f1', // indigo
+  '#f59e0b', // amber
 ];
 
-const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const PRESET_EMOJIS = [
+  '🏃', '💪', '📚', '🧘', '💧', '🥗', '😴', '🎯',
+  '✍️', '🎵', '🌿', '💊', '🚴', '🏊', '🧹', '💡',
+];
+
+const DAYS_SHORT = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+// Maps pill index (0=Mon) → JS day-of-week (0=Sun): Mon=1, Tue=2,...Sat=6, Sun=0
+const PILL_TO_DOW = [1, 2, 3, 4, 5, 6, 0];
 
 type FrequencyType = 'daily' | 'weekly' | 'xPerWeek';
 type HabitType = 'boolean' | 'measurable';
@@ -32,6 +37,7 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
   const [description, setDescription] = useState(habit?.description ?? '');
   const [color, setColor] = useState(habit?.color ?? PRESET_COLORS[0]);
   const [icon, setIcon] = useState(habit?.icon ?? '');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [groupName, setGroupName] = useState(habit?.groupName ?? '');
   const [showGroupSuggestions, setShowGroupSuggestions] = useState(false);
 
@@ -39,12 +45,14 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
     if (!habit) return 'daily';
     return habit.frequency.type as FrequencyType;
   });
+
+  // weeklyDays stored as DOW (0=Sun). Pills are Mon-indexed, converted on toggle.
   const [weeklyDays, setWeeklyDays] = useState<number[]>(() => {
     if (habit?.frequency.type === 'weekly') return habit.frequency.days;
     return [1, 2, 3, 4, 5]; // Mon-Fri default
   });
   const [xPerWeekTimes, setXPerWeekTimes] = useState<number>(() => {
-    if (habit?.frequency.type === 'xPerWeek') return habit.frequency.times;
+    if (habit?.frequency.type === 'xPerWeek') return (habit.frequency as { type: 'xPerWeek'; times: number }).times;
     return 3;
   });
 
@@ -53,14 +61,10 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
   );
   const [target, setTarget] = useState<number>(habit?.target ?? 1);
   const [unit, setUnit] = useState(habit?.unit ?? '');
-
   const [nameError, setNameError] = useState('');
 
-  // Reset unit if switching to boolean
   useEffect(() => {
-    if (habitType === 'boolean') {
-      setTarget(1);
-    }
+    if (habitType === 'boolean') setTarget(1);
   }, [habitType]);
 
   function buildFrequency(): HabitFrequency {
@@ -69,9 +73,10 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
     return { type: 'xPerWeek', times: xPerWeekTimes };
   }
 
-  function handleToggleDay(day: number) {
+  function handleToggleDay(pillIdx: number) {
+    const dow = PILL_TO_DOW[pillIdx];
     setWeeklyDays((prev) =>
-      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day],
+      prev.includes(dow) ? prev.filter((d) => d !== dow) : [...prev, dow],
     );
   }
 
@@ -101,17 +106,17 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
     (g) => g.toLowerCase().includes(groupName.toLowerCase()) && g !== groupName,
   );
 
-  const inputStyle = {
+  const inputStyle: React.CSSProperties = {
     backgroundColor: 'var(--color-bg-tertiary)',
     borderColor: 'var(--color-border)',
     color: 'var(--color-text-primary)',
   };
 
   const inputFocusHandlers = {
-    onFocus: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    onFocus: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       e.currentTarget.style.borderColor = 'var(--color-accent)';
     },
-    onBlur: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    onBlur: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       e.currentTarget.style.borderColor = 'var(--color-border)';
     },
   };
@@ -141,84 +146,121 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
         </button>
       </div>
 
-      {/* Name */}
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-          Name <span style={{ color: 'var(--color-danger)' }}>*</span>
-        </label>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Morning run"
-          className="input-base px-3 py-2.5 rounded-lg border text-sm outline-none transition-colors"
-          style={inputStyle}
-          {...inputFocusHandlers}
-        />
-        {nameError && (
-          <p className="text-xs" style={{ color: 'var(--color-danger)' }}>{nameError}</p>
-        )}
-      </div>
-
-      {/* Description */}
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-          Description
-        </label>
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Optional description..."
-          rows={2}
-          className="px-3 py-2.5 rounded-lg border text-sm outline-none transition-colors resize-none"
-          style={inputStyle}
-          {...inputFocusHandlers}
-        />
-      </div>
-
-      {/* Color + Icon row */}
-      <div className="flex gap-4">
-        {/* Color picker */}
-        <div className="flex flex-col gap-1.5 flex-1">
-          <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Color</label>
-          <div className="flex flex-wrap gap-2">
-            {PRESET_COLORS.map((c) => (
+      {/* Name + emoji icon row */}
+      <div className="flex gap-2 items-start">
+        {/* Emoji picker trigger */}
+        <div className="flex flex-col gap-1 flex-shrink-0 relative">
+          <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+            Icon
+          </label>
+          <button
+            type="button"
+            onClick={() => setShowEmojiPicker((v) => !v)}
+            className="w-11 h-10 rounded-lg border text-xl flex items-center justify-center transition-colors"
+            style={{
+              backgroundColor: icon ? `${color}18` : 'var(--color-bg-tertiary)',
+              borderColor: showEmojiPicker ? 'var(--color-accent)' : 'var(--color-border)',
+            }}
+          >
+            {icon || '😊'}
+          </button>
+          {showEmojiPicker && (
+            <div
+              className="absolute top-full mt-1 left-0 z-20 rounded-xl p-2 grid"
+              style={{
+                gridTemplateColumns: 'repeat(4, 1fr)',
+                gap: 4,
+                backgroundColor: 'var(--color-bg-elevated)',
+                border: '1px solid var(--color-border)',
+                boxShadow: 'var(--shadow-popup)',
+                width: 160,
+              }}
+            >
+              {PRESET_EMOJIS.map((em) => (
+                <button
+                  key={em}
+                  type="button"
+                  className="w-8 h-8 rounded-lg text-lg flex items-center justify-center transition-colors"
+                  style={{
+                    backgroundColor: icon === em ? 'var(--color-bg-hover)' : 'transparent',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'; }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = icon === em ? 'var(--color-bg-hover)' : 'transparent';
+                  }}
+                  onClick={() => {
+                    setIcon(em);
+                    setShowEmojiPicker(false);
+                  }}
+                >
+                  {em}
+                </button>
+              ))}
+              {/* Clear button */}
               <button
-                key={c}
                 type="button"
-                onClick={() => setColor(c)}
-                className="w-7 h-7 rounded-full transition-transform hover:scale-110 flex-shrink-0"
-                style={{
-                  backgroundColor: c,
-                  outline: color === c ? `2px solid ${c}` : 'none',
-                  outlineOffset: '2px',
-                  boxShadow: color === c ? `0 0 0 2px var(--color-bg-elevated)` : 'none',
+                className="col-span-4 text-xs py-1 rounded-lg transition-colors"
+                style={{ color: 'var(--color-text-muted)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                onClick={() => {
+                  setIcon('');
+                  setShowEmojiPicker(false);
                 }}
-              />
-            ))}
-          </div>
+              >
+                Clear
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Icon (emoji) */}
-        <div className="flex flex-col gap-1.5 w-24">
-          <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Icon</label>
+        {/* Name */}
+        <div className="flex flex-col gap-1 flex-1">
+          <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+            Name <span style={{ color: 'var(--color-danger)' }}>*</span>
+          </label>
           <input
             type="text"
-            value={icon}
-            onChange={(e) => setIcon(e.target.value)}
-            placeholder="🏃"
-            maxLength={4}
-            className="input-base px-3 py-2.5 rounded-lg border text-sm outline-none transition-colors text-center"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Morning run"
+            className="input-base px-3 py-2.5 rounded-lg border text-sm outline-none transition-colors"
             style={inputStyle}
             {...inputFocusHandlers}
           />
+          {nameError && (
+            <p className="text-xs" style={{ color: 'var(--color-danger)' }}>{nameError}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Color picker — 8 swatches */}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Color</label>
+        <div className="flex gap-2.5 flex-wrap">
+          {PRESET_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setColor(c)}
+              className="rounded-full transition-transform hover:scale-110 flex-shrink-0"
+              style={{
+                width: 28,
+                height: 28,
+                backgroundColor: c,
+                outline: color === c ? `2px solid ${c}` : 'none',
+                outlineOffset: '2px',
+                boxShadow: color === c ? `0 0 0 3px var(--color-bg-elevated)` : 'none',
+              }}
+            />
+          ))}
         </div>
       </div>
 
       {/* Frequency */}
       <div className="flex flex-col gap-2">
         <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Frequency</label>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {(['daily', 'weekly', 'xPerWeek'] as FrequencyType[]).map((ft) => (
             <button
               key={ft}
@@ -242,44 +284,62 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
           ))}
         </div>
 
+        {/* Day-of-week pills (Mon-indexed) */}
         {freqType === 'weekly' && (
-          <div className="flex gap-1.5 flex-wrap">
-            {DAYS_OF_WEEK.map((day, idx) => (
-              <button
-                key={day}
-                type="button"
-                onClick={() => handleToggleDay(idx)}
-                className="w-10 h-10 rounded-full text-xs font-medium transition-colors"
-                style={
-                  weeklyDays.includes(idx)
-                    ? { backgroundColor: color, color: 'white' }
-                    : { backgroundColor: 'var(--color-bg-tertiary)', color: 'var(--color-text-secondary)' }
-                }
-                onMouseEnter={(e) => {
-                  if (!weeklyDays.includes(idx)) e.currentTarget.style.color = 'var(--color-text-primary)';
-                }}
-                onMouseLeave={(e) => {
-                  if (!weeklyDays.includes(idx)) e.currentTarget.style.color = 'var(--color-text-secondary)';
-                }}
-              >
-                {day}
-              </button>
-            ))}
+          <div className="flex gap-1.5">
+            {DAYS_SHORT.map((day, pillIdx) => {
+              const dow = PILL_TO_DOW[pillIdx];
+              const active = weeklyDays.includes(dow);
+              return (
+                <button
+                  key={pillIdx}
+                  type="button"
+                  onClick={() => handleToggleDay(pillIdx)}
+                  className="rounded-full text-xs font-semibold transition-all duration-150 flex-shrink-0 flex items-center justify-center"
+                  style={{
+                    width: 36,
+                    height: 36,
+                    backgroundColor: active ? color : 'var(--color-bg-tertiary)',
+                    color: active ? 'white' : 'var(--color-text-secondary)',
+                    boxShadow: active ? `0 0 0 2px ${color}44` : 'none',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!active) e.currentTarget.style.color = 'var(--color-text-primary)';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!active) e.currentTarget.style.color = 'var(--color-text-secondary)';
+                  }}
+                >
+                  {day}
+                </button>
+              );
+            })}
           </div>
         )}
 
         {freqType === 'xPerWeek' && (
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              min={1}
-              max={7}
-              value={xPerWeekTimes}
-              onChange={(e) => setXPerWeekTimes(Number(e.target.value))}
-              className="input-base w-16 px-2 py-2 rounded-lg border text-sm outline-none transition-colors text-center"
-              style={inputStyle}
-              {...inputFocusHandlers}
-            />
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 rounded-lg overflow-hidden" style={{ border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg-tertiary)' }}>
+              <button
+                type="button"
+                className="px-3 py-2 text-sm transition-colors"
+                style={{ color: 'var(--color-text-secondary)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; }}
+                onClick={() => setXPerWeekTimes((v) => Math.max(1, v - 1))}
+              >−</button>
+              <span className="w-8 text-center text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                {xPerWeekTimes}
+              </span>
+              <button
+                type="button"
+                className="px-3 py-2 text-sm transition-colors"
+                style={{ color: 'var(--color-text-secondary)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; }}
+                onClick={() => setXPerWeekTimes((v) => Math.min(7, v + 1))}
+              >+</button>
+            </div>
             <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>times per week</span>
           </div>
         )}
@@ -342,6 +402,23 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
         )}
       </div>
 
+      {/* Description */}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+          Description
+        </label>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Optional description..."
+          rows={2}
+          className="px-3 py-2.5 rounded-lg border text-sm outline-none transition-colors resize-none"
+          style={inputStyle}
+          onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent)'; }}
+          onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
+        />
+      </div>
+
       {/* Group name */}
       <div className="flex flex-col gap-1.5 relative">
         <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Group</label>
@@ -353,10 +430,12 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
             setShowGroupSuggestions(true);
           }}
           onBlur={(e) => {
-            inputFocusHandlers.onBlur(e as React.FocusEvent<HTMLInputElement>);
+            e.currentTarget.style.borderColor = 'var(--color-border)';
             setTimeout(() => setShowGroupSuggestions(false), 150);
           }}
-          onFocus={inputFocusHandlers.onFocus as React.FocusEventHandler<HTMLInputElement>}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = 'var(--color-accent)';
+          }}
           placeholder="e.g. Health, Work..."
           className="input-base px-3 py-2.5 rounded-lg border text-sm outline-none transition-colors"
           style={inputStyle}
@@ -396,10 +475,7 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
           type="button"
           onClick={onCancel}
           className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
-          style={{
-            color: 'var(--color-text-secondary)',
-            backgroundColor: 'var(--color-bg-tertiary)',
-          }}
+          style={{ color: 'var(--color-text-secondary)', backgroundColor: 'var(--color-bg-tertiary)' }}
           onMouseEnter={(e) => {
             e.currentTarget.style.color = 'var(--color-text-primary)';
             e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';

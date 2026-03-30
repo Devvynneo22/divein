@@ -1,5 +1,69 @@
 import { useState, useRef, useEffect } from 'react';
 import { FileText, MoreHorizontal, FileDown, FileType } from 'lucide-react';
+
+// ─── IconAvatar ───────────────────────────────────────────────────────────────
+
+function IconAvatar({ icon, onClick }: { icon: string | null; onClick: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  const isImage = icon ? (icon.startsWith('data:') || icon.startsWith('http')) : false;
+
+  return (
+    <button
+      onClick={onClick}
+      title="Change icon"
+      style={{
+        width: 80,
+        height: 80,
+        borderRadius: '50%',
+        border: '3px solid var(--color-bg-primary, #fff)',
+        backgroundColor: 'var(--color-bg-tertiary)',
+        cursor: 'pointer',
+        padding: 0,
+        overflow: 'hidden',
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.12)',
+        flexShrink: 0,
+        outline: 'none',
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {isImage ? (
+        <img
+          src={icon!}
+          alt="page icon"
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+      ) : icon ? (
+        <span style={{ fontSize: 36, lineHeight: 1, userSelect: 'none' }}>{icon}</span>
+      ) : (
+        <FileText size={34} style={{ color: 'var(--color-text-muted)' }} />
+      )}
+
+      {/* Hover overlay */}
+      {hovered && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            gap: 2,
+          }}
+        >
+          <span style={{ fontSize: 14 }}>✏️</span>
+          <span style={{ fontSize: 10, color: '#fff', fontWeight: 600, letterSpacing: '0.02em' }}>Edit</span>
+        </div>
+      )}
+    </button>
+  );
+}
 import { format } from 'date-fns';
 import { PageIconPicker } from './PageIconPicker';
 import { exportNoteToMarkdown, exportNoteToPDF } from '@/shared/lib/exportService';
@@ -412,36 +476,21 @@ export function NoteHeader({ note, childCount, onTitleChange, onIconChange, onCo
           </button>
         )}
 
-        {/* Icon button — overlaps cover bottom when cover is present */}
+        {/* Icon button — LinkedIn-style circular avatar */}
         <div
-          className="mb-2"
+          className="mb-4"
           ref={iconPickerRef}
           style={{
             position: 'relative',
-            zIndex: 1,
-            ...(note.coverColor ? { marginTop: -20 } : {}),
+            zIndex: 2,
+            display: 'inline-block',
+            ...(note.coverColor ? { marginTop: -40 } : { marginTop: 0 }),
           }}
         >
-          <button
+          <IconAvatar
+            icon={note.icon ?? null}
             onClick={() => setShowIconPicker((v) => !v)}
-            className="text-4xl leading-none transition-opacity hover:opacity-70 w-14 h-14 flex items-center justify-center rounded-lg"
-            style={{
-              backgroundColor: showIconPicker ? 'var(--color-bg-tertiary)' : 'transparent',
-              boxShadow: 'none',
-              border: 'none',
-            }}
-            title="Change icon"
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
-            onMouseLeave={(e) => {
-              if (!showIconPicker) e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            {note.icon ? (
-              note.icon
-            ) : (
-              <FileText size={32} style={{ color: 'var(--color-text-muted)' }} />
-            )}
-          </button>
+          />
           {showIconPicker && (
             <PageIconPicker
               onSelect={onIconChange}
