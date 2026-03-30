@@ -1,15 +1,17 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { LoadingSpinner } from '@/app/LoadingSpinner';
-import { ArrowLeft, Plus, Table2, Filter, ArrowUpDown, Download, Upload, LayoutGrid, Columns3, X } from 'lucide-react';
+import {
+  ArrowLeft, Plus, Table2, Filter, ArrowUpDown, Download, Upload,
+  LayoutGrid, Columns3, X, Search,
+} from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useTables,
   useCreateTable,
   useUpdateTable,
-  useDeleteTable,
-  useRows,
-  useCreateRow,
   useAddColumn,
+  useCreateRow,
+  useRows,
 } from './hooks/useTables';
 import { TableCard } from './components/TableCard';
 import { TableGrid } from './components/TableGrid';
@@ -21,7 +23,7 @@ import { tableService } from '@/shared/lib/tableService';
 import { exportTableToCSV, downloadCSV, parseCSVToRows, type CSVParseResult } from '@/shared/lib/csvService';
 import type { TableDef, TableFilter, TableSort, ColumnDef } from '@/shared/types/table';
 
-// ─── Row count fetcher for cards ──────────────────────────────────────────────
+// ─── Row count wrapper for TableCard ──────────────────────────────────────────
 
 function TableCardWithCount({
   table,
@@ -34,7 +36,7 @@ function TableCardWithCount({
   return <TableCard table={table} rowCount={rows.length} onClick={onSelect} />;
 }
 
-// ─── CSV Import Preview Modal ─────────────────────────────────────────────
+// ─── CSV Import Preview Modal ─────────────────────────────────────────────────
 
 interface ImportPreviewModalProps {
   parseResult: CSVParseResult;
@@ -49,13 +51,14 @@ function ImportPreviewModal({ parseResult, tableName, onConfirm, onCancel, isImp
   const totalCols = parseResult.headers.length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={onCancel}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+      onClick={onCancel}
+    >
       <div
-        className="rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col m-4"
-        style={{
-          backgroundColor: 'var(--color-bg-elevated)',
-          border: '1px solid var(--color-border)',
-        }}
+        className="rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col m-4"
+        style={{ backgroundColor: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -82,19 +85,21 @@ function ImportPreviewModal({ parseResult, tableName, onConfirm, onCancel, isImp
           </button>
         </div>
 
-        {/* Column mapping summary */}
+        {/* Column mapping */}
         <div
           className="px-5 py-3 flex-shrink-0"
           style={{ borderBottom: '1px solid var(--color-border)' }}
         >
-          <p className="text-xs font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>Column Mapping</p>
+          <p className="text-xs font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+            Column Mapping
+          </p>
           <div className="flex flex-wrap gap-1.5">
             {parseResult.mappedColumns.map((m) => (
               <span
                 key={m.csvHeader}
-                className="px-2 py-0.5 rounded text-[11px] font-medium"
+                className="px-2 py-0.5 rounded-full text-[11px] font-medium"
                 style={{
-                  backgroundColor: m.column ? 'var(--color-success-soft)' : 'var(--color-warning-soft)',
+                  backgroundColor: m.column ? 'var(--color-success-soft, #dcfce7)' : 'var(--color-warning-soft, #fef9c3)',
                   color: m.column ? 'var(--color-success)' : 'var(--color-warning)',
                 }}
               >
@@ -109,18 +114,15 @@ function ImportPreviewModal({ parseResult, tableName, onConfirm, onCancel, isImp
           <p className="text-xs font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>
             Preview (first {Math.min(parseResult.rows.length, 10)} rows)
           </p>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-lg" style={{ border: '1px solid var(--color-border)' }}>
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr style={{ backgroundColor: 'var(--color-bg-tertiary)' }}>
                   {parseResult.headers.map((h) => (
                     <th
                       key={h}
-                      className="px-2 py-1.5 text-left font-medium whitespace-nowrap"
-                      style={{
-                        color: 'var(--color-text-secondary)',
-                        border: '1px solid var(--color-border)',
-                      }}
+                      className="px-3 py-2 text-left font-semibold whitespace-nowrap"
+                      style={{ color: 'var(--color-text-secondary)', borderBottom: '1px solid var(--color-border)' }}
                     >
                       {h}
                     </th>
@@ -129,15 +131,15 @@ function ImportPreviewModal({ parseResult, tableName, onConfirm, onCancel, isImp
               </thead>
               <tbody>
                 {parseResult.rows.slice(0, 10).map((row, i) => (
-                  <tr key={i}>
+                  <tr
+                    key={i}
+                    style={{ backgroundColor: i % 2 === 0 ? 'var(--color-bg-primary)' : 'var(--color-bg-secondary)' }}
+                  >
                     {parseResult.headers.map((h) => (
                       <td
                         key={h}
-                        className="px-2 py-1 max-w-[200px] truncate"
-                        style={{
-                          border: '1px solid var(--color-border)',
-                          color: 'var(--color-text-primary)',
-                        }}
+                        className="px-3 py-1.5 max-w-[200px] truncate"
+                        style={{ color: 'var(--color-text-primary)' }}
                       >
                         {row.raw[h] ?? ''}
                       </td>
@@ -172,15 +174,15 @@ function ImportPreviewModal({ parseResult, tableName, onConfirm, onCancel, isImp
           <button
             onClick={onConfirm}
             disabled={isImporting || parseResult.rows.length === 0}
-            className="px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
             onMouseEnter={(e) => {
               if (!isImporting && parseResult.rows.length > 0)
-                e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)';
+                e.currentTarget.style.opacity = '0.85';
             }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
           >
-            {isImporting ? 'Importing...' : `Import ${parseResult.rows.length} rows`}
+            {isImporting ? 'Importing…' : `Import ${parseResult.rows.length} rows`}
           </button>
         </div>
       </div>
@@ -188,7 +190,7 @@ function ImportPreviewModal({ parseResult, tableName, onConfirm, onCancel, isImp
   );
 }
 
-// ─── Table View ───────────────────────────────────────────────────────────────
+// ─── Table Detail View ────────────────────────────────────────────────────────
 
 type ViewMode = 'grid' | 'board';
 
@@ -209,13 +211,9 @@ function TableView({ table, onBack }: TableViewProps) {
   const [importPreview, setImportPreview] = useState<CSVParseResult | null>(null);
   const [isImporting, setIsImporting] = useState(false);
 
-  // Board view state
   const selectColumns = table.columns.filter((c) => c.type === 'select');
-  const [groupByColumnId, setGroupByColumnId] = useState<string>(
-    selectColumns[0]?.id ?? '',
-  );
+  const [groupByColumnId, setGroupByColumnId] = useState<string>(selectColumns[0]?.id ?? '');
 
-  // Update groupByColumnId when columns change
   useEffect(() => {
     if (!selectColumns.find((c) => c.id === groupByColumnId) && selectColumns.length > 0) {
       setGroupByColumnId(selectColumns[0].id);
@@ -236,7 +234,6 @@ function TableView({ table, onBack }: TableViewProps) {
     if (editingName) nameRef.current?.focus();
   }, [editingName]);
 
-  // Close add column panel on outside click
   useEffect(() => {
     function handleOutside(e: MouseEvent) {
       if (addColumnRef.current && !addColumnRef.current.contains(e.target as Node)) {
@@ -262,15 +259,15 @@ function TableView({ table, onBack }: TableViewProps) {
     setShowAddColumn(false);
   }
 
-  // ── CSV Export ──────────────────────────────────────────────────────────────
+  function handleAddRow() {
+    createRow.mutate({ tableId: table.id, data: {} });
+  }
 
   const handleExport = useCallback(() => {
     const csv = exportTableToCSV(table, rows);
     const safeName = table.name.replace(/[^a-zA-Z0-9_-]/g, '_');
     downloadCSV(csv, `${safeName}.csv`);
   }, [table, rows]);
-
-  // ── CSV Import ──────────────────────────────────────────────────────────────
 
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -283,7 +280,6 @@ function TableView({ table, onBack }: TableViewProps) {
         setImportPreview(result);
       };
       reader.readAsText(file);
-      // Reset input so same file can be re-selected
       e.target.value = '';
     },
     [table.columns],
@@ -298,53 +294,66 @@ function TableView({ table, onBack }: TableViewProps) {
       }
       setImportPreview(null);
       setIsImporting(false);
-      // Invalidate rows cache to show newly imported data
       void queryClient.invalidateQueries({ queryKey: ['tableRows', table.id] });
     } catch {
       setIsImporting(false);
     }
   }, [importPreview, table.id, queryClient]);
 
-  // Toolbar button helper styles
-  const toolbarBtnBase: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    padding: '6px 12px',
-    borderRadius: '8px',
-    fontSize: '12px',
-    fontWeight: 500,
-    transition: 'colors 0.15s',
-    cursor: 'pointer',
-    backgroundColor: 'var(--color-bg-tertiary)',
-    color: 'var(--color-text-secondary)',
-    border: 'none',
-  };
+  // ── Toolbar button style helpers ──────────────────────────────────────────
+
+  function toolbarBtn(active?: boolean): React.CSSProperties {
+    return {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '5px',
+      padding: '5px 10px',
+      borderRadius: '8px',
+      fontSize: '12px',
+      fontWeight: 500,
+      cursor: 'pointer',
+      border: 'none',
+      transition: 'all 0.15s',
+      backgroundColor: active ? 'var(--color-accent-soft)' : 'var(--color-bg-tertiary)',
+      color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+    };
+  }
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-8 pt-6 pb-3 flex-shrink-0">
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <div
+        className="px-6 pt-5 pb-3 flex-shrink-0"
+        style={{ borderBottom: '1px solid var(--color-border)' }}
+      >
+        {/* Breadcrumb */}
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 text-sm mb-4 transition-colors"
-          style={{ color: 'var(--color-text-muted)' }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+          className="inline-flex items-center gap-1.5 text-xs mb-3 rounded-lg px-2 py-1 transition-colors"
+          style={{ color: 'var(--color-text-muted)', backgroundColor: 'transparent' }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--color-text-primary)';
+            e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--color-text-muted)';
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
         >
-          <ArrowLeft size={16} />
-          All Tables
+          <ArrowLeft size={13} />
+          Tables
         </button>
 
-        <div className="flex items-start gap-3 mb-5">
+        {/* Table name + icon */}
+        <div className="flex items-center gap-3 mb-4">
           <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
             style={{ backgroundColor: 'var(--color-bg-tertiary)' }}
           >
             {table.icon ? (
-              <span className="text-xl">{table.icon}</span>
+              <span className="text-lg">{table.icon}</span>
             ) : (
-              <Table2 size={18} style={{ color: 'var(--color-text-muted)' }} />
+              <Table2 size={16} style={{ color: 'var(--color-text-muted)' }} />
             )}
           </div>
           <div className="flex-1 min-w-0">
@@ -356,44 +365,39 @@ function TableView({ table, onBack }: TableViewProps) {
                 onBlur={commitName}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') commitName();
-                  if (e.key === 'Escape') {
-                    setNameInput(table.name);
-                    setEditingName(false);
-                  }
+                  if (e.key === 'Escape') { setNameInput(table.name); setEditingName(false); }
                 }}
-                className="text-2xl font-bold bg-transparent w-full outline-none"
+                className="text-xl font-bold bg-transparent w-full outline-none"
                 style={{
                   color: 'var(--color-text-primary)',
-                  borderBottom: '1px solid var(--color-accent)',
+                  borderBottom: '2px solid var(--color-accent)',
+                  paddingBottom: '1px',
                 }}
               />
             ) : (
               <h1
-                className="text-2xl font-bold truncate cursor-text"
+                className="text-xl font-bold truncate cursor-text"
                 style={{ color: 'var(--color-text-primary)' }}
                 onClick={() => setEditingName(true)}
+                title="Click to rename"
               >
                 {table.name}
               </h1>
             )}
             {table.description && (
-              <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{table.description}</p>
+              <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--color-text-muted)' }}>
+                {table.description}
+              </p>
             )}
           </div>
         </div>
 
-        {/* Toolbar */}
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* ── Toolbar ─────────────────────────────────────────────────────── */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Filter */}
           <button
-            onClick={() => {
-              setShowFilters((v) => !v);
-              setShowSorts(false);
-            }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-            style={{
-              backgroundColor: (showFilters || filters.length > 0) ? 'var(--color-accent-muted)' : 'var(--color-bg-tertiary)',
-              color: (showFilters || filters.length > 0) ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-            }}
+            style={toolbarBtn(showFilters || filters.length > 0)}
+            onClick={() => { setShowFilters((v) => !v); setShowSorts(false); }}
             onMouseEnter={(e) => {
               if (!(showFilters || filters.length > 0)) e.currentTarget.style.color = 'var(--color-text-primary)';
             }}
@@ -401,7 +405,7 @@ function TableView({ table, onBack }: TableViewProps) {
               if (!(showFilters || filters.length > 0)) e.currentTarget.style.color = 'var(--color-text-secondary)';
             }}
           >
-            <Filter size={13} />
+            <Filter size={12} />
             Filter
             {filters.length > 0 && (
               <span
@@ -413,16 +417,10 @@ function TableView({ table, onBack }: TableViewProps) {
             )}
           </button>
 
+          {/* Sort */}
           <button
-            onClick={() => {
-              setShowSorts((v) => !v);
-              setShowFilters(false);
-            }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-            style={{
-              backgroundColor: (showSorts || sorts.length > 0) ? 'var(--color-accent-muted)' : 'var(--color-bg-tertiary)',
-              color: (showSorts || sorts.length > 0) ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-            }}
+            style={toolbarBtn(showSorts || sorts.length > 0)}
+            onClick={() => { setShowSorts((v) => !v); setShowFilters(false); }}
             onMouseEnter={(e) => {
               if (!(showSorts || sorts.length > 0)) e.currentTarget.style.color = 'var(--color-text-primary)';
             }}
@@ -430,7 +428,7 @@ function TableView({ table, onBack }: TableViewProps) {
               if (!(showSorts || sorts.length > 0)) e.currentTarget.style.color = 'var(--color-text-secondary)';
             }}
           >
-            <ArrowUpDown size={13} />
+            <ArrowUpDown size={12} />
             Sort
             {sorts.length > 0 && (
               <span
@@ -450,55 +448,53 @@ function TableView({ table, onBack }: TableViewProps) {
             >
               <button
                 onClick={() => setViewMode('grid')}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all"
                 style={{
-                  backgroundColor: viewMode === 'grid' ? 'var(--color-bg-primary)' : 'transparent',
+                  backgroundColor: viewMode === 'grid' ? 'var(--color-bg-elevated)' : 'transparent',
                   color: viewMode === 'grid' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
                   boxShadow: viewMode === 'grid' ? 'var(--shadow-sm)' : 'none',
                 }}
               >
-                <LayoutGrid size={12} />
+                <LayoutGrid size={11} />
                 Grid
               </button>
               <button
                 onClick={() => setViewMode('board')}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all"
                 style={{
-                  backgroundColor: viewMode === 'board' ? 'var(--color-bg-primary)' : 'transparent',
+                  backgroundColor: viewMode === 'board' ? 'var(--color-bg-elevated)' : 'transparent',
                   color: viewMode === 'board' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
                   boxShadow: viewMode === 'board' ? 'var(--shadow-sm)' : 'none',
                 }}
               >
-                <Columns3 size={12} />
+                <Columns3 size={11} />
                 Board
               </button>
             </div>
           )}
 
-          {/* CSV Export */}
+          {/* Export CSV */}
           <button
+            style={toolbarBtn()}
             onClick={handleExport}
             disabled={rows.length === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            style={{ backgroundColor: 'var(--color-bg-tertiary)', color: 'var(--color-text-secondary)' }}
+            title="Export as CSV"
             onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; }}
-            title="Export as CSV"
           >
-            <Download size={13} />
+            <Download size={12} />
             Export
           </button>
 
-          {/* CSV Import */}
+          {/* Import CSV */}
           <button
+            style={toolbarBtn()}
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-            style={{ backgroundColor: 'var(--color-bg-tertiary)', color: 'var(--color-text-secondary)' }}
+            title="Import from CSV"
             onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; }}
-            title="Import from CSV"
           >
-            <Upload size={13} />
+            <Upload size={12} />
             Import
           </button>
           <input
@@ -509,24 +505,24 @@ function TableView({ table, onBack }: TableViewProps) {
             className="hidden"
           />
 
-          {/* Add Column — positioned button + floating panel */}
+          {/* Add Column */}
           <div className="relative ml-auto" ref={addColumnRef}>
             <button
+              style={toolbarBtn()}
               onClick={() => setShowAddColumn((v) => !v)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-              style={{ backgroundColor: 'var(--color-bg-tertiary)', color: 'var(--color-text-secondary)' }}
               onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; }}
             >
-              <Plus size={13} />
+              <Plus size={12} />
               Add Column
             </button>
             {showAddColumn && (
               <div
-                className="absolute top-full right-0 mt-1 z-50 w-72 rounded-xl shadow-2xl"
+                className="absolute top-full right-0 mt-1.5 z-50 w-72 rounded-2xl overflow-hidden"
                 style={{
                   border: '1px solid var(--color-border)',
                   backgroundColor: 'var(--color-bg-elevated)',
+                  boxShadow: 'var(--shadow-popup)',
                 }}
               >
                 <AddColumnPanel
@@ -539,7 +535,7 @@ function TableView({ table, onBack }: TableViewProps) {
         </div>
       </div>
 
-      {/* Filter/Sort bars */}
+      {/* ── Filter / Sort bars ──────────────────────────────────────────────── */}
       {showFilters && (
         <FilterBar columns={table.columns} filters={filters} onChange={setFilters} />
       )}
@@ -547,7 +543,7 @@ function TableView({ table, onBack }: TableViewProps) {
         <SortBar columns={table.columns} sorts={sorts} onChange={setSorts} />
       )}
 
-      {/* Content area — Grid or Board */}
+      {/* ── Content ─────────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-hidden flex flex-col min-h-0">
         {isLoading ? (
           <div className="flex-1 flex items-center justify-center">
@@ -572,7 +568,29 @@ function TableView({ table, onBack }: TableViewProps) {
         )}
       </div>
 
-      {/* Import Preview Modal */}
+      {/* ── Footer ─────────────────────────────────────────────────────────── */}
+      <div
+        className="flex-shrink-0 px-6 py-2.5 flex items-center justify-between"
+        style={{ borderTop: '1px solid var(--color-border)' }}
+      >
+        <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+          {rows.length} {rows.length === 1 ? 'row' : 'rows'}
+          {filters.length > 0 && ' (filtered)'}
+        </span>
+        <button
+          onClick={handleAddRow}
+          disabled={createRow.isPending}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
+          style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.85'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+        >
+          <Plus size={12} />
+          Add Row
+        </button>
+      </div>
+
+      {/* ── Import modal ────────────────────────────────────────────────────── */}
       {importPreview && (
         <ImportPreviewModal
           parseResult={importPreview}
@@ -582,20 +600,11 @@ function TableView({ table, onBack }: TableViewProps) {
           isImporting={isImporting}
         />
       )}
-
-      {/* Footer */}
-      <div
-        className="flex-shrink-0 px-6 py-2 text-xs"
-        style={{ borderTop: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}
-      >
-        {rows.length} {rows.length === 1 ? 'row' : 'rows'}
-        {filters.length > 0 && ' (filtered)'}
-      </div>
     </div>
   );
 }
 
-// ─── Create table form ────────────────────────────────────────────────────────
+// ─── Create Table Form ────────────────────────────────────────────────────────
 
 interface CreateTableFormProps {
   onSave: (name: string) => void;
@@ -607,14 +616,15 @@ function CreateTableForm({ onSave, onCancel, isLoading }: CreateTableFormProps) 
   const [name, setName] = useState('');
   return (
     <div
-      className="rounded-xl p-5 mb-6"
+      className="rounded-2xl p-5 mb-6"
       style={{
-        border: '1px solid var(--color-border)',
+        border: '1px solid var(--color-accent)',
         backgroundColor: 'var(--color-bg-secondary)',
+        boxShadow: 'var(--shadow-md)',
       }}
     >
-      <h2 className="text-base font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>
-        Create New Table
+      <h2 className="text-sm font-semibold mb-3" style={{ color: 'var(--color-text-primary)' }}>
+        Create new table
       </h2>
       <div className="flex gap-2">
         <input
@@ -625,7 +635,7 @@ function CreateTableForm({ onSave, onCancel, isLoading }: CreateTableFormProps) 
             if (e.key === 'Enter' && name.trim()) onSave(name.trim());
             if (e.key === 'Escape') onCancel();
           }}
-          placeholder="Table name..."
+          placeholder="Table name…"
           className="flex-1 rounded-lg px-3 py-2 text-sm outline-none transition-colors"
           style={{
             backgroundColor: 'var(--color-bg-primary)',
@@ -638,18 +648,16 @@ function CreateTableForm({ onSave, onCancel, isLoading }: CreateTableFormProps) 
         <button
           onClick={() => name.trim() && onSave(name.trim())}
           disabled={!name.trim() || isLoading}
-          className="px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
-          onMouseEnter={(e) => {
-            if (name.trim() && !isLoading) e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)';
-          }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent)'; }}
+          onMouseEnter={(e) => { if (name.trim() && !isLoading) e.currentTarget.style.opacity = '0.85'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
         >
-          Create
+          {isLoading ? 'Creating…' : 'Create'}
         </button>
         <button
           onClick={onCancel}
-          className="px-4 py-2 rounded-lg text-sm transition-colors"
+          className="px-3 py-2 rounded-lg text-sm transition-colors"
           style={{ color: 'var(--color-text-muted)' }}
           onMouseEnter={(e) => {
             e.currentTarget.style.color = 'var(--color-text-primary)';
@@ -672,11 +680,12 @@ function CreateTableForm({ onSave, onCancel, isLoading }: CreateTableFormProps) 
 export function TablesPage() {
   const [selectedTable, setSelectedTable] = useState<TableDef | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [search, setSearch] = useState('');
 
   const { data: tables = [], isLoading } = useTables();
   const createTable = useCreateTable();
 
-  // Sync selectedTable if it was updated (e.g. name change)
+  // Sync selectedTable when underlying data updates (e.g., column added)
   useEffect(() => {
     if (selectedTable && tables.length > 0) {
       const fresh = tables.find((t) => t.id === selectedTable.id);
@@ -698,9 +707,8 @@ export function TablesPage() {
     );
   }
 
-  // ── Table View ─────────────────────────────────────────────────────────────
+  // ── Detail view ────────────────────────────────────────────────────────────
   if (selectedTable) {
-    // Get fresh version from cache
     const freshTable = tables.find((t) => t.id === selectedTable.id) ?? selectedTable;
     return (
       <div className="flex h-full">
@@ -711,30 +719,81 @@ export function TablesPage() {
     );
   }
 
-  // ── Table Browser ──────────────────────────────────────────────────────────
+  // ── Table list ─────────────────────────────────────────────────────────────
+  const filteredTables = search.trim()
+    ? tables.filter((t) =>
+        t.name.toLowerCase().includes(search.toLowerCase()) ||
+        (t.description ?? '').toLowerCase().includes(search.toLowerCase())
+      )
+    : tables;
+
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-8 pt-8 pb-4 flex-shrink-0">
-        <div className="flex items-center justify-between mb-6">
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <div
+        className="px-8 pt-7 pb-5 flex-shrink-0"
+        style={{ borderBottom: '1px solid var(--color-border)' }}
+      >
+        <div className="flex items-start justify-between gap-4 mb-5">
           <div>
-            <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>Tables</h1>
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
+              Tables
+            </h1>
             <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
               Structured data at your fingertips
             </p>
           </div>
           <button
             onClick={() => setShowCreateForm(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent)'; }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all flex-shrink-0"
+            style={{ backgroundColor: 'var(--color-accent)', color: 'white', boxShadow: 'var(--shadow-sm)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.85'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; }}
           >
-            <Plus size={16} />
+            <Plus size={15} />
             New Table
           </button>
         </div>
 
+        {/* Search */}
+        {tables.length > 0 && (
+          <div className="relative max-w-sm">
+            <Search
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+              style={{ color: 'var(--color-text-muted)' }}
+            />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search tables…"
+              className="w-full pl-8 pr-3 py-2 rounded-xl text-sm outline-none transition-colors"
+              style={{
+                backgroundColor: 'var(--color-bg-secondary)',
+                border: '1px solid var(--color-border)',
+                color: 'var(--color-text-primary)',
+              }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent)'; }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 transition-colors"
+                style={{ color: 'var(--color-text-muted)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Content ─────────────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto px-8 py-6">
+        {/* Create form */}
         {showCreateForm && (
           <CreateTableForm
             onSave={handleCreate}
@@ -742,53 +801,72 @@ export function TablesPage() {
             isLoading={createTable.isPending}
           />
         )}
-      </div>
 
-      {/* Table grid */}
-      <div className="flex-1 overflow-y-auto px-8 pb-8">
         {isLoading ? (
           <LoadingSpinner text="Loading tables…" />
         ) : tables.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+          /* ── Empty state ─────────────────────────────────────────────────── */
+          <div className="flex flex-col items-center justify-center py-24 gap-5 text-center">
             <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center"
-              style={{ backgroundColor: 'var(--color-bg-secondary)' }}
+              className="w-20 h-20 rounded-3xl flex items-center justify-center text-4xl"
+              style={{ backgroundColor: 'var(--color-bg-secondary)', boxShadow: 'var(--shadow-md)' }}
             >
-              <Table2 size={28} style={{ color: 'var(--color-text-muted)' }} />
+              📊
             </div>
             <div>
-              <p className="font-medium" style={{ color: 'var(--color-text-secondary)' }}>No tables yet</p>
-              <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                Create your first table to organize structured data
+              <p className="text-lg font-bold mb-1" style={{ color: 'var(--color-text-primary)' }}>
+                Create your first table
+              </p>
+              <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                Organize structured data with flexible columns, filters, and views.
               </p>
             </div>
             <button
               onClick={() => setShowCreateForm(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed text-sm transition-colors"
-              style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'var(--color-accent)';
-                e.currentTarget.style.color = 'var(--color-accent)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--color-border)';
-                e.currentTarget.style.color = 'var(--color-text-muted)';
-              }}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
+              style={{ backgroundColor: 'var(--color-accent)', color: 'white', boxShadow: 'var(--shadow-sm)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.85'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
             >
-              <Plus size={14} />
-              Create a Table
+              <Plus size={15} />
+              New Table
+            </button>
+          </div>
+        ) : filteredTables.length === 0 ? (
+          /* ── No search results ───────────────────────────────────────────── */
+          <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+            <Search size={28} style={{ color: 'var(--color-text-muted)' }} />
+            <p className="font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+              No tables match &ldquo;{search}&rdquo;
+            </p>
+            <button
+              onClick={() => setSearch('')}
+              className="text-sm transition-colors"
+              style={{ color: 'var(--color-accent)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.7'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+            >
+              Clear search
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {tables.map((t) => (
-              <TableCardWithCount
-                key={t.id}
-                table={t}
-                onSelect={() => setSelectedTable(t)}
-              />
-            ))}
-          </div>
+          /* ── Table grid ──────────────────────────────────────────────────── */
+          <>
+            {search && (
+              <p className="text-xs mb-4" style={{ color: 'var(--color-text-muted)' }}>
+                {filteredTables.length} result{filteredTables.length !== 1 ? 's' : ''} for &ldquo;{search}&rdquo;
+              </p>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredTables.map((t) => (
+                <TableCardWithCount
+                  key={t.id}
+                  table={t}
+                  onSelect={() => setSelectedTable(t)}
+                />
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
