@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Check } from 'lucide-react';
-import type { Habit, CreateHabitInput, UpdateHabitInput, HabitFrequency } from '@/shared/types/habit';
+import type { Habit, CreateHabitInput, UpdateHabitInput, HabitFrequency, HabitWithStatus } from '@/shared/types/habit';
+import { HabitItem } from './HabitItem';
 
 interface HabitFormProps {
   habit?: Habit;
@@ -18,6 +19,13 @@ const PRESET_COLORS = [
   '#ec4899', // pink
   '#06b6d4', // cyan
   '#f59e0b', // amber
+  '#10b981', // emerald
+  '#6366f1', // indigo
+];
+
+const SUGGESTED_ICONS = [
+  '🏃‍♂️', '💪', '📚', '🧘‍♀️', '💊', '🥗', '🚰', '💤', '🎯', '🎨',
+  '✍️', '🎸', '🚴', '🏋️', '🧠', '🌿', '☀️', '🌙', '🍎', '🏊',
 ];
 
 const DAYS_FULL = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -26,6 +34,63 @@ const PILL_TO_DOW = [1, 2, 3, 4, 5, 6, 0];
 
 type FrequencyType = 'daily' | 'weekly' | 'xPerWeek';
 type HabitType = 'boolean' | 'measurable';
+
+// ─── Live Preview ─────────────────────────────────────────────────────────────
+
+function LivePreview({
+  name,
+  icon,
+  color,
+  isMeasurable,
+  target,
+  unit,
+  streak,
+}: {
+  name: string;
+  icon: string;
+  color: string;
+  isMeasurable: boolean;
+  target: number;
+  unit: string;
+  streak: number;
+}) {
+  const previewHabit: HabitWithStatus = {
+    id: 'preview',
+    name: name || 'Habit name',
+    description: null,
+    color,
+    icon: icon || null,
+    frequency: { type: 'daily' },
+    groupName: null,
+    target: isMeasurable ? target : 1,
+    unit: isMeasurable && unit ? unit : null,
+    isArchived: false,
+    sortOrder: 0,
+    createdAt: new Date().toISOString(),
+    todayEntry: null,
+    streak,
+    isCompletedToday: false,
+  };
+
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-muted)' }}>
+        Preview
+      </p>
+      <div style={{ pointerEvents: 'none', opacity: 0.92 }}>
+        <HabitItem
+          habit={previewHabit}
+          isSelected={false}
+          onSelect={() => {}}
+          onEdit={() => {}}
+          onDelete={() => {}}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ─── Main form ────────────────────────────────────────────────────────────────
 
 export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitFormProps) {
   const [name, setName] = useState(habit?.name ?? '');
@@ -154,31 +219,58 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
         </button>
       </div>
 
-      {/* Emoji icon — large input */}
-      <div className="flex flex-col gap-1.5">
+      {/* Icon picker — grid of suggestions + custom input */}
+      <div className="flex flex-col gap-2">
         <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
           Icon / Emoji
         </label>
+        {/* Suggestions grid */}
+        <div className="flex flex-wrap gap-1.5">
+          {SUGGESTED_ICONS.map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              onClick={() => setIcon(icon === emoji ? '' : emoji)}
+              className="rounded-lg flex items-center justify-center transition-all duration-150 flex-shrink-0"
+              style={{
+                width: 36,
+                height: 36,
+                fontSize: 20,
+                backgroundColor: icon === emoji ? `${color}25` : 'var(--color-bg-tertiary)',
+                border: icon === emoji
+                  ? `1.5px solid ${color}80`
+                  : '1.5px solid var(--color-border)',
+                cursor: 'pointer',
+                transform: icon === emoji ? 'scale(1.12)' : 'scale(1)',
+              }}
+              onMouseEnter={(e) => {
+                if (icon !== emoji) {
+                  e.currentTarget.style.borderColor = 'var(--color-border-hover)';
+                  e.currentTarget.style.transform = 'scale(1.08)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (icon !== emoji) {
+                  e.currentTarget.style.borderColor = 'var(--color-border)';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }
+              }}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+        {/* Custom input */}
         <input
           type="text"
           value={icon}
           onChange={(e) => setIcon(e.target.value)}
-          placeholder="🏃"
+          placeholder="Or type a custom emoji..."
           maxLength={4}
-          className="text-center"
-          style={{
-            ...baseInputStyle,
-            fontSize: 32,
-            padding: '12px',
-            letterSpacing: 0,
-            height: 64,
-          }}
+          style={{ ...baseInputStyle, fontSize: 14 }}
           onFocus={onFocus}
           onBlur={onBlur}
         />
-        <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-          Type or paste an emoji
-        </p>
       </div>
 
       {/* Name */}
@@ -202,12 +294,12 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
         )}
       </div>
 
-      {/* Color picker — 8 large swatches */}
+      {/* Color picker — 10 swatches */}
       <div className="flex flex-col gap-2">
         <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
           Color
         </label>
-        <div className="flex gap-3 flex-wrap">
+        <div className="flex gap-2 flex-wrap">
           {PRESET_COLORS.map((c) => (
             <button
               key={c}
@@ -215,30 +307,24 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
               onClick={() => setColor(c)}
               className="rounded-full flex-shrink-0 transition-all duration-150 flex items-center justify-center"
               style={{
-                width: 36,
-                height: 36,
+                width: 34,
+                height: 34,
                 backgroundColor: c,
                 outline: color === c ? `3px solid ${c}` : '3px solid transparent',
                 outlineOffset: 3,
                 boxShadow: color === c ? `0 0 0 5px var(--color-bg-elevated), var(--shadow-sm)` : 'none',
                 transform: color === c ? 'scale(1.12)' : 'scale(1)',
               }}
-              onMouseEnter={(e) => {
-                if (color !== c) e.currentTarget.style.transform = 'scale(1.08)';
-              }}
-              onMouseLeave={(e) => {
-                if (color !== c) e.currentTarget.style.transform = 'scale(1)';
-              }}
+              onMouseEnter={(e) => { if (color !== c) e.currentTarget.style.transform = 'scale(1.08)'; }}
+              onMouseLeave={(e) => { if (color !== c) e.currentTarget.style.transform = 'scale(1)'; }}
             >
-              {color === c && (
-                <Check size={14} color="white" strokeWidth={3} />
-              )}
+              {color === c && <Check size={14} color="white" strokeWidth={3} />}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Frequency — visual radio cards */}
+      {/* Frequency */}
       <div className="flex flex-col gap-2">
         <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
           Frequency
@@ -254,9 +340,7 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
                 className="flex flex-col items-center rounded-xl py-3 px-2 transition-all duration-150"
                 style={{
                   backgroundColor: active ? `${color}18` : 'var(--color-bg-tertiary)',
-                  border: active
-                    ? `1.5px solid ${color}88`
-                    : '1.5px solid var(--color-border)',
+                  border: active ? `1.5px solid ${color}88` : '1.5px solid var(--color-border)',
                   color: active ? color : 'var(--color-text-secondary)',
                 }}
                 onMouseEnter={(e) => {
@@ -279,7 +363,7 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
           })}
         </div>
 
-        {/* Day pills for specific days */}
+        {/* Specific days — circular day buttons */}
         {freqType === 'weekly' && (
           <div className="flex gap-1.5 flex-wrap mt-1">
             {DAYS_FULL.map((day, pillIdx) => {
@@ -290,11 +374,16 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
                   key={pillIdx}
                   type="button"
                   onClick={() => handleToggleDay(pillIdx)}
-                  className="rounded-full text-xs font-semibold transition-all duration-150 flex-shrink-0 flex items-center justify-center px-3 py-1.5"
+                  className="flex items-center justify-center font-semibold transition-all duration-150 flex-shrink-0"
                   style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: '50%',
+                    fontSize: 12,
                     backgroundColor: active ? color : 'var(--color-bg-tertiary)',
                     color: active ? 'white' : 'var(--color-text-secondary)',
                     border: active ? `1.5px solid ${color}` : '1.5px solid var(--color-border)',
+                    transform: active ? 'scale(1.08)' : 'scale(1)',
                   }}
                   onMouseEnter={(e) => {
                     if (!active) {
@@ -309,7 +398,7 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
                     }
                   }}
                 >
-                  {day}
+                  {day.slice(0, 2)}
                 </button>
               );
             })}
@@ -318,7 +407,10 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
 
         {/* X per week counter */}
         {freqType === 'xPerWeek' && (
-          <div className="flex items-center gap-4 mt-1 p-3 rounded-xl" style={{ backgroundColor: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border)' }}>
+          <div
+            className="flex items-center gap-4 mt-1 p-3 rounded-xl"
+            style={{ backgroundColor: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border)' }}
+          >
             <button
               type="button"
               onClick={() => setXPerWeekTimes((v) => Math.max(1, v - 1))}
@@ -328,14 +420,8 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
                 border: '1px solid var(--color-border)',
                 color: 'var(--color-text-secondary)',
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = 'var(--color-text-primary)';
-                e.currentTarget.style.borderColor = 'var(--color-border-hover)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = 'var(--color-text-secondary)';
-                e.currentTarget.style.borderColor = 'var(--color-border)';
-              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; e.currentTarget.style.borderColor = 'var(--color-border-hover)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.borderColor = 'var(--color-border)'; }}
             >
               −
             </button>
@@ -352,14 +438,8 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
                 border: '1px solid var(--color-border)',
                 color: 'var(--color-text-secondary)',
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = 'var(--color-text-primary)';
-                e.currentTarget.style.borderColor = 'var(--color-border-hover)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = 'var(--color-text-secondary)';
-                e.currentTarget.style.borderColor = 'var(--color-border)';
-              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; e.currentTarget.style.borderColor = 'var(--color-border-hover)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.borderColor = 'var(--color-border)'; }}
             >
               +
             </button>
@@ -367,7 +447,7 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
         )}
       </div>
 
-      {/* Habit type — visual radio cards */}
+      {/* Habit type */}
       <div className="flex flex-col gap-2">
         <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
           Type
@@ -386,9 +466,7 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
                 className="flex flex-col items-center rounded-xl py-3 px-2 transition-all duration-150"
                 style={{
                   backgroundColor: active ? `${color}18` : 'var(--color-bg-tertiary)',
-                  border: active
-                    ? `1.5px solid ${color}88`
-                    : '1.5px solid var(--color-border)',
+                  border: active ? `1.5px solid ${color}88` : '1.5px solid var(--color-border)',
                   color: active ? color : 'var(--color-text-secondary)',
                 }}
                 onMouseEnter={(e) => {
@@ -411,7 +489,6 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
           })}
         </div>
 
-        {/* Measurable target + unit */}
         {habitType === 'measurable' && (
           <div
             className="flex items-center gap-3 rounded-xl p-3"
@@ -426,12 +503,7 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
                 min={1}
                 value={target}
                 onChange={(e) => setTarget(Number(e.target.value))}
-                style={{
-                  ...baseInputStyle,
-                  padding: '8px 10px',
-                  textAlign: 'center',
-                  width: 80,
-                }}
+                style={{ ...baseInputStyle, padding: '8px 10px', textAlign: 'center', width: 80 }}
                 onFocus={onFocus}
                 onBlur={onBlur}
               />
@@ -464,11 +536,7 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Optional note about this habit..."
           rows={2}
-          style={{
-            ...baseInputStyle,
-            resize: 'none',
-            padding: '10px 12px',
-          }}
+          style={{ ...baseInputStyle, resize: 'none', padding: '10px 12px' }}
           onFocus={onFocus}
           onBlur={onBlur}
         />
@@ -482,18 +550,9 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
         <input
           type="text"
           value={groupName}
-          onChange={(e) => {
-            setGroupName(e.target.value);
-            setShowGroupSuggestions(true);
-          }}
-          onFocus={(e) => {
-            e.currentTarget.style.borderColor = 'var(--color-accent)';
-            setShowGroupSuggestions(true);
-          }}
-          onBlur={(e) => {
-            e.currentTarget.style.borderColor = 'var(--color-border)';
-            setTimeout(() => setShowGroupSuggestions(false), 150);
-          }}
+          onChange={(e) => { setGroupName(e.target.value); setShowGroupSuggestions(true); }}
+          onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent)'; setShowGroupSuggestions(true); }}
+          onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; setTimeout(() => setShowGroupSuggestions(false), 150); }}
           placeholder="e.g. 🌅 Morning Routine, Health..."
           style={baseInputStyle}
         />
@@ -510,18 +569,11 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
               <button
                 key={g}
                 type="button"
-                onMouseDown={() => {
-                  setGroupName(g);
-                  setShowGroupSuggestions(false);
-                }}
+                onMouseDown={() => { setGroupName(g); setShowGroupSuggestions(false); }}
                 className="w-full text-left px-4 py-2.5 text-sm transition-colors"
                 style={{ color: 'var(--color-text-primary)' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
               >
                 {g}
               </button>
@@ -529,6 +581,17 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
           </div>
         )}
       </div>
+
+      {/* Live preview */}
+      <LivePreview
+        name={name}
+        icon={icon}
+        color={color}
+        isMeasurable={habitType === 'measurable'}
+        target={target}
+        unit={unit}
+        streak={3}
+      />
 
       {/* Actions */}
       <div className="flex gap-2 pt-1">
@@ -558,8 +621,7 @@ export function HabitForm({ habit, existingGroups, onSave, onCancel }: HabitForm
           type="submit"
           className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-150"
           style={{
-            background: `linear-gradient(135deg, ${PRESET_COLORS[0]}, ${PRESET_COLORS[4]})`,
-            backgroundColor: 'var(--color-accent)',
+            background: `linear-gradient(135deg, ${color}, ${PRESET_COLORS[4]})`,
             boxShadow: 'var(--shadow-sm)',
           }}
           onMouseEnter={(e) => {

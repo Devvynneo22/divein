@@ -6,16 +6,18 @@ import {
   Trash2,
   ChevronRight,
   Check,
+  Copy,
 } from 'lucide-react';
 import type { ColumnDef, ColumnType } from '@/shared/types/table';
 
 interface ColumnHeaderProps {
   column: ColumnDef;
   sortDirection: 'asc' | 'desc' | false;
-  onSort: () => void;
+  onSort: (direction?: 'asc' | 'desc') => void;
   onRename: (name: string) => void;
   onDelete: () => void;
   onChangeType: (type: ColumnType) => void;
+  onDuplicate?: () => void;
 }
 
 const TYPE_LABELS: Record<ColumnType, string> = {
@@ -31,16 +33,16 @@ const TYPE_LABELS: Record<ColumnType, string> = {
 };
 
 // Compact text icons matching the spec
-const TYPE_ICONS: Record<ColumnType, React.ReactNode> = {
-  text: <span className="text-[11px] font-bold leading-none" style={{ fontFamily: 'serif' }}>Aa</span>,
-  number: <span className="text-[12px] font-bold leading-none">#</span>,
-  date: <span className="text-[12px] leading-none">📅</span>,
-  checkbox: <span className="text-[12px] font-bold leading-none">✓</span>,
-  select: <span className="text-[12px] leading-none">◉</span>,
-  multiselect: <span className="text-[12px] leading-none">◈</span>,
-  url: <span className="text-[11px] font-bold leading-none">🔗</span>,
-  email: <span className="text-[11px] font-bold leading-none">@</span>,
-  formula: <span className="text-[11px] font-bold italic leading-none">ƒ</span>,
+export const TYPE_ICONS: Record<ColumnType, React.ReactNode> = {
+  text: <span style={{ fontSize: '11px', fontWeight: 700, fontFamily: 'serif', lineHeight: 1 }}>Aa</span>,
+  number: <span style={{ fontSize: '12px', fontWeight: 700, lineHeight: 1 }}>#</span>,
+  date: <span style={{ fontSize: '12px', lineHeight: 1 }}>📅</span>,
+  checkbox: <span style={{ fontSize: '12px', fontWeight: 700, lineHeight: 1 }}>☑</span>,
+  select: <span style={{ fontSize: '12px', lineHeight: 1 }}>📋</span>,
+  multiselect: <span style={{ fontSize: '12px', lineHeight: 1 }}>◈</span>,
+  url: <span style={{ fontSize: '11px', fontWeight: 700, lineHeight: 1 }}>🔗</span>,
+  email: <span style={{ fontSize: '11px', fontWeight: 700, lineHeight: 1 }}>@</span>,
+  formula: <span style={{ fontSize: '11px', fontWeight: 700, fontStyle: 'italic', lineHeight: 1 }}>ƒ</span>,
 };
 
 const COLUMN_TYPES: ColumnType[] = [
@@ -54,6 +56,7 @@ export function ColumnHeader({
   onRename,
   onDelete,
   onChangeType,
+  onDuplicate,
 }: ColumnHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [subMenu, setSubMenu] = useState<'type' | null>(null);
@@ -94,7 +97,7 @@ export function ColumnHeader({
 
   return (
     <div
-      className="flex items-center gap-1.5 w-full h-full group relative select-none"
+      className="flex items-center gap-1.5 w-full h-full group relative select-none px-2"
       onContextMenu={(e) => {
         e.preventDefault();
         setMenuOpen(true);
@@ -128,14 +131,15 @@ export function ColumnHeader({
             backgroundColor: 'var(--color-bg-primary)',
             color: 'var(--color-text-primary)',
             outline: '1px solid var(--color-accent)',
+            border: 'none',
           }}
           onClick={(e) => e.stopPropagation()}
         />
       ) : (
         <span
           className="flex-1 text-xs font-semibold truncate cursor-pointer min-w-0"
-          style={{ color: 'var(--color-text-primary)' }}
-          onClick={onSort}
+          style={{ color: 'var(--color-text-secondary)', fontSize: '13px', fontWeight: 600 }}
+          onClick={() => onSort()}
           onDoubleClick={(e) => {
             e.stopPropagation();
             setRenaming(true);
@@ -147,7 +151,7 @@ export function ColumnHeader({
         </span>
       )}
 
-      {/* Sort indicator (always visible when active) */}
+      {/* Sort indicator */}
       {SortIcon && (
         <SortIcon
           size={11}
@@ -181,11 +185,11 @@ export function ColumnHeader({
       {menuOpen && (
         <div
           ref={menuRef}
-          className="absolute top-full left-0 mt-1 z-50 rounded-xl py-1.5 min-w-[180px]"
+          className="absolute top-full left-0 mt-1 z-50 rounded-xl py-1.5 min-w-[190px]"
           style={{
             border: '1px solid var(--color-border)',
             backgroundColor: 'var(--color-bg-elevated)',
-            boxShadow: 'var(--shadow-popup)',
+            boxShadow: 'var(--shadow-popup, 0 8px 24px rgba(0,0,0,0.15))',
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -216,7 +220,7 @@ export function ColumnHeader({
                 style={{
                   border: '1px solid var(--color-border)',
                   backgroundColor: 'var(--color-bg-elevated)',
-                  boxShadow: 'var(--shadow-popup)',
+                  boxShadow: 'var(--shadow-popup, 0 8px 24px rgba(0,0,0,0.15))',
                 }}
               >
                 {COLUMN_TYPES.map((t) => (
@@ -226,12 +230,8 @@ export function ColumnHeader({
                     style={{
                       color: t === column.type ? 'var(--color-accent)' : 'var(--color-text-secondary)',
                     }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                     onClick={() => {
                       onChangeType(t);
                       setMenuOpen(false);
@@ -254,13 +254,27 @@ export function ColumnHeader({
           <MenuItem
             icon={<ArrowUp size={13} />}
             label="Sort ascending"
-            onClick={() => { onSort(); setMenuOpen(false); }}
+            onClick={() => { onSort('asc'); setMenuOpen(false); }}
+            active={sortDirection === 'asc'}
           />
           <MenuItem
             icon={<ArrowDown size={13} />}
             label="Sort descending"
-            onClick={() => { onSort(); setMenuOpen(false); }}
+            onClick={() => { onSort('desc'); setMenuOpen(false); }}
+            active={sortDirection === 'desc'}
           />
+
+          {/* Duplicate */}
+          {onDuplicate && (
+            <>
+              <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
+              <MenuItem
+                icon={<Copy size={13} />}
+                label="Duplicate column"
+                onClick={() => { onDuplicate(); setMenuOpen(false); }}
+              />
+            </>
+          )}
 
           {/* Delete */}
           <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
@@ -304,7 +318,10 @@ function MenuItem({
         color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
         backgroundColor: active ? 'var(--color-bg-tertiary)' : 'transparent',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+        e.currentTarget.style.color = 'var(--color-text-primary)';
+      }}
       onMouseLeave={(e) => {
         e.currentTarget.style.backgroundColor = active ? 'var(--color-bg-tertiary)' : 'transparent';
         e.currentTarget.style.color = active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)';

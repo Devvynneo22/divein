@@ -9,6 +9,8 @@ interface TableCardProps {
   onClick: () => void;
 }
 
+// These are decorative palette colors (not theme colors), intentionally using
+// fixed hues so cards have distinct visual identities regardless of theme.
 const CARD_COLORS = [
   '#6366f1',
   '#8b5cf6',

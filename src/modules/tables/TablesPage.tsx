@@ -605,6 +605,114 @@ function TableView({ table, onBack }: TableViewProps) {
   );
 }
 
+// ─── Table Templates ─────────────────────────────────────────────────────────
+
+interface TableTemplate {
+  name: string;
+  icon: string;
+  description: string;
+  columns: import('@/shared/types/table').ColumnDef[];
+}
+
+const TABLE_TEMPLATES: TableTemplate[] = [
+  {
+    name: 'Project Tracker',
+    icon: '🚀',
+    description: 'Track tasks, owners, status and deadlines',
+    columns: [
+      { id: crypto.randomUUID(), name: 'Task', type: 'text', width: 220 },
+      { id: crypto.randomUUID(), name: 'Status', type: 'select', width: 130, options: ['Not Started', 'In Progress', 'Done', 'Blocked'] },
+      { id: crypto.randomUUID(), name: 'Owner', type: 'text', width: 140 },
+      { id: crypto.randomUUID(), name: 'Due Date', type: 'date', width: 130 },
+      { id: crypto.randomUUID(), name: 'Priority', type: 'select', width: 110, options: ['High', 'Medium', 'Low'] },
+      { id: crypto.randomUUID(), name: 'Done', type: 'checkbox', width: 80 },
+    ],
+  },
+  {
+    name: 'Contacts',
+    icon: '👥',
+    description: 'Manage people, companies and emails',
+    columns: [
+      { id: crypto.randomUUID(), name: 'Name', type: 'text', width: 180 },
+      { id: crypto.randomUUID(), name: 'Company', type: 'text', width: 160 },
+      { id: crypto.randomUUID(), name: 'Email', type: 'email', width: 200 },
+      { id: crypto.randomUUID(), name: 'Phone', type: 'text', width: 140 },
+      { id: crypto.randomUUID(), name: 'Tag', type: 'select', width: 120, options: ['Client', 'Partner', 'Lead', 'Vendor'] },
+      { id: crypto.randomUUID(), name: 'Last Contact', type: 'date', width: 130 },
+    ],
+  },
+  {
+    name: 'Inventory',
+    icon: '📦',
+    description: 'Track items, quantities and values',
+    columns: [
+      { id: crypto.randomUUID(), name: 'Item', type: 'text', width: 200 },
+      { id: crypto.randomUUID(), name: 'Category', type: 'select', width: 130, options: ['Electronics', 'Furniture', 'Supplies', 'Other'] },
+      { id: crypto.randomUUID(), name: 'Quantity', type: 'number', width: 100 },
+      { id: crypto.randomUUID(), name: 'Unit Price', type: 'number', width: 110 },
+      { id: crypto.randomUUID(), name: 'Location', type: 'text', width: 140 },
+      { id: crypto.randomUUID(), name: 'In Stock', type: 'checkbox', width: 80 },
+    ],
+  },
+  {
+    name: 'Reading List',
+    icon: '📚',
+    description: 'Books, articles and notes to read',
+    columns: [
+      { id: crypto.randomUUID(), name: 'Title', type: 'text', width: 220 },
+      { id: crypto.randomUUID(), name: 'Author', type: 'text', width: 150 },
+      { id: crypto.randomUUID(), name: 'Status', type: 'select', width: 120, options: ['Want to Read', 'Reading', 'Finished', 'Abandoned'] },
+      { id: crypto.randomUUID(), name: 'Rating', type: 'number', width: 90 },
+      { id: crypto.randomUUID(), name: 'Link', type: 'url', width: 180 },
+      { id: crypto.randomUUID(), name: 'Finished', type: 'checkbox', width: 80 },
+    ],
+  },
+];
+
+function TemplatesSection({ onCreate }: { onCreate: (tpl: TableTemplate) => void }) {
+  return (
+    <div className="mt-8">
+      <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--color-text-muted)' }}>
+        Quick-start templates
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {TABLE_TEMPLATES.map((tpl) => (
+          <TemplateCard key={tpl.name} template={tpl} onCreate={() => onCreate(tpl)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TemplateCard({ template, onCreate }: { template: TableTemplate; onCreate: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onCreate}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="text-left rounded-xl p-4 transition-all"
+      style={{
+        border: `1px solid ${hovered ? 'var(--color-accent)' : 'var(--color-border)'}`,
+        backgroundColor: hovered ? 'var(--color-accent-soft)' : 'var(--color-bg-secondary)',
+        transform: hovered ? 'translateY(-1px)' : 'none',
+        boxShadow: hovered ? 'var(--shadow-md)' : 'var(--shadow-sm)',
+      }}
+    >
+      <div className="text-xl mb-2">{template.icon}</div>
+      <p className="text-sm font-semibold mb-0.5" style={{ color: hovered ? 'var(--color-accent)' : 'var(--color-text-primary)' }}>
+        {template.name}
+      </p>
+      <p className="text-xs leading-snug" style={{ color: 'var(--color-text-muted)' }}>
+        {template.description}
+      </p>
+      <p className="text-[10px] mt-2 font-medium" style={{ color: hovered ? 'var(--color-accent)' : 'var(--color-text-muted)' }}>
+        {template.columns.length} columns · Use template →
+      </p>
+    </button>
+  );
+}
+
 // ─── Create Table Form ────────────────────────────────────────────────────────
 
 interface CreateTableFormProps {
@@ -702,6 +810,17 @@ export function TablesPage() {
       {
         onSuccess: (created) => {
           setShowCreateForm(false);
+          setSelectedTable(created);
+        },
+      },
+    );
+  }
+
+  function handleCreateFromTemplate(tpl: TableTemplate) {
+    createTable.mutate(
+      { name: tpl.name, columns: tpl.columns },
+      {
+        onSuccess: (created) => {
           setSelectedTable(created);
         },
       },
@@ -807,13 +926,16 @@ export function TablesPage() {
           <LoadingSpinner text="Loading tables…" />
         ) : tables.length === 0 ? (
           /* ── Empty state ─────────────────────────────────────────────────── */
-          <EmptyState
-            icon="📊"
-            title="No tables yet"
-            description="Create a table to organize structured data with formulas and filters"
-            actionLabel="Create Table"
-            onAction={() => setShowCreateForm(true)}
-          />
+          <div>
+            <EmptyState
+              icon="📊"
+              title="No tables yet"
+              description="Create a table to organize structured data with formulas and filters"
+              actionLabel="Create Table"
+              onAction={() => setShowCreateForm(true)}
+            />
+            <TemplatesSection onCreate={handleCreateFromTemplate} />
+          </div>
         ) : filteredTables.length === 0 ? (
           /* ── No search results ───────────────────────────────────────────── */
           <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
@@ -839,7 +961,10 @@ export function TablesPage() {
                 {filteredTables.length} result{filteredTables.length !== 1 ? 's' : ''} for &ldquo;{search}&rdquo;
               </p>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div
+              className="gap-4"
+              style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}
+            >
               {filteredTables.map((t) => (
                 <TableCardWithCount
                   key={t.id}
@@ -848,6 +973,9 @@ export function TablesPage() {
                 />
               ))}
             </div>
+            {!search && (
+              <TemplatesSection onCreate={handleCreateFromTemplate} />
+            )}
           </>
         )}
       </div>

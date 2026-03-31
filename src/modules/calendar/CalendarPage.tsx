@@ -7,7 +7,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as chrono from 'chrono-node';
 import { useEvents, useCreateEvent, useUpdateEvent, useDeleteEvent } from './hooks/useEvents';
-import { X, CheckCircle2, Circle, ArrowRight, Repeat } from 'lucide-react';
+import { X, CheckCircle2, Circle, ArrowRight, Repeat, Clock, Calendar } from 'lucide-react';
 import type { CalendarEvent } from '@/shared/types/event';
 import type { Task } from '@/shared/types/task';
 import type { RecurrenceRule, RecurrenceFrequency } from '@/shared/types/recurrence';
@@ -380,10 +380,10 @@ function EventForm({
 }: EventFormProps) {
   const set = (patch: Partial<FormData>) => onFormDataChange({ ...formData, ...patch });
 
-  const EVENT_TYPE_OPTIONS: { value: EventType; label: string; emoji: string; hint: string }[] = [
-    { value: 'event', label: 'Event', emoji: '📅', hint: 'Standard calendar event' },
-    { value: 'focus_block', label: 'Focus Block', emoji: '🎯', hint: 'Deep work, no interruptions' },
-    { value: 'break', label: 'Break', emoji: '☕', hint: 'Rest / recharge' },
+  const EVENT_TYPE_OPTIONS: { value: EventType; label: string; emoji: string; hint: string; color: string; bg: string }[] = [
+    { value: 'event', label: 'Event', emoji: '📅', hint: 'Standard calendar event', color: 'var(--color-accent)', bg: 'var(--color-accent-soft)' },
+    { value: 'focus_block', label: 'Focus', emoji: '🎯', hint: 'Deep work, no interruptions', color: 'var(--color-p2)', bg: 'color-mix(in srgb, var(--color-p2) 12%, transparent)' },
+    { value: 'break', label: 'Break', emoji: '☕', hint: 'Rest / recharge', color: 'var(--color-success)', bg: 'var(--color-success-soft)' },
   ];
 
   return (
@@ -393,8 +393,17 @@ function EventForm({
         borderLeft: '1px solid var(--color-border)',
         backgroundColor: 'var(--color-bg-elevated)',
         boxShadow: 'var(--shadow-popup)',
+        animation: 'slideInPanel 0.2s ease',
       }}
     >
+      {/* Slide-in animation keyframes */}
+      <style>{`
+        @keyframes slideInPanel {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+      `}</style>
+
       {/* Header */}
       <div
         className="flex items-center justify-between px-5 h-14 flex-shrink-0"
@@ -428,21 +437,22 @@ function EventForm({
       </div>
 
       <form onSubmit={onSubmit} className="p-5 space-y-4 overflow-y-auto flex-1">
-        {/* Title */}
+        {/* Title — 18px, large and prominent */}
         <div>
-          <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--color-text-muted)' }}>Title</label>
           <input
             type="text"
             value={formData.title}
             onChange={(e) => set({ title: e.target.value })}
-            className="w-full px-3 py-2.5 rounded-lg border text-sm outline-none transition-colors"
+            className="w-full px-0 py-2 border-0 border-b-2 outline-none transition-colors bg-transparent"
+            placeholder="Event title…"
             style={{
-              backgroundColor: 'var(--color-bg-tertiary)',
-              borderColor: 'var(--color-border)',
+              fontSize: '18px',
+              fontWeight: 600,
+              borderBottomColor: 'var(--color-border)',
               color: 'var(--color-text-primary)',
             }}
-            onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent)'; }}
-            onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
+            onFocus={(e) => { e.currentTarget.style.borderBottomColor = 'var(--color-accent)'; }}
+            onBlur={(e) => { e.currentTarget.style.borderBottomColor = 'var(--color-border)'; }}
             autoFocus
           />
         </div>
@@ -461,20 +471,22 @@ function EventForm({
                   title={opt.hint}
                   className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-lg border text-xs font-medium transition-all"
                   style={{
-                    backgroundColor: selected ? 'var(--color-accent-soft)' : 'var(--color-bg-tertiary)',
-                    borderColor: selected ? 'var(--color-accent)' : 'var(--color-border)',
-                    color: selected ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                    backgroundColor: selected ? opt.bg : 'var(--color-bg-tertiary)',
+                    borderColor: selected ? opt.color : 'var(--color-border)',
+                    color: selected ? opt.color : 'var(--color-text-secondary)',
                   }}
                   onMouseEnter={(e) => {
                     if (!selected) {
-                      e.currentTarget.style.borderColor = 'var(--color-border-hover)';
-                      e.currentTarget.style.color = 'var(--color-text-primary)';
+                      e.currentTarget.style.borderColor = opt.color;
+                      e.currentTarget.style.color = opt.color;
+                      e.currentTarget.style.backgroundColor = opt.bg;
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!selected) {
                       e.currentTarget.style.borderColor = 'var(--color-border)';
                       e.currentTarget.style.color = 'var(--color-text-secondary)';
+                      e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
                     }
                   }}
                 >
@@ -590,6 +602,182 @@ function EventForm({
   );
 }
 
+// ─── TodayEventsSidebar ───────────────────────────────────────────────────────
+
+interface TodayEventsSidebarProps {
+  events: CalendarEvent[];
+  onEventClick: (evt: CalendarEvent) => void;
+}
+
+function TodayEventsSidebar({ events, onEventClick }: TodayEventsSidebarProps) {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+  const todayEvents = events
+    .filter((e) => {
+      const start = new Date(e.startTime);
+      return start >= todayStart && start <= todayEnd;
+    })
+    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
+  function getEventTypeColor(evt: CalendarEvent): string {
+    const evtType = parseEventType(evt.description);
+    if (evtType === 'focus_block') return 'var(--color-p2)';
+    if (evtType === 'break') return 'var(--color-success)';
+    return evt.color ?? 'var(--color-accent)';
+  }
+
+  function formatTime(iso: string): string {
+    const d = new Date(iso);
+    const h = d.getHours();
+    const m = d.getMinutes();
+    const period = h >= 12 ? 'pm' : 'am';
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    return m === 0 ? `${h12}${period}` : `${h12}:${String(m).padStart(2, '0')}${period}`;
+  }
+
+  const isCurrentlyHappening = (evt: CalendarEvent) => {
+    const start = new Date(evt.startTime).getTime();
+    const end = evt.endTime ? new Date(evt.endTime).getTime() : start + 3600000;
+    const n = now.getTime();
+    return n >= start && n <= end;
+  };
+
+  return (
+    <div
+      className="flex flex-col flex-shrink-0"
+      style={{
+        width: 220,
+        borderLeft: '1px solid var(--color-border)',
+        backgroundColor: 'var(--color-bg-secondary)',
+      }}
+    >
+      <div
+        className="flex items-center gap-2 px-4 py-3 flex-shrink-0"
+        style={{ borderBottom: '1px solid var(--color-border)' }}
+      >
+        <Calendar size={14} style={{ color: 'var(--color-accent)' }} />
+        <span
+          className="text-xs font-semibold uppercase tracking-wider"
+          style={{ color: 'var(--color-text-muted)' }}
+        >
+          Today
+        </span>
+        {todayEvents.length > 0 && (
+          <span
+            className="ml-auto text-xs px-1.5 py-0.5 rounded-full font-medium"
+            style={{
+              backgroundColor: 'var(--color-accent-soft)',
+              color: 'var(--color-accent)',
+            }}
+          >
+            {todayEvents.length}
+          </span>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-y-auto py-3 px-2 space-y-1.5">
+        {todayEvents.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+            <span className="text-2xl mb-2">🌤</span>
+            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              No events today
+            </p>
+          </div>
+        ) : (
+          todayEvents.map((evt) => {
+            const color = getEventTypeColor(evt);
+            const ongoing = isCurrentlyHappening(evt);
+            const evtType = parseEventType(evt.description);
+            return (
+              <button
+                key={evt.id}
+                onClick={() => onEventClick(evt)}
+                className="w-full text-left rounded-lg px-3 py-2.5 transition-all"
+                style={{
+                  borderLeft: `3px solid ${color}`,
+                  backgroundColor: ongoing ? 'var(--color-accent-soft)' : 'var(--color-bg-elevated)',
+                  border: ongoing
+                    ? `1px solid var(--color-accent-muted)`
+                    : `1px solid var(--color-border)`,
+                  borderLeftWidth: 3,
+                  borderLeftColor: color,
+                }}
+                onMouseEnter={(e) => {
+                  if (!ongoing) {
+                    e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!ongoing) {
+                    e.currentTarget.style.backgroundColor = 'var(--color-bg-elevated)';
+                  }
+                }}
+              >
+                <p
+                  className="text-xs font-medium leading-tight truncate"
+                  style={{ color: 'var(--color-text-primary)' }}
+                >
+                  {evt.title}
+                </p>
+                <div className="flex items-center gap-1 mt-1">
+                  <Clock size={10} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+                  <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>
+                    {evt.allDay ? 'All day' : formatTime(evt.startTime)}
+                    {evt.endTime && !evt.allDay ? ` – ${formatTime(evt.endTime)}` : ''}
+                  </span>
+                  {ongoing && (
+                    <span
+                      className="ml-auto text-xs font-semibold"
+                      style={{ fontSize: '10px', color: 'var(--color-accent)' }}
+                    >
+                      now
+                    </span>
+                  )}
+                </div>
+                {evtType !== 'event' && (
+                  <span
+                    className="inline-block mt-1 text-xs rounded px-1.5 py-0.5"
+                    style={{
+                      fontSize: '9px',
+                      backgroundColor: evtType === 'focus_block' ? 'color-mix(in srgb, var(--color-p2) 15%, transparent)' : 'color-mix(in srgb, var(--color-success) 15%, transparent)',
+                      color: evtType === 'focus_block' ? 'var(--color-p2)' : 'var(--color-success)',
+                    }}
+                  >
+                    {evtType === 'focus_block' ? '🎯 Focus' : '☕ Break'}
+                  </span>
+                )}
+              </button>
+            );
+          })
+        )}
+      </div>
+
+      {/* Current time indicator */}
+      <div
+        className="px-4 py-3 flex-shrink-0"
+        style={{ borderTop: '1px solid var(--color-border)' }}
+      >
+        <div className="flex items-center gap-1.5">
+          <div
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              backgroundColor: 'var(--color-success)',
+              boxShadow: '0 0 4px var(--color-success)',
+            }}
+          />
+          <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+            {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── CalendarPage ─────────────────────────────────────────────────────────────
 
 const DEFAULT_FORM: FormData = {
@@ -678,7 +866,15 @@ export function CalendarPage() {
       .filter(Boolean)
       .join(' ');
 
-    const bgColor = e.color ?? 'var(--color-accent)';
+    // Event type-based color theming
+    let bgColor: string;
+    if (evtType === 'focus_block') {
+      bgColor = '#7c3aed'; // purple
+    } else if (evtType === 'break') {
+      bgColor = '#059669'; // green
+    } else {
+      bgColor = e.color ?? '#4f46e5'; // blue/accent
+    }
 
     return {
       id: e.id,
@@ -991,7 +1187,7 @@ export function CalendarPage() {
 
       {/* Page header */}
       <div
-        className="flex items-center justify-between px-8 py-6 flex-shrink-0"
+        className="flex items-center justify-between px-8 py-4 flex-shrink-0"
         style={{ borderBottom: '1px solid var(--color-border)' }}
       >
         <div className="flex items-center gap-4">
@@ -1006,8 +1202,7 @@ export function CalendarPage() {
               style={{
                 backgroundColor: 'var(--color-accent-soft)',
                 color: 'var(--color-accent)',
-                border: '1px solid var(--color-accent)',
-                opacity: 0.9,
+                border: '1px solid var(--color-accent-muted)',
                 letterSpacing: '0.01em',
               }}
             >
@@ -1032,7 +1227,7 @@ export function CalendarPage() {
 
       {/* Content row */}
       <div className="flex flex-1 min-h-0">
-        <div className="flex-1 px-6 py-4 overflow-auto">
+        <div className="flex-1 px-6 py-4 overflow-auto min-w-0">
           {/* FullCalendar theme overrides */}
           <style>{`
             .fc {
@@ -1040,11 +1235,12 @@ export function CalendarPage() {
               --fc-border-color: var(--color-border);
               --fc-button-bg-color: var(--color-bg-tertiary);
               --fc-button-border-color: var(--color-border);
-              --fc-button-text-color: var(--color-text-primary);
-              --fc-button-hover-bg-color: var(--color-bg-elevated);
+              --fc-button-text-color: var(--color-text-secondary);
+              --fc-button-hover-bg-color: var(--color-bg-hover);
               --fc-button-hover-border-color: var(--color-border-hover);
               --fc-button-active-bg-color: var(--color-accent);
               --fc-button-active-border-color: var(--color-accent);
+              --fc-button-active-text-color: white;
               --fc-page-bg-color: var(--color-bg-primary);
               --fc-neutral-bg-color: var(--color-bg-secondary);
               --fc-today-bg-color: var(--color-accent-soft);
@@ -1055,24 +1251,83 @@ export function CalendarPage() {
               color: var(--color-text-primary);
               font-size: 13px;
             }
-            .fc .fc-col-header-cell { background: var(--color-bg-secondary); }
-            .fc .fc-daygrid-day-number { color: var(--color-text-secondary); padding: 4px 8px; }
-            .fc .fc-scrollgrid { border-color: var(--color-border); }
+            .fc .fc-col-header-cell {
+              background: var(--color-bg-secondary);
+              padding: 8px 0;
+            }
+            .fc .fc-col-header-cell-cushion {
+              color: var(--color-text-muted);
+              font-size: 11px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.06em;
+              padding: 0 8px;
+              text-decoration: none;
+            }
+            .fc .fc-daygrid-day-number {
+              color: var(--color-text-secondary);
+              padding: 4px 8px;
+              font-size: 12px;
+              text-decoration: none;
+              font-weight: 500;
+            }
+            .fc .fc-day-today .fc-daygrid-day-number {
+              color: var(--color-accent);
+              font-weight: 700;
+              background: var(--color-accent-soft);
+              border-radius: 50%;
+              width: 24px;
+              height: 24px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              margin: 4px;
+            }
+            .fc .fc-scrollgrid { border-color: var(--color-border); border-radius: 12px; overflow: hidden; }
             .fc td, .fc th { border-color: var(--color-border) !important; }
-            .fc .fc-toolbar-title { font-size: 1.25rem; font-weight: 600; color: var(--color-text-primary); }
+            .fc .fc-toolbar-title {
+              font-size: 1.1rem;
+              font-weight: 700;
+              color: var(--color-text-primary);
+              letter-spacing: -0.01em;
+            }
             .fc .fc-event.task-done { opacity: 0.5; }
             .fc .fc-event.task-done .fc-event-title { text-decoration: line-through; }
             .fc .fc-button {
-              padding: 8px 16px !important;
-              font-size: 13px !important;
-              font-weight: 500 !important;
+              padding: 6px 14px !important;
+              font-size: 12px !important;
+              font-weight: 600 !important;
               border-radius: 8px !important;
+              transition: all 0.15s ease !important;
             }
             .fc .fc-button-group .fc-button { border-radius: 0 !important; }
             .fc .fc-button-group .fc-button:first-child { border-radius: 8px 0 0 8px !important; }
             .fc .fc-button-group .fc-button:last-child { border-radius: 0 8px 8px 0 !important; }
-            .fc .fc-toolbar { gap: 8px; }
+            .fc .fc-button-primary:not(:disabled):active,
+            .fc .fc-button-primary:not(:disabled).fc-button-active {
+              background-color: var(--color-accent) !important;
+              border-color: var(--color-accent) !important;
+              color: white !important;
+              box-shadow: none !important;
+            }
+            .fc .fc-toolbar { gap: 8px; flex-wrap: wrap; }
             .fc .fc-toolbar-chunk { display: flex; align-items: center; gap: 4px; }
+            .fc .fc-event {
+              border-radius: 5px !important;
+              font-size: 11px !important;
+              padding: 1px 4px !important;
+              cursor: pointer;
+              transition: opacity 0.1s ease;
+            }
+            .fc .fc-event:hover { opacity: 0.85; }
+            .fc .fc-daygrid-event-dot { display: none; }
+            .fc .fc-timegrid-slot { height: 32px !important; }
+            .fc .fc-timegrid-slot-label {
+              font-size: 10px;
+              color: var(--color-text-muted) !important;
+            }
+            .fc .fc-scrollgrid-section-header { position: sticky; top: 0; z-index: 2; }
+            .fc .fc-button:focus { box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 30%, transparent) !important; }
           `}</style>
 
           <FullCalendar
@@ -1082,6 +1337,12 @@ export function CalendarPage() {
               left: 'prev,next today',
               center: 'title',
               right: 'dayGridMonth,timeGridWeek,timeGridDay',
+            }}
+            buttonText={{
+              today: 'Today',
+              month: 'Month',
+              week: 'Week',
+              day: 'Day',
             }}
             events={allFcEvents}
             editable={true}
@@ -1093,6 +1354,21 @@ export function CalendarPage() {
             height="100%"
           />
         </div>
+
+        {/* Today's Events sidebar — shown when no panel is open */}
+        {!showForm && !selectedTask && (
+          <TodayEventsSidebar
+            events={events}
+            onEventClick={(evt) => {
+              if (eventService.isRecurringId(evt.id)) {
+                setPendingEventClick(evt);
+                setShowScopeDialog(true);
+              } else {
+                openEventForm(evt, 'all');
+              }
+            }}
+          />
+        )}
 
         {/* Event form panel */}
         {showForm && (

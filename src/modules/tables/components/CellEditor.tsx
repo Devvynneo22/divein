@@ -121,7 +121,7 @@ export function CellEditor({
         ref={inputRef}
         type="date"
         value={local}
-        style={{ ...baseInputStyle, colorScheme: 'dark' }}
+        style={{ ...baseInputStyle, colorScheme: 'auto' }}
         onChange={(e) => setLocal(e.target.value)}
         onBlur={() => onSave(local || null)}
         onKeyDown={handleKey}

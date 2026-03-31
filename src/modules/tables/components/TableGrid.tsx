@@ -8,7 +8,7 @@ import {
   type SortingState,
   type ColumnDef as TanColumnDef,
 } from '@tanstack/react-table';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Copy } from 'lucide-react';
 import { format, parseISO, isValid } from 'date-fns';
 import type { TableDef, TableRow, TableFilter, TableSort, ColumnDef } from '@/shared/types/table';
 import { evaluateFormula } from '@/shared/lib/formulaEngine';
@@ -20,11 +20,12 @@ import {
   useDeleteRow,
   useUpdateColumn,
   useDeleteColumn,
+  useAddColumn,
 } from '../hooks/useTables';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-interface EditingCell {
+interface CellPos {
   rowId: string;
   columnId: string;
 }
@@ -36,6 +37,13 @@ interface TableGridProps {
   sorts: TableSort[];
   onSortsChange: (sorts: TableSort[]) => void;
   onShowAddColumn: () => void;
+}
+
+interface RowContextMenu {
+  x: number;
+  y: number;
+  rowId: string;
+  rowData: Record<string, unknown>;
 }
 
 // ─── Column resize hook ─────────────────────────────────────────────────────
@@ -67,11 +75,8 @@ function useColumnResize(
       function onMouseUp() {
         if (dragging.current) {
           dragging.current = false;
-          const finalWidth = Math.max(60, startWidth.current + (startX.current - startX.current));
-          void finalWidth; // updated via setWidth
           document.removeEventListener('mousemove', onMouseMove);
           document.removeEventListener('mouseup', onMouseUp);
-          // read final width from state in next tick
           setWidth((w) => {
             onResize(w);
             return w;
@@ -98,14 +103,16 @@ function ResizableHeader({
   onDelete,
   onChangeType,
   onResize,
+  onDuplicate,
 }: {
   column: ColumnDef;
   sortDirection: 'asc' | 'desc' | false;
-  onSort: () => void;
+  onSort: (direction?: 'asc' | 'desc') => void;
   onRename: (name: string) => void;
   onDelete: () => void;
   onChangeType: (type: import('@/shared/types/table').ColumnType) => void;
   onResize: (width: number) => void;
+  onDuplicate: () => void;
 }) {
   const { width: _w, onMouseDown } = useColumnResize(column.width ?? 150, onResize);
 
@@ -119,6 +126,7 @@ function ResizableHeader({
           onRename={onRename}
           onDelete={onDelete}
           onChangeType={onChangeType}
+          onDuplicate={onDuplicate}
         />
       </div>
       {/* Resize handle */}
@@ -152,16 +160,19 @@ function FormulaCell({
   const isError = typeof result === 'string' && result.startsWith('#');
 
   return (
-    <div className="w-full h-full flex items-center px-2.5 gap-1.5 select-none">
+    <div
+      className="w-full h-full flex items-center px-2.5 gap-1.5 select-none"
+      style={{ backgroundColor: 'var(--color-bg-wash)' }}
+      title={`Formula: ${column.formula}`}
+    >
       <span
         className="text-[9px] font-bold italic leading-none flex-shrink-0"
         style={{ color: 'var(--color-text-muted)' }}
-        title={`Formula: ${column.formula}`}
       >
         ƒ
       </span>
       <span
-        className="text-xs truncate"
+        className="text-xs truncate italic"
         style={{
           color: isError
             ? 'var(--color-danger)'
@@ -169,7 +180,7 @@ function FormulaCell({
               ? result
                 ? 'var(--color-success)'
                 : 'var(--color-text-muted)'
-              : 'var(--color-text-primary)',
+              : 'var(--color-text-secondary)',
         }}
       >
         {typeof result === 'boolean' ? (result ? 'TRUE' : 'FALSE') : String(result)}
@@ -182,8 +193,17 @@ function FormulaCell({
 
 function DisplayCell({ column, value }: { column: ColumnDef; value: unknown }) {
   if (value === null || value === undefined || value === '') {
+    if (column.type === 'checkbox') {
+      return (
+        <div className="flex items-center justify-center w-full h-full">
+          <span className="text-base leading-none select-none" style={{ color: 'var(--color-text-muted)' }}>
+            ☐
+          </span>
+        </div>
+      );
+    }
     return (
-      <span className="text-xs italic select-none" style={{ color: 'var(--color-text-muted)' }}>
+      <span className="text-xs italic select-none" style={{ color: 'var(--color-text-muted)', opacity: 0.4 }}>
         —
       </span>
     );
@@ -194,7 +214,7 @@ function DisplayCell({ column, value }: { column: ColumnDef; value: unknown }) {
       return (
         <div className="flex items-center justify-center w-full h-full">
           <span
-            className="text-base leading-none select-none"
+            className="text-base leading-none select-none transition-all"
             style={{ color: value ? 'var(--color-success)' : 'var(--color-text-muted)' }}
           >
             {value ? '☑' : '☐'}
@@ -205,8 +225,8 @@ function DisplayCell({ column, value }: { column: ColumnDef; value: unknown }) {
     case 'number':
       return (
         <span
-          className="text-xs font-mono tabular-nums"
-          style={{ color: 'var(--color-text-primary)' }}
+          className="text-xs tabular-nums w-full block text-right pr-0.5"
+          style={{ color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}
         >
           {typeof value === 'number' ? value.toLocaleString() : String(value)}
         </span>
@@ -227,7 +247,7 @@ function DisplayCell({ column, value }: { column: ColumnDef; value: unknown }) {
         // fall through
       }
       return (
-        <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+        <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
           {str}
         </span>
       );
@@ -236,13 +256,13 @@ function DisplayCell({ column, value }: { column: ColumnDef; value: unknown }) {
     case 'multiselect': {
       const arr = Array.isArray(value) ? (value as string[]) : [];
       return (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1 overflow-hidden">
           {arr.map((tag) => {
             const colors = getSelectColor(tag);
             return (
               <span
                 key={tag}
-                className="px-1.5 py-0.5 rounded-full text-[11px] font-medium"
+                className="px-1.5 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap"
                 style={{ backgroundColor: colors.bg, color: colors.text }}
               >
                 {tag}
@@ -286,6 +306,104 @@ function DisplayCell({ column, value }: { column: ColumnDef; value: unknown }) {
   }
 }
 
+// ─── Row Context Menu ─────────────────────────────────────────────────────────
+
+function RowContextMenuEl({
+  menu,
+  onClose,
+  onDuplicate,
+  onDelete,
+}: {
+  menu: RowContextMenu;
+  onClose: () => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        onClose();
+      }
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [onClose]);
+
+  const menuStyle: React.CSSProperties = {
+    position: 'fixed',
+    left: menu.x,
+    top: menu.y,
+    zIndex: 9999,
+    backgroundColor: 'var(--color-bg-elevated)',
+    border: '1px solid var(--color-border)',
+    borderRadius: '10px',
+    boxShadow: 'var(--shadow-popup, 0 8px 24px rgba(0,0,0,0.15))',
+    padding: '4px',
+    minWidth: '160px',
+  };
+
+  const itemBase: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    width: '100%',
+    padding: '6px 10px',
+    borderRadius: '6px',
+    fontSize: '12px',
+    cursor: 'pointer',
+    border: 'none',
+    backgroundColor: 'transparent',
+    color: 'var(--color-text-secondary)',
+    transition: 'background-color 0.1s, color 0.1s',
+    textAlign: 'left' as const,
+  };
+
+  return (
+    <div ref={ref} style={menuStyle}>
+      <button
+        style={itemBase}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+          e.currentTarget.style.color = 'var(--color-text-primary)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent';
+          e.currentTarget.style.color = 'var(--color-text-secondary)';
+        }}
+        onClick={() => { onDuplicate(); onClose(); }}
+      >
+        <Copy size={13} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+        Duplicate row
+      </button>
+
+      <div style={{ height: '1px', backgroundColor: 'var(--color-border)', margin: '4px 0' }} />
+
+      <button
+        style={{ ...itemBase, color: 'var(--color-danger)' }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = 'var(--color-danger-soft)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }}
+        onClick={() => { onDelete(); onClose(); }}
+      >
+        <Trash2 size={13} style={{ flexShrink: 0 }} />
+        Delete row
+      </button>
+    </div>
+  );
+}
+
 // ─── Main component ──────────────────────────────────────────────────────────
 
 const columnHelper = createColumnHelper<TableRow>();
@@ -296,7 +414,8 @@ export function TableGrid({
   onSortsChange,
   onShowAddColumn,
 }: TableGridProps) {
-  const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
+  const [editingCell, setEditingCell] = useState<CellPos | null>(null);
+  const [selectedCell, setSelectedCell] = useState<CellPos | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
@@ -306,25 +425,36 @@ export function TableGrid({
     }
     return widths;
   });
+  const [rowContextMenu, setRowContextMenu] = useState<RowContextMenu | null>(null);
+
+  const gridRef = useRef<HTMLDivElement>(null);
+  const cellPositions = useRef<CellPos[]>([]);
 
   const updateCell = useUpdateCell();
   const createRow = useCreateRow();
   const deleteRow = useDeleteRow();
   const updateColumn = useUpdateColumn();
   const deleteColumn = useDeleteColumn();
+  const addColumn = useAddColumn();
 
-  const cellPositions = useRef<Array<{ rowId: string; columnId: string }>>([]);
+  // ── Cell interaction ────────────────────────────────────────────────────
 
   const startEdit = useCallback((rowId: string, columnId: string) => {
+    setSelectedCell({ rowId, columnId });
     setEditingCell({ rowId, columnId });
   }, []);
 
-  const cancelEdit = useCallback(() => setEditingCell(null), []);
+  const cancelEdit = useCallback(() => {
+    setEditingCell(null);
+    // Keep selection so user can navigate with arrows after Escape
+    setTimeout(() => gridRef.current?.focus(), 0);
+  }, []);
 
   const saveCell = useCallback(
     (rowId: string, columnId: string, value: unknown) => {
       setEditingCell(null);
       updateCell.mutate({ rowId, columnId, value, tableId: table.id });
+      setTimeout(() => gridRef.current?.focus(), 0);
     },
     [updateCell, table.id],
   );
@@ -334,8 +464,106 @@ export function TableGrid({
     const idx = positions.findIndex((p) => p.rowId === rowId && p.columnId === columnId);
     if (idx === -1) return;
     const next = positions[idx + delta];
-    if (next) setEditingCell({ rowId: next.rowId, columnId: next.columnId });
+    if (next) {
+      setSelectedCell({ rowId: next.rowId, columnId: next.columnId });
+      setEditingCell({ rowId: next.rowId, columnId: next.columnId });
+    }
   }
+
+  // ── Grid keyboard navigation ────────────────────────────────────────────
+
+  function handleGridKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (editingCell) return; // editor handles its own keys
+    if (!selectedCell) return;
+
+    const { rowId, columnId } = selectedCell;
+    const tableRows = tanTable.getRowModel().rows;
+    const rowIndex = tableRows.findIndex((r) => r.original.id === rowId);
+    const colIndex = table.columns.findIndex((c) => c.id === columnId);
+
+    switch (e.key) {
+      case 'Enter': {
+        e.preventDefault();
+        const col = table.columns.find((c) => c.id === columnId);
+        if (col && col.type !== 'formula') {
+          if (col.type === 'checkbox') {
+            const row = tableRows[rowIndex]?.original;
+            if (row) {
+              const val = row.data[columnId];
+              saveCell(rowId, columnId, !val);
+            }
+          } else {
+            startEdit(rowId, columnId);
+          }
+        }
+        break;
+      }
+      case 'Escape':
+        e.preventDefault();
+        setSelectedCell(null);
+        break;
+      case 'Delete':
+      case 'Backspace': {
+        e.preventDefault();
+        const col = table.columns.find((c) => c.id === columnId);
+        if (col && col.type !== 'formula') {
+          updateCell.mutate({ rowId, columnId, value: null, tableId: table.id });
+        }
+        break;
+      }
+      case 'Tab': {
+        e.preventDefault();
+        const positions = cellPositions.current;
+        const idx = positions.findIndex((p) => p.rowId === rowId && p.columnId === columnId);
+        const next = positions[idx + (e.shiftKey ? -1 : 1)];
+        if (next) setSelectedCell({ rowId: next.rowId, columnId: next.columnId });
+        break;
+      }
+      case 'ArrowRight': {
+        e.preventDefault();
+        if (colIndex < table.columns.length - 1) {
+          const nextCol = table.columns[colIndex + 1];
+          setSelectedCell({ rowId, columnId: nextCol.id });
+        }
+        break;
+      }
+      case 'ArrowLeft': {
+        e.preventDefault();
+        if (colIndex > 0) {
+          const prevCol = table.columns[colIndex - 1];
+          setSelectedCell({ rowId, columnId: prevCol.id });
+        }
+        break;
+      }
+      case 'ArrowDown': {
+        e.preventDefault();
+        if (rowIndex < tableRows.length - 1) {
+          setSelectedCell({ rowId: tableRows[rowIndex + 1].original.id, columnId });
+        }
+        break;
+      }
+      case 'ArrowUp': {
+        e.preventDefault();
+        if (rowIndex > 0) {
+          setSelectedCell({ rowId: tableRows[rowIndex - 1].original.id, columnId });
+        }
+        break;
+      }
+    }
+  }
+
+  // Deselect when clicking outside the grid
+  useEffect(() => {
+    function handleOutside(e: MouseEvent) {
+      if (gridRef.current && !gridRef.current.contains(e.target as Node)) {
+        setSelectedCell(null);
+        setEditingCell(null);
+        setRowContextMenu(null);
+      }
+    }
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, []);
 
   // Sync column widths when table.columns changes
   useEffect(() => {
@@ -348,12 +576,41 @@ export function TableGrid({
     });
   }, [table.columns]);
 
-  // Build TanStack columns
+  // ── Sort helpers ─────────────────────────────────────────────────────────
+
+  function applySort(colId: string, direction?: 'asc' | 'desc') {
+    if (direction) {
+      const desc = direction === 'desc';
+      setSorting((prev) => {
+        const existing = prev.find((s) => s.id === colId);
+        if (existing) return prev.map((s) => (s.id === colId ? { ...s, desc } : s));
+        return [...prev, { id: colId, desc }];
+      });
+      onSortsChange([{ columnId: colId, direction }]);
+    } else {
+      // Toggle: none → asc → desc → none
+      setSorting((prev) => {
+        const existing = prev.find((s) => s.id === colId);
+        if (!existing) return [...prev, { id: colId, desc: false }];
+        if (!existing.desc) return prev.map((s) => (s.id === colId ? { ...s, desc: true } : s));
+        return prev.filter((s) => s.id !== colId);
+      });
+      const existing = sorting.find((s) => s.id === colId);
+      let newSorts: TableSort[];
+      if (!existing) newSorts = [{ columnId: colId, direction: 'asc' }];
+      else if (!existing.desc) newSorts = [{ columnId: colId, direction: 'desc' }];
+      else newSorts = [];
+      onSortsChange(newSorts);
+    }
+  }
+
+  // ── Build TanStack columns ────────────────────────────────────────────────
+
   const tanColumns: TanColumnDef<TableRow>[] = [
     // Row number column
     columnHelper.display({
       id: '__rownum__',
-      size: 48,
+      size: 44,
       header: () => (
         <div className="flex items-center justify-center w-full">
           <input
@@ -363,23 +620,21 @@ export function TableGrid({
               if (e.target.checked) setSelectedRows(new Set(rows.map((r) => r.id)));
               else setSelectedRows(new Set());
             }}
-            className="accent-[var(--color-accent)]"
+            style={{ accentColor: 'var(--color-accent)', cursor: 'pointer' }}
           />
         </div>
       ),
       cell: ({ row }) => {
         const isSelected = selectedRows.has(row.original.id);
         return (
-          <div
-            className="flex items-center justify-center gap-1.5 w-full h-full group/rownum"
-          >
-            {/* Show checkbox on hover/selected, row number otherwise */}
+          <div className="flex items-center justify-center gap-1.5 w-full h-full group/rownum">
             <div className="relative w-5 h-5 flex items-center justify-center">
               <span
                 className="absolute text-[11px] transition-opacity group-hover/rownum:opacity-0"
                 style={{
                   color: 'var(--color-text-muted)',
                   opacity: isSelected ? 0 : 1,
+                  userSelect: 'none',
                 }}
               >
                 {row.index + 1}
@@ -393,8 +648,16 @@ export function TableGrid({
                   else next.delete(row.original.id);
                   setSelectedRows(next);
                 }}
-                className="accent-[var(--color-accent)] absolute opacity-0 group-hover/rownum:opacity-100 transition-opacity"
-                style={{ opacity: isSelected ? 1 : undefined }}
+                className="absolute transition-opacity"
+                style={{
+                  opacity: isSelected ? 1 : 0,
+                  accentColor: 'var(--color-accent)',
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLInputElement).style.opacity = '1'; }}
+                onMouseLeave={(e) => {
+                  if (!isSelected) (e.currentTarget as HTMLInputElement).style.opacity = '0';
+                }}
               />
             </div>
           </div>
@@ -417,26 +680,11 @@ export function TableGrid({
                   ? 'desc'
                   : false
             }
-            onSort={() => {
-              setSorting((prev) => {
-                const existing = prev.find((s) => s.id === col.id);
-                if (!existing) return [...prev, { id: col.id, desc: false }];
-                if (!existing.desc) return prev.map((s) => s.id === col.id ? { ...s, desc: true } : s);
-                return prev.filter((s) => s.id !== col.id);
-              });
-              const existing = sorting.find((s) => s.id === col.id);
-              let newSorts: TableSort[];
-              if (!existing) newSorts = [{ columnId: col.id, direction: 'asc' }];
-              else if (!existing.desc) newSorts = [{ columnId: col.id, direction: 'desc' }];
-              else newSorts = [];
-              onSortsChange(newSorts);
-            }}
+            onSort={(dir) => applySort(col.id, dir)}
             onRename={(name) =>
               updateColumn.mutate({ tableId: table.id, columnId: col.id, updates: { name } })
             }
-            onDelete={() =>
-              deleteColumn.mutate({ tableId: table.id, columnId: col.id })
-            }
+            onDelete={() => deleteColumn.mutate({ tableId: table.id, columnId: col.id })}
             onChangeType={(type) =>
               updateColumn.mutate({ tableId: table.id, columnId: col.id, updates: { type } })
             }
@@ -444,25 +692,34 @@ export function TableGrid({
               setColumnWidths((prev) => ({ ...prev, [col.id]: width }));
               updateColumn.mutate({ tableId: table.id, columnId: col.id, updates: { width } });
             }}
+            onDuplicate={() => {
+              const newCol = {
+                ...col,
+                id: crypto.randomUUID(),
+                name: `${col.name} (copy)`,
+              };
+              addColumn.mutate({ tableId: table.id, column: newCol });
+            }}
           />
         ),
         cell: ({ row, getValue }) => {
           const rowId = row.original.id;
           const value = getValue();
-          const isEditing =
-            editingCell?.rowId === rowId && editingCell?.columnId === col.id;
+          const isEditing = editingCell?.rowId === rowId && editingCell?.columnId === col.id;
+          const isSelected = selectedCell?.rowId === rowId && selectedCell?.columnId === col.id;
 
           if (col.type === 'formula') {
-            return (
-              <FormulaCell column={col} row={row.original.data} allColumns={table.columns} />
-            );
+            return <FormulaCell column={col} row={row.original.data} allColumns={table.columns} />;
           }
 
           if (col.type === 'checkbox') {
             return (
               <div
                 className="flex items-center justify-center w-full h-full cursor-pointer select-none"
-                onClick={() => saveCell(rowId, col.id, !value)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  saveCell(rowId, col.id, !value);
+                }}
               >
                 <DisplayCell column={col} value={value} />
               </div>
@@ -483,11 +740,27 @@ export function TableGrid({
           }
 
           const isNumber = col.type === 'number';
+          const isAlreadySelected = isSelected && !isEditing;
+
           return (
             <div
               className="w-full h-full flex items-center px-2.5 cursor-text overflow-hidden"
-              style={{ justifyContent: isNumber ? 'flex-end' : undefined }}
-              onClick={() => startEdit(rowId, col.id)}
+              style={{
+                justifyContent: isNumber ? 'flex-end' : undefined,
+                paddingTop: '5px',
+                paddingBottom: '5px',
+              }}
+              onClick={() => {
+                if (isAlreadySelected) {
+                  // Second click → start editing
+                  startEdit(rowId, col.id);
+                } else {
+                  // First click → select
+                  setSelectedCell({ rowId, columnId: col.id });
+                  gridRef.current?.focus();
+                }
+              }}
+              onDoubleClick={() => startEdit(rowId, col.id)}
             >
               <DisplayCell column={col} value={value} />
             </div>
@@ -504,7 +777,10 @@ export function TableGrid({
       cell: ({ row }) => (
         <div className="flex items-center justify-center w-full h-full opacity-0 group-hover/row:opacity-100 transition-opacity">
           <button
-            onClick={() => deleteRow.mutate({ id: row.original.id, tableId: table.id })}
+            onClick={(e) => {
+              e.stopPropagation();
+              deleteRow.mutate({ id: row.original.id, tableId: table.id });
+            }}
             className="p-1 rounded transition-colors"
             style={{ color: 'var(--color-text-muted)' }}
             onMouseEnter={(e) => {
@@ -536,7 +812,7 @@ export function TableGrid({
 
   // Build cell positions after each render
   useEffect(() => {
-    const positions: Array<{ rowId: string; columnId: string }> = [];
+    const positions: CellPos[] = [];
     tanTable.getRowModel().rows.forEach((row) => {
       table.columns.forEach((col) => {
         if (col.type !== 'checkbox' && col.type !== 'formula') {
@@ -548,24 +824,31 @@ export function TableGrid({
   });
 
   const totalWidth =
-    48 + // row num
+    44 + // row num
     36 + // delete
-    table.columns.reduce((sum, c) => sum + (columnWidths[c.id] ?? c.width ?? 150), 0) +
-    36; // add column btn
+    36 + // add col
+    table.columns.reduce((sum, c) => sum + (columnWidths[c.id] ?? c.width ?? 150), 0);
 
   return (
-    <div className="flex-1 overflow-auto relative" style={{ WebkitOverflowScrolling: 'touch' }}>
+    <div
+      ref={gridRef}
+      className="flex-1 overflow-auto relative"
+      style={{ WebkitOverflowScrolling: 'touch', outline: 'none' }}
+      tabIndex={0}
+      onKeyDown={handleGridKeyDown}
+    >
       <table
-        className="border-collapse text-sm"
+        className="border-collapse"
         style={{
           width: `${totalWidth}px`,
           minWidth: '100%',
           tableLayout: 'fixed',
+          fontSize: '13px',
         }}
       >
         {/* colgroup for precise widths */}
         <colgroup>
-          <col style={{ width: '48px' }} />
+          <col style={{ width: '44px' }} />
           {table.columns.map((col) => (
             <col key={col.id} style={{ width: `${columnWidths[col.id] ?? col.width ?? 150}px` }} />
           ))}
@@ -586,11 +869,13 @@ export function TableGrid({
               {hg.headers.map((header) => (
                 <th
                   key={header.id}
-                  className="px-2 py-2 text-left h-9 overflow-hidden"
+                  className="px-2 py-0 text-left overflow-hidden"
                   style={{
                     borderRight: '1px solid var(--color-border)',
                     width: header.getSize(),
                     fontWeight: 600,
+                    height: '36px',
+                    fontSize: '13px',
                   }}
                 >
                   {header.isPlaceholder
@@ -600,16 +885,16 @@ export function TableGrid({
               ))}
               {/* Add column header button */}
               <th
-                className="h-9"
                 style={{
                   width: '36px',
                   borderRight: '1px solid var(--color-border)',
+                  height: '36px',
                 }}
               >
                 <button
                   onClick={onShowAddColumn}
                   className="w-full h-full flex items-center justify-center transition-colors"
-                  style={{ color: 'var(--color-text-muted)' }}
+                  style={{ color: 'var(--color-text-muted)', height: '36px' }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.color = 'var(--color-accent)';
                     e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
@@ -630,42 +915,71 @@ export function TableGrid({
         {/* Body */}
         <tbody>
           {tanTable.getRowModel().rows.map((row, rowIndex) => {
-            const isSelected = selectedRows.has(row.original.id);
+            const isRowSelected = selectedRows.has(row.original.id);
+            const isOdd = rowIndex % 2 !== 0;
+
+            // Row background: selected rows > alternating > transparent
+            let rowBg = isOdd ? 'var(--color-bg-wash)' : 'transparent';
+            if (isRowSelected) rowBg = 'var(--color-accent-soft)';
+
             return (
               <tr
                 key={row.id}
-                className="group/row transition-colors"
+                className="group/row"
                 style={{
-                  backgroundColor: isSelected
-                    ? 'var(--color-accent-soft)'
-                    : rowIndex % 2 === 0
-                      ? 'transparent'
-                      : 'transparent',
+                  backgroundColor: rowBg,
                   borderBottom: '1px solid var(--color-border)',
+                  transition: 'background-color 0.1s',
                 }}
                 onMouseEnter={(e) => {
-                  if (!isSelected) e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+                  if (!isRowSelected)
+                    e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
                 }}
                 onMouseLeave={(e) => {
-                  if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                  if (!isRowSelected)
+                    e.currentTarget.style.backgroundColor = rowBg;
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setRowContextMenu({
+                    x: e.clientX,
+                    y: e.clientY,
+                    rowId: row.original.id,
+                    rowData: row.original.data,
+                  });
                 }}
               >
                 {row.getVisibleCells().map((cell) => {
                   const isEditingThis =
                     editingCell?.rowId === row.original.id &&
                     editingCell?.columnId === cell.column.id;
+                  const isSelectedThis =
+                    selectedCell?.rowId === row.original.id &&
+                    selectedCell?.columnId === cell.column.id;
+
+                  let cellBg: string | undefined;
+                  if (isEditingThis) cellBg = 'var(--color-bg-elevated)';
+                  else if (cell.column.id !== '__rownum__' && cell.column.id !== '__delete__') {
+                    const colDef = table.columns.find((c) => c.id === cell.column.id);
+                    if (colDef?.type === 'formula') cellBg = 'var(--color-bg-wash)';
+                  }
+
                   return (
                     <td
                       key={cell.id}
-                      className="relative overflow-hidden h-9"
+                      className="relative overflow-hidden"
                       style={{
                         borderRight: '1px solid var(--color-border)',
                         width: cell.column.getSize(),
-                        outline: isEditingThis
-                          ? '2px solid var(--color-accent)'
-                          : 'none',
-                        outlineOffset: isEditingThis ? '-2px' : undefined,
-                        backgroundColor: isEditingThis ? 'var(--color-accent-soft)' : undefined,
+                        height: '36px',
+                        backgroundColor: cellBg,
+                        // Selected cell: 2px inset accent border
+                        outline:
+                          isSelectedThis
+                            ? '2px solid var(--color-accent)'
+                            : 'none',
+                        outlineOffset: isSelectedThis ? '-2px' : undefined,
+                        position: 'relative',
                       }}
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -674,8 +988,11 @@ export function TableGrid({
                 })}
                 {/* Placeholder for add-column */}
                 <td
-                  className="h-9"
-                  style={{ borderRight: '1px solid var(--color-border)', width: '36px' }}
+                  style={{
+                    borderRight: '1px solid var(--color-border)',
+                    width: '36px',
+                    height: '36px',
+                  }}
                 />
               </tr>
             );
@@ -700,8 +1017,8 @@ export function TableGrid({
             <td colSpan={tanColumns.length + 1}>
               <button
                 onClick={() => createRow.mutate({ tableId: table.id })}
-                className="flex items-center gap-2 px-4 py-2.5 w-full text-xs font-medium transition-colors"
-                style={{ color: 'var(--color-text-muted)' }}
+                className="flex items-center gap-2 px-3 py-2.5 w-full transition-colors"
+                style={{ color: 'var(--color-text-muted)', fontSize: '12px', fontWeight: 500 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.color = 'var(--color-text-primary)';
                   e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
@@ -712,12 +1029,26 @@ export function TableGrid({
                 }}
               >
                 <Plus size={13} />
-                Add row
+                New row
               </button>
             </td>
           </tr>
         </tbody>
       </table>
+
+      {/* Row Context Menu */}
+      {rowContextMenu && (
+        <RowContextMenuEl
+          menu={rowContextMenu}
+          onClose={() => setRowContextMenu(null)}
+          onDuplicate={() => {
+            createRow.mutate({ tableId: table.id, data: rowContextMenu.rowData });
+          }}
+          onDelete={() => {
+            deleteRow.mutate({ id: rowContextMenu.rowId, tableId: table.id });
+          }}
+        />
+      )}
     </div>
   );
 }
