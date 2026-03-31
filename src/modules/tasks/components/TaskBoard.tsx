@@ -2,6 +2,8 @@ import React, { useState, useCallback } from 'react';
 import type { Task, TaskStatus, TaskPriority } from '@/shared/types/task';
 import { TaskBoardColumn } from './TaskBoardColumn';
 import { useTaskSettingsStore } from '@/shared/stores/taskSettingsStore';
+import { useAppSettingsStore } from '@/shared/stores/appSettingsStore';
+import { DENSITY_CONFIGS } from '../lib/densityConfig';
 
 interface TaskBoardProps {
   tasks: Task[];
@@ -102,6 +104,8 @@ export function TaskBoard({
 }: TaskBoardProps) {
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const customStatuses = useTaskSettingsStore((s) => s.customStatuses);
+  const density = useAppSettingsStore((s) => s.app.taskDensity);
+  const dc = DENSITY_CONFIGS[density];
 
   // Build column list from customStatuses (or fallback to default order)
   const columnStatuses: TaskStatus[] = STATUS_COLUMN_ORDER.filter((s) => {
@@ -340,7 +344,7 @@ export function TaskBoard({
         style={{
           display: 'flex',
           flexDirection: 'row',
-          gap: '12px',
+          gap: `${dc.column.gap}px`,
           padding: '16px 24px 0 24px',
           alignItems: 'flex-start',
           minHeight: '100%',

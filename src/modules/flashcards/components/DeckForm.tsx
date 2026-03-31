@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, KeyboardEvent } from 'react';
+import { X } from 'lucide-react';
+import { getDeckGradient } from './DeckCard';
 import type { CreateDeckInput, UpdateDeckInput, Deck } from '@/shared/types/flashcard';
 
 export const PRESET_COLORS = [
@@ -24,6 +26,25 @@ export function DeckForm({ initialData, onSave, onCancel, isLoading }: DeckFormP
   const [description, setDescription] = useState(initialData?.description ?? '');
   const [color, setColor] = useState<string>(initialData?.color ?? PRESET_COLORS[0]);
   const [newCardsPerDay, setNewCardsPerDay] = useState(initialData?.newCardsPerDay ?? 20);
+  const [tags, setTags] = useState<string[]>(initialData?.tags ?? []);
+  const [tagInput, setTagInput] = useState('');
+
+  function handleTagKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if ((e.key === 'Enter' || e.key === ',') && tagInput.trim()) {
+      e.preventDefault();
+      const newTag = tagInput.trim().toLowerCase().replace(/,/g, '');
+      if (newTag && !tags.includes(newTag)) {
+        setTags([...tags, newTag]);
+      }
+      setTagInput('');
+    } else if (e.key === 'Backspace' && !tagInput && tags.length > 0) {
+      setTags(tags.slice(0, -1));
+    }
+  }
+
+  function removeTag(tag: string) {
+    setTags(tags.filter((t) => t !== tag));
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -33,6 +54,7 @@ export function DeckForm({ initialData, onSave, onCancel, isLoading }: DeckFormP
       description: description.trim() || undefined,
       color,
       newCardsPerDay,
+      tags,
     });
   }
 
@@ -63,7 +85,7 @@ export function DeckForm({ initialData, onSave, onCancel, isLoading }: DeckFormP
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="What is this deck about?"
-          rows={2}
+          rows={3}
           className="input-base px-3 py-2 rounded-lg text-sm resize-none"
         />
       </div>
@@ -73,54 +95,115 @@ export function DeckForm({ initialData, onSave, onCancel, isLoading }: DeckFormP
         <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
           Deck Color
         </label>
-        <div className="flex gap-2.5 flex-wrap">
-          {PRESET_COLORS.map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => setColor(c)}
-              className="w-8 h-8 rounded-full transition-all hover:scale-110 active:scale-95 flex items-center justify-center"
+        <div className="flex gap-3 flex-wrap">
+          {PRESET_COLORS.map((c) => {
+            const isSelected = color === c;
+            const grad = getDeckGradient(c);
+            return (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setColor(c)}
+                title={c}
+                aria-label={`Color ${c}`}
+                className="relative flex items-center justify-center flex-shrink-0 transition-all hover:scale-110 active:scale-95"
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  background: grad,
+                  outline: isSelected ? `2px solid ${c}` : '2px solid transparent',
+                  outlineOffset: '2px',
+                  boxShadow: isSelected ? `0 0 0 4px ${c}33` : '0 1px 4px rgba(0,0,0,0.15)',
+                  transition: 'transform 0.15s ease, box-shadow 0.15s ease, outline 0.15s ease',
+                }}
+              >
+                {isSelected && (
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                    <path d="M2.5 6.5l3 3 5-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        {/* Preview strip */}
+        <div
+          className="h-2 rounded-full mt-1"
+          style={{ background: getDeckGradient(color), transition: 'background 0.2s ease' }}
+        />
+      </div>
+
+      {/* Tags */}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+          Tags
+          <span className="ml-1 font-normal" style={{ color: 'var(--color-text-muted)' }}>(Enter or comma)</span>
+        </label>
+        <div
+          className="flex flex-wrap gap-1.5 px-3 py-2 rounded-lg min-h-[40px]"
+          style={{
+            backgroundColor: 'var(--color-bg-tertiary)',
+            border: '1px solid var(--color-border)',
+          }}
+        >
+          {tags.map((tag) => (
+            <span
+              key={tag}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
               style={{
-                backgroundColor: c,
-                outline: color === c ? `2px solid ${c}` : '2px solid transparent',
-                outlineOffset: '2px',
-                boxShadow: color === c ? `0 0 0 4px ${c}22` : 'none',
+                backgroundColor: 'var(--color-accent-soft)',
+                color: 'var(--color-accent)',
+                border: '1px solid var(--color-border)',
               }}
-              title={c}
-              aria-label={`Color ${c}`}
             >
-              {color === c && (
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              )}
-            </button>
+              {tag}
+              <button
+                type="button"
+                onClick={() => removeTag(tag)}
+                className="rounded-full p-0.5 transition-colors"
+                style={{ color: 'var(--color-accent)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.7'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+              >
+                <X size={9} />
+              </button>
+            </span>
           ))}
+          <input
+            type="text"
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            onKeyDown={handleTagKeyDown}
+            placeholder={tags.length === 0 ? 'Add tags…' : ''}
+            className="flex-1 min-w-[100px] bg-transparent text-sm outline-none"
+            style={{ color: 'var(--color-text-primary)' }}
+          />
         </div>
       </div>
 
       {/* New cards per day */}
       <div className="flex flex-col gap-1.5">
         <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-          New Cards Per Day
+          Cards Per Day
         </label>
         <div className="flex items-center gap-3">
           <input
             type="number"
             value={newCardsPerDay}
-            onChange={(e) => setNewCardsPerDay(Math.max(1, parseInt(e.target.value, 10) || 1))}
+            onChange={(e) => setNewCardsPerDay(Math.min(200, Math.max(1, parseInt(e.target.value, 10) || 1)))}
             min={1}
             max={200}
             className="input-base px-3 py-2 rounded-lg text-sm w-24"
           />
           <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-            Max new cards introduced each day
+            New cards introduced each day (max 200)
           </span>
         </div>
       </div>
 
       {/* Actions */}
-      <div className="flex gap-2 justify-end pt-1 border-t" style={{ borderColor: 'var(--color-border)' }}>
+      <div className="flex gap-2 justify-end pt-1 border-t mt-1" style={{ borderColor: 'var(--color-border)' }}>
         <button
           type="button"
           onClick={onCancel}

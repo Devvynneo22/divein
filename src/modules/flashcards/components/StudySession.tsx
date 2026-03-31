@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { X, RotateCcw, CheckCircle2, Clock, Zap } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+import { X, RotateCcw, CheckCircle2 } from 'lucide-react';
 import type { Card, ReviewQuality, UIRating } from '@/shared/types/flashcard';
 import { UI_RATING_QUALITY } from '@/shared/types/flashcard';
 import { previewInterval } from '@/shared/lib/sm2';
@@ -11,6 +11,7 @@ interface StudySessionProps {
   queue: Card[];
   deckColor?: string | null;
   deckName?: string;
+  allCards?: Card[];
   onExit: () => void;
 }
 
@@ -26,7 +27,7 @@ const RATING_CONFIG = [
   {
     rating: 'again' as UIRating,
     emoji: '❌',
-    label: 'Hard',
+    label: 'Again',
     color: 'var(--color-danger)',
     bg: 'var(--color-danger-soft)',
     border: 'rgba(224,62,62,0.3)',
@@ -35,7 +36,7 @@ const RATING_CONFIG = [
   {
     rating: 'hard' as UIRating,
     emoji: '😐',
-    label: 'OK',
+    label: 'Hard',
     color: 'var(--color-warning)',
     bg: 'var(--color-warning-soft)',
     border: 'rgba(207,142,23,0.3)',
@@ -44,13 +45,28 @@ const RATING_CONFIG = [
   {
     rating: 'good' as UIRating,
     emoji: '✅',
-    label: 'Easy',
+    label: 'Good',
     color: 'var(--color-success)',
     bg: 'var(--color-success-soft)',
     border: 'rgba(15,123,15,0.3)',
     hoverBg: 'rgba(15,123,15,0.15)',
   },
+  {
+    rating: 'easy' as UIRating,
+    emoji: '⚡',
+    label: 'Easy',
+    color: 'var(--color-accent)',
+    bg: 'var(--color-accent-soft)',
+    border: 'rgba(59,130,246,0.3)',
+    hoverBg: 'rgba(59,130,246,0.15)',
+  },
 ] as const;
+
+function formatTimer(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
 
 function formatDuration(ms: number): string {
   const s = Math.floor(ms / 1000);
@@ -69,12 +85,63 @@ function formatIntervalLabel(days: number): string {
   return `${Math.round(days / 30)}mo`;
 }
 
-export function StudySession({ queue, deckColor, deckName, onExit }: StudySessionProps) {
+function getNextReviewDate(cards: Card[]): string {
+  if (cards.length === 0) return 'Unknown';
+  const timestamps = cards
+    .map((c) => new Date(c.nextReview).getTime())
+    .filter((t) => !isNaN(t));
+  if (timestamps.length === 0) return 'Unknown';
+  const minDate = new Date(Math.min(...timestamps));
+
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const tomorrowStart = new Date(todayStart);
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+  minDate.setHours(0, 0, 0, 0);
+
+  if (minDate.getTime() <= todayStart.getTime()) return 'Today';
+  if (minDate.getTime() === tomorrowStart.getTime()) return 'Tomorrow';
+  return minDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function computeStreak(): number {
+  const today = new Date().toISOString().split('T')[0];
+  const yesterday = new Date(Date.now() - 86_400_000).toISOString().split('T')[0];
+  try {
+    const raw = localStorage.getItem('divein-study-streak');
+    if (raw) {
+      const data = JSON.parse(raw) as { lastStudyDate: string; streak: number };
+      if (data.lastStudyDate === today) {
+        return data.streak;
+      } else if (data.lastStudyDate === yesterday) {
+        const newStreak = data.streak + 1;
+        localStorage.setItem(
+          'divein-study-streak',
+          JSON.stringify({ lastStudyDate: today, streak: newStreak }),
+        );
+        return newStreak;
+      }
+    }
+    localStorage.setItem(
+      'divein-study-streak',
+      JSON.stringify({ lastStudyDate: today, streak: 1 }),
+    );
+    return 1;
+  } catch {
+    return 1;
+  }
+}
+
+export function StudySession({ queue, deckColor, deckName, allCards, onExit }: StudySessionProps) {
+  const [localQueue, setLocalQueue] = useState<Card[]>(queue);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [showingAnswer, setShowingAnswer] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [timerSeconds, setTimerSeconds] = useState(0);
+  const [streakCount, setStreakCount] = useState(0);
+  const [missedIds, setMissedIds] = useState<Set<string>>(new Set());
   const [sessionStats, setSessionStats] = useState<SessionStats>({
     again: 0,
     hard: 0,
@@ -84,11 +151,24 @@ export function StudySession({ queue, deckColor, deckName, onExit }: StudySessio
   });
 
   const reviewCard = useReviewCard();
-  const totalCards = queue.length;
-  const currentCard: Card | undefined = queue[currentIndex];
+  const totalCards = localQueue.length;
+  const currentCard: Card | undefined = localQueue[currentIndex];
   const progress = totalCards > 0 ? (currentIndex / totalCards) * 100 : 0;
   const gradient = getDeckGradient(deckColor ?? null);
-  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Live session timer
+  useEffect(() => {
+    if (isComplete) return;
+    const id = setInterval(() => setTimerSeconds((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [isComplete]);
+
+  // Update streak once when session completes
+  useEffect(() => {
+    if (isComplete) {
+      setStreakCount(computeStreak());
+    }
+  }, [isComplete]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -102,6 +182,7 @@ export function StudySession({ queue, deckColor, deckName, onExit }: StudySessio
         if (e.key === '1') handleRate('again');
         else if (e.key === '2') handleRate('hard');
         else if (e.key === '3') handleRate('good');
+        else if (e.key === '4') handleRate('easy');
         else if (e.key === 'Escape') onExit();
       }
     }
@@ -121,7 +202,10 @@ export function StudySession({ queue, deckColor, deckName, onExit }: StudySessio
       reviewCard.mutate({ cardId: currentCard.id, quality });
       setSessionStats((prev) => ({ ...prev, [rating]: prev[rating] + 1 }));
 
-      // Brief animation before advancing
+      if (rating === 'again') {
+        setMissedIds((prev) => new Set(prev).add(currentCard.id));
+      }
+
       setIsAnimating(true);
       setTimeout(() => {
         const nextIndex = currentIndex + 1;
@@ -138,6 +222,33 @@ export function StudySession({ queue, deckColor, deckName, onExit }: StudySessio
     [currentCard, currentIndex, totalCards, reviewCard, isAnimating],
   );
 
+  function handleRetryMissed() {
+    setLocalQueue(localQueue.filter((c) => missedIds.has(c.id)));
+    setCurrentIndex(0);
+    setIsFlipped(false);
+    setShowingAnswer(false);
+    setIsComplete(false);
+    setIsAnimating(false);
+    setTimerSeconds(0);
+    setMissedIds(new Set());
+    setSessionStats({ again: 0, hard: 0, good: 0, easy: 0, startTime: Date.now() });
+  }
+
+  function handleStudyAgain() {
+    setCurrentIndex(0);
+    setIsFlipped(false);
+    setShowingAnswer(false);
+    setIsComplete(false);
+    setIsAnimating(false);
+    setTimerSeconds(0);
+    setMissedIds(new Set());
+    setSessionStats({ again: 0, hard: 0, good: 0, easy: 0, startTime: Date.now() });
+  }
+
+  // Running score for header
+  const correctSoFar = sessionStats.good + sessionStats.easy;
+  const incorrectSoFar = sessionStats.again + sessionStats.hard;
+
   // ── Session complete ──────────────────────────────────────────────────────
   if (isComplete) {
     const total = sessionStats.again + sessionStats.hard + sessionStats.good + sessionStats.easy;
@@ -145,77 +256,183 @@ export function StudySession({ queue, deckColor, deckName, onExit }: StudySessio
     const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
     const elapsed = Date.now() - sessionStats.startTime;
 
+    const accuracyEmoji = pct >= 90 ? '🏆' : pct >= 70 ? '🎯' : pct >= 50 ? '💪' : '📚';
+    const ringColor =
+      pct >= 70
+        ? 'var(--color-success)'
+        : pct >= 50
+          ? 'var(--color-warning)'
+          : 'var(--color-danger)';
+    const strokeOffset = 282.7 * (1 - pct / 100);
+
     return (
-      <div className="flex flex-col items-center justify-center flex-1 gap-8 py-12 px-4 text-center">
-        {/* Trophy */}
+      <div className="flex flex-col items-center justify-center flex-1 gap-6 py-10 px-4 text-center">
+        {/* Accuracy emoji */}
         <div
-          className="w-24 h-24 rounded-full flex items-center justify-center"
+          className="w-20 h-20 rounded-full flex items-center justify-center"
           style={{ background: gradient }}
         >
-          <span style={{ fontSize: '2.5rem' }}>🎉</span>
+          <span style={{ fontSize: '2.25rem' }}>{accuracyEmoji}</span>
         </div>
 
         <div>
           <h2 className="text-3xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
             Session Complete!
           </h2>
-          <p className="text-sm mt-2" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
             Great work on {deckName ?? 'this deck'}
           </p>
+          {streakCount > 1 && (
+            <p
+              className="text-sm mt-1 font-semibold"
+              style={{ color: 'var(--color-warning)' }}
+            >
+              🔥 {streakCount} day streak!
+            </p>
+          )}
         </div>
 
-        {/* Stats grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full max-w-lg">
-          <StatBox label="Accuracy" value={`${pct}%`} color="var(--color-accent)" />
-          <StatBox label="Cards" value={String(total)} color="var(--color-text-primary)" />
-          <StatBox label="Time" value={formatDuration(elapsed)} color="var(--color-text-primary)" icon={<Clock size={14} />} />
-          <StatBox label="Streak" value={`${sessionStats.good + sessionStats.easy}`} color="var(--color-success)" icon={<Zap size={14} />} />
+        {/* SVG accuracy ring + stats row */}
+        <div className="flex items-center gap-8 flex-wrap justify-center">
+          {/* Accuracy ring */}
+          <svg width="120" height="120" viewBox="0 0 100 100">
+            <circle
+              cx="50"
+              cy="50"
+              r="45"
+              fill="none"
+              stroke="var(--color-bg-tertiary)"
+              strokeWidth="8"
+            />
+            <circle
+              cx="50"
+              cy="50"
+              r="45"
+              fill="none"
+              stroke={ringColor}
+              strokeWidth="8"
+              strokeDasharray="282.7"
+              strokeDashoffset={strokeOffset}
+              strokeLinecap="round"
+              transform="rotate(-90 50 50)"
+            />
+            <text
+              x="50"
+              y="50"
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontSize="18"
+              fontWeight="bold"
+              fill="var(--color-text-primary)"
+            >
+              {pct}%
+            </text>
+          </svg>
+
+          {/* Quick stats */}
+          <div className="flex flex-col gap-2 text-left">
+            <div className="flex items-center gap-2">
+              <span style={{ fontSize: '1rem' }}>🃏</span>
+              <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+                {total} cards reviewed
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span style={{ fontSize: '1rem' }}>⏱️</span>
+              <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+                {formatDuration(elapsed)}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span style={{ fontSize: '1rem' }}>✓</span>
+              <span className="text-sm font-medium" style={{ color: 'var(--color-success)' }}>
+                {correct} correct
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span style={{ fontSize: '1rem' }}>✗</span>
+              <span className="text-sm font-medium" style={{ color: 'var(--color-danger)' }}>
+                {sessionStats.again + sessionStats.hard} incorrect
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Rating breakdown */}
         <div
           className="flex gap-3 w-full max-w-sm rounded-2xl p-4"
-          style={{ backgroundColor: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}
+          style={{
+            backgroundColor: 'var(--color-bg-secondary)',
+            border: '1px solid var(--color-border)',
+          }}
         >
-          {RATING_CONFIG.map(({ label, emoji, color }) => (
-            <div key={label} className="flex-1 flex flex-col items-center gap-1">
-              <span style={{ fontSize: '1.2rem' }}>{emoji}</span>
-              <span className="text-lg font-bold tabular-nums" style={{ color }}>
-                {sessionStats[label === 'Hard' ? 'again' : label === 'OK' ? 'hard' : 'good']}
+          {RATING_CONFIG.map(({ rating, label, emoji, color }) => (
+            <div key={rating} className="flex-1 flex flex-col items-center gap-1">
+              <span style={{ fontSize: '1.1rem' }}>{emoji}</span>
+              <span
+                className="text-lg font-bold tabular-nums"
+                style={{ color }}
+              >
+                {sessionStats[rating]}
               </span>
-              <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{label}</span>
+              <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                {label}
+              </span>
             </div>
           ))}
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap justify-center">
           <button
-            onClick={() => {
-              setCurrentIndex(0);
-              setIsFlipped(false);
-              setShowingAnswer(false);
-              setIsComplete(false);
-              setSessionStats({ again: 0, hard: 0, good: 0, easy: 0, startTime: Date.now() });
-            }}
-            className="px-6 py-3 rounded-xl text-sm font-semibold transition-all active:scale-95"
+            onClick={handleStudyAgain}
+            className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95"
             style={{
               border: '1px solid var(--color-border)',
               color: 'var(--color-text-primary)',
               backgroundColor: 'var(--color-bg-secondary)',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-secondary)'; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-bg-secondary)';
+            }}
           >
-            <RotateCcw size={14} className="inline mr-1.5" />
+            <RotateCcw size={13} className="inline mr-1.5" />
             Study Again
           </button>
+
+          {sessionStats.again > 0 && (
+            <button
+              onClick={handleRetryMissed}
+              className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95"
+              style={{
+                border: '1px solid rgba(224,62,62,0.35)',
+                color: 'var(--color-danger)',
+                backgroundColor: 'var(--color-danger-soft)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(224,62,62,0.15)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--color-danger-soft)';
+              }}
+            >
+              ❌ Retry Missed ({sessionStats.again})
+            </button>
+          )}
+
           <button
             onClick={onExit}
-            className="px-6 py-3 rounded-xl text-sm font-semibold text-white transition-all active:scale-95"
+            className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all active:scale-95"
             style={{ background: gradient }}
-            onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '0.9';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '1';
+            }}
           >
             Back to Deck
           </button>
@@ -226,6 +443,9 @@ export function StudySession({ queue, deckColor, deckName, onExit }: StudySessio
 
   // ── Empty queue ───────────────────────────────────────────────────────────
   if (!currentCard || totalCards === 0) {
+    const nextDate =
+      allCards && allCards.length > 0 ? getNextReviewDate(allCards) : null;
+
     return (
       <div className="flex flex-col items-center justify-center flex-1 gap-6 py-16 text-center">
         <div
@@ -239,22 +459,59 @@ export function StudySession({ queue, deckColor, deckName, onExit }: StudySessio
             All caught up! 🎉
           </h2>
           <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
-            No cards due right now. Come back tomorrow.
+            No cards due right now.
           </p>
+          {nextDate && (
+            <p className="text-sm mt-1 font-medium" style={{ color: 'var(--color-text-muted)' }}>
+              Next review: <span style={{ color: 'var(--color-accent)' }}>{nextDate}</span>
+            </p>
+          )}
         </div>
-        <button
-          onClick={onExit}
-          className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all"
-          style={{
-            border: '1px solid var(--color-border)',
-            color: 'var(--color-text-secondary)',
-            backgroundColor: 'var(--color-bg-secondary)',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-secondary)'; }}
-        >
-          Back to Deck
-        </button>
+        <div className="flex gap-3">
+          {allCards && allCards.length > 0 && (
+            <button
+              onClick={() => {
+                setLocalQueue(allCards);
+                setCurrentIndex(0);
+                setIsFlipped(false);
+                setShowingAnswer(false);
+                setTimerSeconds(0);
+                setMissedIds(new Set());
+                setSessionStats({ again: 0, hard: 0, good: 0, easy: 0, startTime: Date.now() });
+              }}
+              className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all"
+              style={{
+                background: gradient,
+                color: 'white',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = '0.9';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = '1';
+              }}
+            >
+              Study Anyway
+            </button>
+          )}
+          <button
+            onClick={onExit}
+            className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all"
+            style={{
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-secondary)',
+              backgroundColor: 'var(--color-bg-secondary)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-bg-secondary)';
+            }}
+          >
+            Back to Deck
+          </button>
+        </div>
       </div>
     );
   }
@@ -263,40 +520,73 @@ export function StudySession({ queue, deckColor, deckName, onExit }: StudySessio
   return (
     <div className="flex flex-col flex-1 min-h-0">
       {/* Top bar: progress + exit */}
-      <div className="flex items-center gap-4 mb-6 flex-shrink-0">
-        {/* Progress label */}
-        <span className="text-xs font-medium tabular-nums flex-shrink-0" style={{ color: 'var(--color-text-muted)' }}>
-          Card {currentIndex + 1} of {totalCards}
-        </span>
+      <div className="flex flex-col gap-2 mb-4 flex-shrink-0">
+        <div className="flex items-center gap-4">
+          {/* Progress label */}
+          <span
+            className="text-xs font-medium tabular-nums flex-shrink-0"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
+            {currentIndex + 1} / {totalCards}
+          </span>
 
-        {/* Progress bar */}
-        <div
-          className="flex-1 h-2 rounded-full overflow-hidden"
-          style={{ backgroundColor: 'var(--color-bg-tertiary)' }}
-        >
+          {/* Progress bar */}
           <div
-            className="h-full rounded-full transition-all duration-500 ease-out"
-            style={{ width: `${progress}%`, background: gradient }}
-          />
+            className="flex-1 h-2 rounded-full overflow-hidden"
+            style={{ backgroundColor: 'var(--color-bg-tertiary)' }}
+          >
+            <div
+              className="h-full rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${progress}%`, background: gradient }}
+            />
+          </div>
+
+          {/* Exit */}
+          <button
+            onClick={onExit}
+            className="flex-shrink-0 p-1.5 rounded-lg transition-colors"
+            title="Exit session (Esc)"
+            style={{ color: 'var(--color-text-muted)' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+              e.currentTarget.style.color = 'var(--color-text-primary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = 'var(--color-text-muted)';
+            }}
+          >
+            <X size={16} />
+          </button>
         </div>
 
-        {/* Exit */}
-        <button
-          onClick={onExit}
-          className="flex-shrink-0 p-1.5 rounded-lg transition-colors"
-          title="Exit session (Esc)"
-          style={{ color: 'var(--color-text-muted)' }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
-            e.currentTarget.style.color = 'var(--color-text-primary)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.color = 'var(--color-text-muted)';
-          }}
-        >
-          <X size={16} />
-        </button>
+        {/* Deck name + timer + running score */}
+        <div className="flex items-center gap-3 px-1">
+          {deckName && (
+            <span
+              className="text-xs font-medium truncate"
+              style={{ color: 'var(--color-text-muted)' }}
+            >
+              {deckName}
+            </span>
+          )}
+          <span
+            className="text-xs tabular-nums font-mono flex-shrink-0"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
+            {formatTimer(timerSeconds)}
+          </span>
+          {(correctSoFar > 0 || incorrectSoFar > 0) && (
+            <span
+              className="text-xs font-medium flex-shrink-0 ml-auto"
+              style={{ color: 'var(--color-text-muted)' }}
+            >
+              <span style={{ color: 'var(--color-success)' }}>{correctSoFar} ✓</span>
+              {' · '}
+              <span style={{ color: 'var(--color-danger)' }}>{incorrectSoFar} ✗</span>
+            </span>
+          )}
+        </div>
       </div>
 
       {/* ── 3D Flip Card ── */}
@@ -307,7 +597,6 @@ export function StudySession({ queue, deckColor, deckName, onExit }: StudySessio
           onClick={!showingAnswer ? handleShowAnswer : undefined}
         >
           <div
-            ref={cardRef}
             className="relative"
             style={{
               transformStyle: 'preserve-3d',
@@ -323,12 +612,9 @@ export function StudySession({ queue, deckColor, deckName, onExit }: StudySessio
               style={{ backfaceVisibility: 'hidden' }}
             >
               {/* Gradient header strip */}
+              <div className="h-2 w-full flex-shrink-0" style={{ background: gradient }} />
               <div
-                className="h-2 w-full flex-shrink-0"
-                style={{ background: gradient }}
-              />
-              <div
-                className="flex-1 flex flex-col items-center justify-center p-10"
+                className="flex-1 flex flex-col p-10"
                 style={{
                   backgroundColor: 'var(--color-bg-elevated)',
                   border: '1px solid var(--color-border)',
@@ -336,24 +622,57 @@ export function StudySession({ queue, deckColor, deckName, onExit }: StudySessio
                   borderRadius: '0 0 1.5rem 1.5rem',
                 }}
               >
+                {/* Deck name top-left */}
+                {deckName && (
+                  <span
+                    className="text-xs font-medium mb-4 self-start"
+                    style={{ color: 'var(--color-text-muted)' }}
+                  >
+                    {deckName}
+                  </span>
+                )}
+
+                {/* Question content centered */}
+                <div className="flex-1 flex flex-col items-center justify-center">
+                  <p
+                    className="text-xs font-semibold uppercase tracking-widest mb-6"
+                    style={{ color: 'var(--color-text-muted)' }}
+                  >
+                    Question
+                  </p>
+                  <p
+                    className="text-center leading-relaxed font-medium"
+                    style={{
+                      color: 'var(--color-text-primary)',
+                      fontSize: 'clamp(18px, 2.5vw, 24px)',
+                      maxWidth: '80%',
+                    }}
+                  >
+                    {currentCard.front}
+                  </p>
+
+                  {/* Tags */}
+                  {currentCard.tags && currentCard.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-5 justify-center">
+                      {currentCard.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="px-2 py-0.5 rounded-full text-xs font-medium"
+                          style={{
+                            backgroundColor: 'var(--color-bg-tertiary)',
+                            color: 'var(--color-text-muted)',
+                            border: '1px solid var(--color-border)',
+                          }}
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <p
-                  className="text-xs font-semibold uppercase tracking-widest mb-6"
-                  style={{ color: 'var(--color-text-muted)' }}
-                >
-                  Question
-                </p>
-                <p
-                  className="text-center leading-relaxed font-medium"
-                  style={{
-                    color: 'var(--color-text-primary)',
-                    fontSize: 'clamp(18px, 2.5vw, 24px)',
-                    maxWidth: '80%',
-                  }}
-                >
-                  {currentCard.front}
-                </p>
-                <p
-                  className="mt-8 text-xs"
+                  className="text-xs text-center mt-6"
                   style={{ color: 'var(--color-text-muted)' }}
                 >
                   Space or click to reveal
@@ -370,10 +689,7 @@ export function StudySession({ queue, deckColor, deckName, onExit }: StudySessio
               }}
             >
               {/* Gradient header strip */}
-              <div
-                className="h-2 w-full flex-shrink-0"
-                style={{ background: gradient }}
-              />
+              <div className="h-2 w-full flex-shrink-0" style={{ background: gradient }} />
               <div
                 className="flex-1 flex flex-col items-center justify-center p-10"
                 style={{
@@ -381,6 +697,7 @@ export function StudySession({ queue, deckColor, deckName, onExit }: StudySessio
                   border: '1px solid var(--color-border)',
                   borderTop: 'none',
                   borderRadius: '0 0 1.5rem 1.5rem',
+                  boxShadow: '0 0 0 2px var(--color-success-soft) inset',
                 }}
               >
                 <p
@@ -416,13 +733,17 @@ export function StudySession({ queue, deckColor, deckName, onExit }: StudySessio
               color: 'white',
               boxShadow: 'var(--shadow-md)',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '0.9';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '1';
+            }}
           >
             Show Answer
           </button>
         ) : (
-          <div className="flex gap-3 w-full max-w-md">
+          <div className="flex gap-3 w-full max-w-xl">
             {RATING_CONFIG.map(({ rating, emoji, label, color, bg, border, hoverBg }) => {
               const quality = UI_RATING_QUALITY[rating];
               const days = previewInterval(
@@ -436,18 +757,24 @@ export function StudySession({ queue, deckColor, deckName, onExit }: StudySessio
                   key={rating}
                   onClick={() => handleRate(rating)}
                   disabled={reviewCard.isPending || isAnimating}
-                  className="flex-1 flex flex-col items-center gap-1.5 py-3.5 px-3 rounded-2xl text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+                  className="flex-1 flex flex-col items-center gap-1.5 py-3.5 px-2 rounded-2xl text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
                   style={{
                     backgroundColor: bg,
                     border: `1px solid ${border}`,
                     color,
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = hoverBg; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = bg; }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = hoverBg;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = bg;
+                  }}
                 >
                   <span style={{ fontSize: '1.2rem' }}>{emoji}</span>
                   <span>{label}</span>
-                  <span className="text-xs opacity-60 font-normal">{formatIntervalLabel(days)}</span>
+                  <span className="text-xs opacity-60 font-normal">
+                    {formatIntervalLabel(days)}
+                  </span>
                 </button>
               );
             })}
@@ -457,9 +784,20 @@ export function StudySession({ queue, deckColor, deckName, onExit }: StudySessio
         {/* Keyboard hints */}
         {showingAnswer && (
           <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-            Press <kbd className="px-1.5 py-0.5 rounded text-xs font-mono" style={{ backgroundColor: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border)' }}>1</kbd>{' '}
-            <kbd className="px-1.5 py-0.5 rounded text-xs font-mono" style={{ backgroundColor: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border)' }}>2</kbd>{' '}
-            <kbd className="px-1.5 py-0.5 rounded text-xs font-mono" style={{ backgroundColor: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border)' }}>3</kbd>{' '}
+            {(['1', '2', '3', '4'] as const).map((k, i) => (
+              <span key={k}>
+                {i > 0 && ' '}
+                <kbd
+                  className="px-1.5 py-0.5 rounded text-xs font-mono"
+                  style={{
+                    backgroundColor: 'var(--color-bg-tertiary)',
+                    border: '1px solid var(--color-border)',
+                  }}
+                >
+                  {k}
+                </kbd>
+              </span>
+            ))}{' '}
             to rate
           </p>
         )}

@@ -5,13 +5,15 @@ import { StatusIcon } from './StatusIcon';
 import { PriorityIcon } from './PriorityIcon';
 import { useAppSettingsStore } from '@/shared/stores/appSettingsStore';
 import type { TaskDensity } from '@/shared/stores/appSettingsStore';
+import { DENSITY_CONFIGS } from '../lib/densityConfig';
 
 interface TaskListRowProps {
   task: Task;
   isSelected: boolean;
   isMultiSelected?: boolean;
-  isBlocked?: boolean; // true if task has active (non-done) blockers
+  isBlocked?: boolean;
   onSelect: (e: React.MouseEvent<HTMLDivElement>) => void;
+  onToggleSelect?: (id: string, shiftKey?: boolean) => void;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
   onStatusChange: (status: TaskStatus) => void;
@@ -82,6 +84,7 @@ export function TaskListRow({
   isMultiSelected = false,
   isBlocked = false,
   onSelect,
+  onToggleSelect,
   onMouseEnter: onMouseEnterProp,
   onMouseLeave: onMouseLeaveProp,
   onStatusChange,
@@ -89,6 +92,7 @@ export function TaskListRow({
 }: TaskListRowProps) {
   const [hovered, setHovered] = useState(false);
   const density = useAppSettingsStore((s) => s.app.taskDensity);
+  const dc = DENSITY_CONFIGS[density];
 
   const isDone = task.status === 'done' || task.status === 'cancelled';
   const isOverdue = task.dueDate
@@ -120,6 +124,9 @@ export function TaskListRow({
       ? '2px solid var(--color-accent)'
       : '2px solid transparent';
 
+  // Checkbox is visible when hovered or multi-selected
+  const checkboxOpacity = hovered || isMultiSelected ? 1 : 0;
+
   return (
     <div
       role="row"
@@ -131,8 +138,8 @@ export function TaskListRow({
         display: 'flex',
         alignItems: 'center',
         gap: 8,
-        height: DENSITY_ROW_HEIGHT[density],
-        padding: '0 12px',
+        height: dc.list.rowHeight,
+        padding: dc.list.padding,
         cursor: 'pointer',
         backgroundColor: rowBg,
         borderLeft: rowBorderLeft,
@@ -141,6 +148,43 @@ export function TaskListRow({
         userSelect: 'none',
       }}
     >
+      {/* Multi-select checkbox — left of row, hidden by default */}
+      <div
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleSelect?.(task.id, e.shiftKey);
+        }}
+        style={{
+          width: 16,
+          height: 16,
+          flexShrink: 0,
+          opacity: checkboxOpacity,
+          transition: 'opacity 0.15s ease',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 4,
+          border: isMultiSelected
+            ? '2px solid var(--color-accent)'
+            : '1.5px solid var(--color-border-hover, #94a3b8)',
+          backgroundColor: isMultiSelected ? 'var(--color-accent)' : 'transparent',
+          boxSizing: 'border-box',
+        }}
+      >
+        {isMultiSelected && (
+          <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+            <path
+              d="M1 4L3.5 6.5L9 1"
+              stroke="white"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
+      </div>
+
       {/* Status checkbox */}
       <button
         onClick={(e) => {
@@ -176,7 +220,7 @@ export function TaskListRow({
           display: 'flex',
           alignItems: 'center',
           gap: 5,
-          fontSize: DENSITY_FONT_SIZE[density],
+          fontSize: dc.list.fontSize,
           color: isDone ? 'var(--color-text-muted)' : 'var(--color-text-primary)',
           textDecoration: isDone ? 'line-through' : 'none',
           overflow: 'hidden',
@@ -202,8 +246,8 @@ export function TaskListRow({
         </span>
       </span>
 
-      {/* Tags */}
-      {task.tags.length > 0 && (
+      {/* Tags — hidden in compact density */}
+      {dc.list.showTags && task.tags.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
           {visibleTags.map((tag) => {
             const c = getTagColor(tag);
@@ -211,7 +255,7 @@ export function TaskListRow({
               <span
                 key={tag}
                 style={{
-                  fontSize: DENSITY_BADGE_FONT_SIZE[density],
+                  fontSize: dc.list.fontSize - 2,
                   padding: '1px 6px',
                   borderRadius: 10,
                   backgroundColor: c.bg,
@@ -227,7 +271,7 @@ export function TaskListRow({
           {overflowCount > 0 && (
             <span
               style={{
-                fontSize: DENSITY_BADGE_FONT_SIZE[density],
+                fontSize: dc.list.fontSize - 2,
                 padding: '1px 6px',
                 borderRadius: 10,
                 backgroundColor: 'var(--color-bg-tertiary)',
@@ -242,10 +286,10 @@ export function TaskListRow({
       )}
 
       {/* Due date */}
-      {task.dueDate && (
+      {dc.list.showDueDate && task.dueDate && (
         <span
           style={{
-            fontSize: DENSITY_BADGE_FONT_SIZE[density],
+            fontSize: dc.list.fontSize - 2,
             color: dueDateColor,
             flexShrink: 0,
             whiteSpace: 'nowrap',
@@ -256,10 +300,10 @@ export function TaskListRow({
         </span>
       )}
 
-      {isDueToday && (
+      {dc.list.showDueDate && isDueToday && (
         <span
           style={{
-            fontSize: DENSITY_BADGE_FONT_SIZE[density],
+            fontSize: dc.list.fontSize - 2,
             padding: '2px 6px',
             borderRadius: 999,
             backgroundColor: 'var(--color-accent-soft)',

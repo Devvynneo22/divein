@@ -9,6 +9,8 @@ interface TaskFilters {
   priority?: TaskPriority[];
   tags?: string[];
   dueBefore?: string;
+  /** Client-side only: filter tasks with no due date set */
+  noDueDate?: boolean;
 }
 
 interface TaskToolbarProps {
@@ -86,7 +88,8 @@ function hasActiveFilters(filters: TaskFilters): boolean {
     (filters.status?.length ?? 0) > 0 ||
     (filters.priority?.length ?? 0) > 0 ||
     (filters.tags?.length ?? 0) > 0 ||
-    !!filters.dueBefore
+    !!filters.dueBefore ||
+    !!filters.noDueDate
   );
 }
 
@@ -137,6 +140,8 @@ export function TaskToolbar({
       onFilterChange({ ...filters, tags: updated.length > 0 ? updated : undefined });
     } else if (key === 'dueBefore') {
       onFilterChange({ ...filters, dueBefore: undefined });
+    } else if (key === 'noDueDate') {
+      onFilterChange({ ...filters, noDueDate: undefined });
     }
   };
 
@@ -144,363 +149,311 @@ export function TaskToolbar({
     onFilterChange({});
   };
 
+  // Count active filters for the badge
+  const filterCount =
+    (filters.status?.length ?? 0) +
+    (filters.priority?.length ?? 0) +
+    (filters.tags?.length ?? 0) +
+    (filters.dueBefore ? 1 : 0) +
+    (filters.noDueDate ? 1 : 0);
+
   return (
     <div
       style={{
         display: 'flex',
-        flexDirection: 'column',
-        borderBottom: '1px solid var(--color-border)',
-        backgroundColor: 'var(--color-bg-secondary)',
+        alignItems: 'center',
+        gap: 8,
       }}
     >
-      {/* Main toolbar row */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '8px 16px',
-        }}
-      >
-        {/* Search input */}
-        <div style={{ position: 'relative', width: 200, flexShrink: 0 }}>
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-            style={{
-              position: 'absolute',
-              left: 8,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'var(--color-text-muted)',
-              pointerEvents: 'none',
-            }}
-          >
-            <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.3" />
-            <line x1="9.5" y1="9.5" x2="13" y2="13" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search tasks..."
-            value={searchQuery}
-            onChange={(e) => onSearch(e.target.value)}
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => setSearchFocused(false)}
-            style={{
-              width: '100%',
-              fontSize: 13,
-              color: 'var(--color-text-primary)',
-              backgroundColor: 'var(--color-bg-elevated)',
-              border: `1px solid ${searchFocused ? 'var(--color-accent)' : 'var(--color-border)'}`,
-              borderRadius: 6,
-              padding: '5px 8px 5px 28px',
-              outline: 'none',
-              transition: 'border-color 0.15s ease',
-              boxSizing: 'border-box',
-            }}
-          />
-        </div>
+      {/* Search input */}
+      <div style={{ position: 'relative', width: 200, flexShrink: 0 }}>
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 14 14"
+          fill="none"
+          style={{
+            position: 'absolute',
+            left: 8,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            color: 'var(--color-text-muted)',
+            pointerEvents: 'none',
+          }}
+        >
+          <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.3" />
+          <line x1="9.5" y1="9.5" x2="13" y2="13" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        </svg>
+        <input
+          type="text"
+          placeholder="Search tasks..."
+          value={searchQuery}
+          onChange={(e) => onSearch(e.target.value)}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
+          style={{
+            width: '100%',
+            fontSize: 13,
+            color: 'var(--color-text-primary)',
+            backgroundColor: 'var(--color-bg-elevated)',
+            border: `1px solid ${searchFocused ? 'var(--color-accent)' : 'var(--color-border)'}`,
+            borderRadius: 6,
+            padding: '5px 8px 5px 28px',
+            outline: 'none',
+            transition: 'border-color 0.15s ease',
+            boxSizing: 'border-box',
+          }}
+        />
+      </div>
 
-        {/* Filter dropdown */}
-        <div style={{ position: 'relative' }} ref={filterRef}>
-          <button
-            onClick={() => setFilterOpen((o) => !o)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-              fontSize: 13,
-              fontWeight: 500,
-              color: filtersActive ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-              backgroundColor: filtersActive ? 'var(--color-accent-soft)' : 'var(--color-bg-elevated)',
-              border: `1px solid ${filtersActive ? 'var(--color-accent)' : 'var(--color-border)'}`,
-              borderRadius: 6,
-              padding: '5px 10px',
-              cursor: 'pointer',
-            }}
-          >
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-              <path d="M1 2.5h11M3 6.5h7M5 10.5h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-            </svg>
-            Filter
-            {filtersActive && (
-              <span
-                style={{
-                  minWidth: 16,
-                  height: 16,
-                  borderRadius: 8,
-                  backgroundColor: 'var(--color-accent)',
-                  color: '#fff',
-                  fontSize: 10,
-                  fontWeight: 700,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '0 3px',
-                }}
-              >
-                {(filters.status?.length ?? 0) +
-                  (filters.priority?.length ?? 0) +
-                  (filters.tags?.length ?? 0) +
-                  (filters.dueBefore ? 1 : 0)}
-              </span>
-            )}
-          </button>
-
-          {/* Filter popover */}
-          {filterOpen && (
-            <div
-              style={{
-                position: 'absolute',
-                top: 'calc(100% + 6px)',
-                left: 0,
-                zIndex: 50,
-                backgroundColor: 'var(--color-bg-elevated)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 8,
-                boxShadow: 'var(--shadow-md)',
-                padding: 12,
-                minWidth: 220,
-              }}
-            >
-              <div style={{ marginBottom: 10 }}>
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    letterSpacing: '0.06em',
-                    textTransform: 'uppercase',
-                    color: 'var(--color-text-muted)',
-                    marginBottom: 6,
-                  }}
-                >
-                  Status
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {STATUS_OPTIONS.map((opt) => {
-                    const checked = filters.status?.includes(opt.value) ?? false;
-                    return (
-                      <label
-                        key={opt.value}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 8,
-                          fontSize: 13,
-                          color: 'var(--color-text-secondary)',
-                          cursor: 'pointer',
-                          padding: '3px 4px',
-                          borderRadius: 4,
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleStatusFilter(opt.value)}
-                          style={{ accentColor: 'var(--color-accent)' }}
-                        />
-                        {opt.label}
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    letterSpacing: '0.06em',
-                    textTransform: 'uppercase',
-                    color: 'var(--color-text-muted)',
-                    marginBottom: 6,
-                  }}
-                >
-                  Priority
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {PRIORITY_OPTIONS.map((opt) => {
-                    const checked = filters.priority?.includes(opt.value) ?? false;
-                    return (
-                      <label
-                        key={opt.value}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 8,
-                          fontSize: 13,
-                          color: 'var(--color-text-secondary)',
-                          cursor: 'pointer',
-                          padding: '3px 4px',
-                          borderRadius: 4,
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => togglePriorityFilter(opt.value)}
-                          style={{ accentColor: 'var(--color-accent)' }}
-                        />
-                        {opt.label}
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between' }}>
-                <button
-                  onClick={() => {
-                    handleClearAll();
-                    setFilterOpen(false);
-                  }}
-                  style={{
-                    fontSize: 12,
-                    color: 'var(--color-text-muted)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '3px 6px',
-                    borderRadius: 4,
-                  }}
-                >
-                  Clear filters
-                </button>
-                <button
-                  onClick={() => setFilterOpen(false)}
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: 'var(--color-accent)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '3px 6px',
-                    borderRadius: 4,
-                  }}
-                >
-                  Done
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Group by */}
-        <div style={{ position: 'relative' }}>
-          <label style={{ fontSize: 12, color: 'var(--color-text-muted)', marginRight: 4 }}>
-            Group:
-          </label>
-          <select
-            value={groupBy}
-            onChange={(e) => onGroupByChange(e.target.value)}
-            style={selectStyle}
-          >
-            {GROUP_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Sort by */}
-        <div style={{ position: 'relative' }}>
-          <label style={{ fontSize: 12, color: 'var(--color-text-muted)', marginRight: 4 }}>
-            Sort:
-          </label>
-          <select
-            value={sortBy}
-            onChange={(e) => onSortByChange(e.target.value)}
-            style={selectStyle}
-          >
-            {SORT_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Density */}
-        <div style={{ position: 'relative' }}>
-          <label style={{ fontSize: 12, color: 'var(--color-text-muted)', marginRight: 4 }}>
-            Density:
-          </label>
-          <select
-            value={density}
-            onChange={(e) => updateApp({ taskDensity: e.target.value as TaskDensity })}
-            style={selectStyle}
-          >
-            {DENSITY_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Spacer */}
-        <div style={{ flex: 1 }} />
-
-        {/* New Task button */}
+      {/* Filter dropdown */}
+      <div style={{ position: 'relative' }} ref={filterRef}>
         <button
-          onClick={onNewTask}
+          onClick={() => setFilterOpen((o) => !o)}
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
+            gap: 5,
             fontSize: 13,
-            fontWeight: 600,
-            color: '#ffffff',
-            backgroundColor: 'var(--color-accent)',
-            border: 'none',
+            fontWeight: 500,
+            color: filtersActive ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+            backgroundColor: filtersActive ? 'var(--color-accent-soft)' : 'var(--color-bg-elevated)',
+            border: `1px solid ${filtersActive ? 'var(--color-accent)' : 'var(--color-border)'}`,
             borderRadius: 6,
-            padding: '6px 14px',
+            padding: '5px 10px',
             cursor: 'pointer',
-            transition: 'background-color 0.15s ease',
-            flexShrink: 0,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--color-accent)';
           }}
         >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <line x1="6" y1="1" x2="6" y2="11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            <line x1="1" y1="6" x2="11" y2="6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <path d="M1 2.5h11M3 6.5h7M5 10.5h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
           </svg>
-          New Task
+          Filter
+          {filtersActive && (
+            <span
+              style={{
+                minWidth: 16,
+                height: 16,
+                borderRadius: 8,
+                backgroundColor: 'var(--color-accent)',
+                color: '#fff',
+                fontSize: 10,
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '0 3px',
+              }}
+            >
+              {filterCount}
+            </span>
+          )}
         </button>
+
+        {/* Filter popover */}
+        {filterOpen && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 6px)',
+              left: 0,
+              zIndex: 50,
+              backgroundColor: 'var(--color-bg-elevated)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 8,
+              boxShadow: 'var(--shadow-md)',
+              padding: 12,
+              minWidth: 220,
+            }}
+          >
+            <div style={{ marginBottom: 10 }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  color: 'var(--color-text-muted)',
+                  marginBottom: 6,
+                }}
+              >
+                Status
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {STATUS_OPTIONS.map((opt) => {
+                  const checked = filters.status?.includes(opt.value) ?? false;
+                  return (
+                    <label
+                      key={opt.value}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        fontSize: 13,
+                        color: 'var(--color-text-secondary)',
+                        cursor: 'pointer',
+                        padding: '3px 4px',
+                        borderRadius: 4,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleStatusFilter(opt.value)}
+                        style={{ accentColor: 'var(--color-accent)' }}
+                      />
+                      {opt.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  color: 'var(--color-text-muted)',
+                  marginBottom: 6,
+                }}
+              >
+                Priority
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {PRIORITY_OPTIONS.map((opt) => {
+                  const checked = filters.priority?.includes(opt.value) ?? false;
+                  return (
+                    <label
+                      key={opt.value}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        fontSize: 13,
+                        color: 'var(--color-text-secondary)',
+                        cursor: 'pointer',
+                        padding: '3px 4px',
+                        borderRadius: 4,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => togglePriorityFilter(opt.value)}
+                        style={{ accentColor: 'var(--color-accent)' }}
+                      />
+                      {opt.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between' }}>
+              <button
+                onClick={() => {
+                  handleClearAll();
+                  setFilterOpen(false);
+                }}
+                style={{
+                  fontSize: 12,
+                  color: 'var(--color-text-muted)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '3px 6px',
+                  borderRadius: 4,
+                }}
+              >
+                Clear filters
+              </button>
+              <button
+                onClick={() => setFilterOpen(false)}
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: 'var(--color-accent)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '3px 6px',
+                  borderRadius: 4,
+                }}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Filter chips row */}
-      {filtersActive && (
-        <div style={{ padding: '0 16px 8px' }}>
-          <TaskFilterChips
-            filters={filters}
-            onRemoveFilter={handleRemoveFilter}
-            onClearAll={handleClearAll}
-          />
-        </div>
-      )}
+      {/* Group by */}
+      <div style={{ position: 'relative' }}>
+        <label style={{ fontSize: 12, color: 'var(--color-text-muted)', marginRight: 4 }}>
+          Group:
+        </label>
+        <select
+          value={groupBy}
+          onChange={(e) => onGroupByChange(e.target.value)}
+          style={selectStyle}
+        >
+          {GROUP_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Sort by */}
+      <div style={{ position: 'relative' }}>
+        <label style={{ fontSize: 12, color: 'var(--color-text-muted)', marginRight: 4 }}>
+          Sort:
+        </label>
+        <select
+          value={sortBy}
+          onChange={(e) => onSortByChange(e.target.value)}
+          style={selectStyle}
+        >
+          {SORT_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Density */}
+      <div style={{ position: 'relative' }}>
+        <label style={{ fontSize: 12, color: 'var(--color-text-muted)', marginRight: 4 }}>
+          Density:
+        </label>
+        <select
+          value={density}
+          onChange={(e) => updateApp({ taskDensity: e.target.value as TaskDensity })}
+          style={selectStyle}
+        >
+          {DENSITY_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
 
       {/* Click outside to close filter popover */}
       {filterOpen && (

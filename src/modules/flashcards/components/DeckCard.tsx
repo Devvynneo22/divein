@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { Play } from 'lucide-react';
-import { formatDistanceToNow, parseISO } from 'date-fns';
+import { Play, LayoutList } from 'lucide-react';
 import type { Deck, DeckStats } from '@/shared/types/flashcard';
 
 // 8 gradient presets keyed by base color
@@ -29,20 +28,14 @@ interface DeckCardProps {
 
 export function DeckCard({ deck, stats, onClick, onStudy }: DeckCardProps) {
   const [hovered, setHovered] = useState(false);
+  const [studyHovered, setStudyHovered] = useState(false);
+  const [cardsHovered, setCardsHovered] = useState(false);
   const gradient = getDeckGradient(deck.color);
 
   const totalCards = stats?.totalCards ?? 0;
-  const masteredCards = stats?.reviewCards ?? 0; // review-stage ≈ mastered
+  const masteredCards = stats?.reviewCards ?? 0;
   const dueToday = stats?.dueToday ?? 0;
-  const masteredPct = totalCards > 0 ? (masteredCards / totalCards) * 100 : 0;
-
-  const lastStudied = (() => {
-    try {
-      return formatDistanceToNow(parseISO(deck.updatedAt), { addSuffix: true });
-    } catch {
-      return 'Never';
-    }
-  })();
+  const masteredPct = totalCards > 0 ? Math.round((masteredCards / totalCards) * 100) : 0;
 
   return (
     <div
@@ -53,65 +46,106 @@ export function DeckCard({ deck, stats, onClick, onStudy }: DeckCardProps) {
       style={{
         backgroundColor: 'var(--color-bg-secondary)',
         border: `1px solid ${hovered ? 'var(--color-border-hover)' : 'var(--color-border)'}`,
-        boxShadow: hovered ? 'var(--shadow-md)' : 'var(--shadow-sm)',
-        transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
+        boxShadow: hovered ? 'var(--shadow-lg)' : 'var(--shadow-sm)',
+        transform: hovered ? 'translateY(-3px)' : 'translateY(0)',
         transition: 'box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease',
+        minHeight: '220px',
       }}
     >
-      {/* Gradient color stripe */}
-      <div className="h-1.5 w-full flex-shrink-0" style={{ background: gradient }} />
-
-      <div className="flex flex-col gap-3 p-5 flex-1">
-        {/* Title */}
+      {/* ── Gradient header with deck name ── */}
+      <div
+        className="relative flex-shrink-0 flex items-end px-4 pb-3"
+        style={{
+          height: '64px',
+          background: gradient,
+        }}
+      >
         <h3
-          className="font-semibold leading-snug line-clamp-2"
-          style={{ color: 'var(--color-text-primary)', fontSize: '18px' }}
+          className="font-bold leading-tight line-clamp-2 pr-2"
+          style={{
+            color: 'white',
+            fontSize: '15px',
+            textShadow: '0 1px 3px rgba(0,0,0,0.3)',
+          }}
         >
           {deck.name}
         </h3>
 
-        {/* Card count + Due badge */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-            {totalCards} {totalCards === 1 ? 'card' : 'cards'}
+        {/* Due today badge — top right */}
+        {dueToday > 0 && (
+          <div
+            className="absolute top-3 right-3 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold"
+            style={{
+              backgroundColor: 'rgba(255,255,255,0.95)',
+              color: 'var(--color-warning)',
+            }}
+          >
+            <span style={{ fontSize: '10px' }}>⚡</span>
+            {dueToday} due
+          </div>
+        )}
+      </div>
+
+      {/* ── Card body ── */}
+      <div className="flex flex-col gap-3 p-4 flex-1">
+        {/* Stats row */}
+        <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+          <span>{totalCards} {totalCards === 1 ? 'card' : 'cards'}</span>
+          <span style={{ opacity: 0.4 }}>·</span>
+          <span
+            style={{
+              color: dueToday > 0 ? 'var(--color-warning)' : 'var(--color-text-muted)',
+              fontWeight: dueToday > 0 ? 600 : 400,
+            }}
+          >
+            {dueToday} due
           </span>
-          {dueToday > 0 && (
-            <span
-              className="text-xs font-semibold px-2 py-0.5 rounded-full"
-              style={{
-                backgroundColor: 'var(--color-warning-soft)',
-                color: 'var(--color-warning)',
-                border: '1px solid rgba(207,142,23,0.3)',
-              }}
-            >
-              {dueToday} due
-            </span>
-          )}
-          {dueToday === 0 && totalCards > 0 && (
-            <span
-              className="text-xs px-2 py-0.5 rounded-full"
-              style={{
-                backgroundColor: 'var(--color-success-soft)',
-                color: 'var(--color-success)',
-              }}
-            >
-              ✓ Up to date
-            </span>
-          )}
+          <span style={{ opacity: 0.4 }}>·</span>
+          <span>{masteredPct}% mastered</span>
         </div>
 
-        {/* Last studied */}
-        <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-          Updated {lastStudied}
-        </p>
+        {/* Status badge */}
+        {dueToday > 0 ? (
+          <div
+            className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg"
+            style={{
+              backgroundColor: 'var(--color-warning-soft)',
+              color: 'var(--color-warning)',
+              border: '1px solid rgba(207,142,23,0.25)',
+            }}
+          >
+            <span>🔔</span>
+            <span>{dueToday} card{dueToday !== 1 ? 's' : ''} due today</span>
+          </div>
+        ) : totalCards > 0 ? (
+          <div
+            className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg"
+            style={{
+              backgroundColor: 'var(--color-success-soft)',
+              color: 'var(--color-success)',
+              border: '1px solid rgba(34,197,94,0.2)',
+            }}
+          >
+            <span>✓</span>
+            <span>All caught up</span>
+          </div>
+        ) : (
+          <div
+            className="text-xs px-2.5 py-1.5 rounded-lg"
+            style={{
+              backgroundColor: 'var(--color-bg-tertiary)',
+              color: 'var(--color-text-muted)',
+            }}
+          >
+            Empty deck — add some cards
+          </div>
+        )}
 
         {/* Progress bar */}
-        <div className="mt-auto pt-1">
-          <div className="flex justify-between text-xs mb-1.5" style={{ color: 'var(--color-text-muted)' }}>
-            <span>Mastered</span>
-            <span>
-              {masteredCards}/{totalCards}
-            </span>
+        <div className="mt-auto">
+          <div className="flex justify-between text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>
+            <span>Mastery</span>
+            <span>{masteredCards}/{totalCards}</span>
           </div>
           <div
             className="h-1.5 rounded-full overflow-hidden"
@@ -129,24 +163,47 @@ export function DeckCard({ deck, stats, onClick, onStudy }: DeckCardProps) {
         </div>
       </div>
 
-      {/* Study button — always in DOM, fades in on hover (no layout shift) */}
-      <div className="px-5 pb-5">
+      {/* ── Action buttons — always visible ── */}
+      <div
+        className="flex gap-2 px-4 pb-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Study button */}
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onStudy(e);
-          }}
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white"
+          onMouseEnter={() => setStudyHovered(true)}
+          onMouseLeave={() => setStudyHovered(false)}
+          onClick={onStudy}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-semibold text-white transition-all active:scale-95"
           style={{
             background: gradient,
-            opacity: hovered ? 1 : 0,
-            transform: hovered ? 'translateY(0)' : 'translateY(6px)',
-            pointerEvents: hovered ? 'auto' : 'none',
-            transition: 'opacity 0.2s ease, transform 0.2s ease',
+            boxShadow: studyHovered ? '0 4px 12px rgba(0,0,0,0.2)' : '0 1px 4px rgba(0,0,0,0.15)',
+            transform: studyHovered ? 'scale(1.02)' : 'scale(1)',
+            transition: 'box-shadow 0.2s ease, transform 0.15s ease',
           }}
         >
-          <Play size={13} fill="white" />
+          <Play size={12} fill="white" />
           Study
+        </button>
+
+        {/* Cards button */}
+        <button
+          onMouseEnter={() => setCardsHovered(true)}
+          onMouseLeave={() => setCardsHovered(false)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick();
+          }}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all active:scale-95"
+          style={{
+            backgroundColor: cardsHovered ? 'var(--color-bg-elevated)' : 'var(--color-bg-tertiary)',
+            color: cardsHovered ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+            border: '1px solid var(--color-border)',
+            transition: 'background-color 0.15s ease, color 0.15s ease',
+          }}
+          title="View cards"
+        >
+          <LayoutList size={12} />
+          Cards
         </button>
       </div>
     </div>

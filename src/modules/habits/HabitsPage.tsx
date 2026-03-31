@@ -8,14 +8,16 @@ import {
   useDeleteHabit,
   useHabitEntries,
 } from './hooks/useHabits';
+import { toast } from '@/shared/stores/toastStore';
 import { habitService } from '@/shared/lib/habitService';
 import { HabitItem } from './components/HabitItem';
 import { HabitForm } from './components/HabitForm';
 import { HabitStats } from './components/HabitStats';
 import type { Habit, CreateHabitInput, UpdateHabitInput, HabitWithStatus } from '@/shared/types/habit';
 import { useQuery } from '@tanstack/react-query';
+import { EmptyState } from '@/shared/components/EmptyState';
 
-// ─── Panel state ─────────────────────────────────────────────────────────────
+// ─── Panel state ──────────────────────────────────────────────────────────────
 
 type PanelMode = 'create' | 'edit' | 'stats';
 
@@ -24,13 +26,13 @@ interface PanelState {
   habit?: Habit;
 }
 
+// ─── Filter type ──────────────────────────────────────────────────────────────
+
+type FilterTab = 'all' | 'active' | 'completed';
+
 // ─── Stats loader ─────────────────────────────────────────────────────────────
 
-interface StatsLoaderProps {
-  habit: Habit;
-}
-
-function StatsLoader({ habit }: StatsLoaderProps) {
+function StatsLoader({ habit }: { habit: Habit }) {
   const { data: entries = [] } = useHabitEntries(habit.id);
 
   const { data: streak = 0 } = useQuery({
@@ -65,37 +67,243 @@ function StatsLoader({ habit }: StatsLoaderProps) {
   );
 }
 
-// ─── Overall progress bar ──────────────────────────────────────────────────────
+// ─── Completion ring ──────────────────────────────────────────────────────────
 
-function OverallProgress({ total, completed }: { total: number; completed: number }) {
-  const pct = total === 0 ? 0 : Math.round((completed / total) * 100);
-  const accentColor = pct === 100 ? 'var(--color-success)' : 'var(--color-accent)';
+function CompletionRing({ total, completed }: { total: number; completed: number }) {
+  const pct = total === 0 ? 0 : Math.min(completed / total, 1);
+  const r = 26;
+  const circ = 2 * Math.PI * r;
+  const offset = circ * (1 - pct);
+  const color = pct === 1 ? 'var(--color-success)' : 'var(--color-accent)';
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-          {completed} <span style={{ color: 'var(--color-text-muted)' }}>/ {total} completed</span>
-        </span>
-        <span
-          className="text-sm font-semibold"
-          style={{ color: accentColor }}
-        >
-          {pct === 100 ? '🎉 All done!' : `${pct}%`}
-        </span>
-      </div>
-      <div
-        className="h-2 rounded-full overflow-hidden"
-        style={{ backgroundColor: 'var(--color-bg-tertiary)' }}
-      >
-        <div
-          className="h-full rounded-full transition-all duration-500"
-          style={{
-            width: `${pct}%`,
-            backgroundColor: accentColor,
-          }}
+    <div className="flex flex-col items-center gap-1 flex-shrink-0">
+      <svg width={68} height={68} viewBox="0 0 68 68">
+        {/* Track */}
+        <circle
+          cx={34}
+          cy={34}
+          r={r}
+          fill="none"
+          stroke="var(--color-bg-tertiary)"
+          strokeWidth={7}
         />
+        {/* Progress arc */}
+        <circle
+          cx={34}
+          cy={34}
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth={7}
+          strokeDasharray={circ}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          transform="rotate(-90 34 34)"
+          style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+        />
+        <text
+          x={34}
+          y={34}
+          textAnchor="middle"
+          dy="0.35em"
+          style={{ fontSize: 14, fontWeight: 700, fill: color }}
+        >
+          {Math.round(pct * 100)}%
+        </text>
+      </svg>
+      <span className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>
+        {completed}/{total}
+      </span>
+    </div>
+  );
+}
+
+// ─── Top progress bar ─────────────────────────────────────────────────────────
+
+function TopProgressBar({ total, completed }: { total: number; completed: number }) {
+  const pct = total === 0 ? 0 : Math.round((completed / total) * 100);
+  const color = pct === 100 ? 'var(--color-success)' : 'var(--color-accent)';
+
+  return (
+    <div
+      className="flex-shrink-0"
+      style={{ borderBottom: '1px solid var(--color-border)' }}
+    >
+      {/* Date row */}
+      <div
+        className="flex items-center justify-between px-8 pt-4 pb-2"
+      >
+        <div>
+          <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
+            Today
+          </span>
+          <p className="text-sm font-medium mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+            {format(new Date(), 'EEEE, MMMM d')}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {total > 0 && (
+            <span className="text-sm font-semibold" style={{ color }}>
+              {pct === 100 ? '🎉 All done!' : `${completed}/${total} done`}
+            </span>
+          )}
+        </div>
       </div>
+      {/* Progress bar */}
+      {total > 0 && (
+        <div
+          className="h-1"
+          style={{ backgroundColor: 'var(--color-bg-tertiary)' }}
+        >
+          <div
+            className="h-full"
+            style={{
+              width: `${pct}%`,
+              backgroundColor: color,
+              transition: 'width 0.5s ease',
+              borderRadius: '0 2px 2px 0',
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Streak leaderboard ───────────────────────────────────────────────────────
+
+const MEDALS = ['🥇', '🥈', '🥉'];
+
+function StreakLeaderboard({ habits }: { habits: HabitWithStatus[] }) {
+  const top3 = useMemo(
+    () =>
+      [...habits]
+        .filter((h) => h.streak > 0)
+        .sort((a, b) => b.streak - a.streak)
+        .slice(0, 3),
+    [habits],
+  );
+
+  if (top3.length === 0) return null;
+
+  return (
+    <div
+      className="flex items-center gap-3 px-4 py-3 rounded-2xl flex-shrink-0"
+      style={{
+        backgroundColor: 'var(--color-bg-elevated)',
+        border: '1px solid var(--color-border)',
+      }}
+    >
+      <span className="text-xs font-bold uppercase tracking-wide flex-shrink-0" style={{ color: 'var(--color-text-muted)' }}>
+        🔥 Streaks
+      </span>
+      <div className="flex items-center gap-3 overflow-hidden">
+        {top3.map((h, i) => (
+          <div key={h.id} className="flex items-center gap-1.5 flex-shrink-0">
+            <span style={{ fontSize: 14 }}>{MEDALS[i]}</span>
+            <span className="text-xs truncate max-w-[5rem]" style={{ color: 'var(--color-text-secondary)' }}>
+              {h.icon ? `${h.icon} ` : ''}{h.name}
+            </span>
+            <span
+              className="text-xs font-bold"
+              style={{ color: h.color ?? 'var(--color-accent)' }}
+            >
+              {h.streak}d
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Filter tabs ──────────────────────────────────────────────────────────────
+
+const FILTER_TABS: { key: FilterTab; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'active', label: 'Active' },
+  { key: 'completed', label: 'Completed Today' },
+];
+
+function FilterTabs({
+  active,
+  onChange,
+  counts,
+}: {
+  active: FilterTab;
+  onChange: (f: FilterTab) => void;
+  counts: Record<FilterTab, number>;
+}) {
+  return (
+    <div className="flex items-center gap-0 flex-shrink-0" style={{ borderBottom: '2px solid var(--color-border)' }}>
+      {FILTER_TABS.map((tab) => {
+        const isActive = active === tab.key;
+        return (
+          <button
+            key={tab.key}
+            onClick={() => onChange(tab.key)}
+            className="relative px-4 py-2.5 text-sm font-medium transition-colors flex-shrink-0"
+            style={{
+              color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              if (!isActive) e.currentTarget.style.color = 'var(--color-text-secondary)';
+            }}
+            onMouseLeave={(e) => {
+              if (!isActive) e.currentTarget.style.color = 'var(--color-text-muted)';
+            }}
+          >
+            {tab.label}
+            {counts[tab.key] > 0 && (
+              <span
+                className="ml-1.5 px-1.5 py-0.5 rounded-full text-xs"
+                style={{
+                  backgroundColor: isActive ? 'var(--color-accent-soft)' : 'var(--color-bg-tertiary)',
+                  color: isActive ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                  fontSize: 10,
+                }}
+              >
+                {counts[tab.key]}
+              </span>
+            )}
+            {/* Underline indicator */}
+            {isActive && (
+              <span
+                className="absolute bottom-0 left-0 right-0 h-0.5 rounded-t-sm"
+                style={{
+                  backgroundColor: 'var(--color-accent)',
+                  marginBottom: -2,
+                }}
+              />
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Group section header ─────────────────────────────────────────────────────
+
+function GroupHeader({ name }: { name: string }) {
+  return (
+    <div className="flex items-center gap-3 mt-2 mb-1">
+      <span
+        className="text-xs font-bold uppercase tracking-widest px-2 py-0.5 rounded-md flex-shrink-0"
+        style={{
+          color: 'var(--color-text-muted)',
+          backgroundColor: 'var(--color-bg-tertiary)',
+          border: '1px solid var(--color-border)',
+          fontSize: 10,
+        }}
+      >
+        {name}
+      </span>
+      <div className="flex-1 h-px" style={{ backgroundColor: 'var(--color-border)' }} />
     </div>
   );
 }
@@ -105,13 +313,12 @@ function OverallProgress({ total, completed }: { total: number; completed: numbe
 export function HabitsPage() {
   const [selectedHabitId, setSelectedHabitId] = useState<string | null>(null);
   const [panel, setPanel] = useState<PanelState | null>(null);
+  const [filter, setFilter] = useState<FilterTab>('all');
 
   const { data: habitsWithStatus = [], isLoading } = useTodayStatus();
   const createHabit = useCreateHabit();
   const updateHabit = useUpdateHabit();
   const deleteHabit = useDeleteHabit();
-
-  const todayLabel = format(new Date(), 'EEEE, MMMM d');
 
   const existingGroups = useMemo(
     () =>
@@ -125,13 +332,36 @@ export function HabitsPage() {
     [habitsWithStatus],
   );
 
-  // Sort: incomplete first, completed to bottom
-  const sortedHabits = useMemo(() => {
-    return [...habitsWithStatus].sort((a, b) => {
-      if (a.isCompletedToday === b.isCompletedToday) return 0;
-      return a.isCompletedToday ? 1 : -1;
-    });
-  }, [habitsWithStatus]);
+  const completedCount = useMemo(
+    () => habitsWithStatus.filter((h) => h.isCompletedToday).length,
+    [habitsWithStatus],
+  );
+
+  // Filter habits
+  const filteredHabits = useMemo(() => {
+    if (filter === 'active') return habitsWithStatus.filter((h) => !h.isCompletedToday);
+    if (filter === 'completed') return habitsWithStatus.filter((h) => h.isCompletedToday);
+    return habitsWithStatus;
+  }, [habitsWithStatus, filter]);
+
+  const filterCounts = useMemo(
+    () => ({
+      all: habitsWithStatus.length,
+      active: habitsWithStatus.filter((h) => !h.isCompletedToday).length,
+      completed: completedCount,
+    }),
+    [habitsWithStatus, completedCount],
+  );
+
+  // Sort within filtered: incomplete first
+  const sortedHabits = useMemo(
+    () =>
+      [...filteredHabits].sort((a, b) => {
+        if (a.isCompletedToday === b.isCompletedToday) return 0;
+        return a.isCompletedToday ? 1 : -1;
+      }),
+    [filteredHabits],
+  );
 
   // Group sorted habits by groupName
   const grouped = useMemo(() => {
@@ -145,12 +375,13 @@ export function HabitsPage() {
     return map;
   }, [sortedHabits]);
 
-  const groupKeys = useMemo(() => Array.from(grouped.keys()), [grouped]);
-
-  const completedCount = useMemo(
-    () => habitsWithStatus.filter((h) => h.isCompletedToday).length,
-    [habitsWithStatus],
-  );
+  // Sort group keys: named groups first (alphabetically), then ungrouped ('') last
+  const groupKeys = useMemo(() => {
+    const keys = Array.from(grouped.keys());
+    const named = keys.filter((k) => k !== '').sort();
+    const hasUngrouped = keys.includes('');
+    return hasUngrouped ? [...named, ''] : named;
+  }, [grouped]);
 
   const handleSelect = useCallback(
     (id: string) => {
@@ -182,7 +413,9 @@ export function HabitsPage() {
         }
         return prev;
       });
-      deleteHabit.mutate(id);
+      deleteHabit.mutate(id, {
+        onSuccess: () => toast.success('Habit deleted'),
+      });
     },
     [deleteHabit],
   );
@@ -196,7 +429,10 @@ export function HabitsPage() {
         );
       } else {
         createHabit.mutate(data as CreateHabitInput, {
-          onSuccess: () => setPanel(null),
+          onSuccess: () => {
+            setPanel(null);
+            toast.success('Habit created');
+          },
         });
       }
     },
@@ -211,99 +447,109 @@ export function HabitsPage() {
 
   return (
     <div className="flex h-full" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
-      {/* Main list */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
+      {/* ── Main content ── */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Top date + progress bar */}
+        <TopProgressBar total={habitsWithStatus.length} completed={completedCount} />
+
+        {/* Header row */}
         <div
-          className="px-8 py-6 flex-shrink-0"
+          className="flex items-center justify-between px-8 py-5 flex-shrink-0"
           style={{ borderBottom: '1px solid var(--color-border)' }}
         >
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
-                Today's Habits
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-extrabold" style={{ color: 'var(--color-text-primary)' }}>
+                Habits
               </h1>
-              <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                {todayLabel}
-              </p>
             </div>
-            <button
-              onClick={openCreate}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-colors flex-shrink-0"
-              style={{ backgroundColor: 'var(--color-accent)' }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent)'; }}
-            >
-              <Plus size={16} />
-              New Habit
-            </button>
+            {/* Completion ring */}
+            {habitsWithStatus.length > 0 && (
+              <CompletionRing total={habitsWithStatus.length} completed={completedCount} />
+            )}
           </div>
 
-          {/* Overall progress bar */}
-          {habitsWithStatus.length > 0 && (
-            <OverallProgress total={habitsWithStatus.length} completed={completedCount} />
-          )}
+          {/* New Habit button — accent gradient */}
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-150 flex-shrink-0"
+            style={{
+              background: 'linear-gradient(135deg, var(--color-accent) 0%, #7c3aed 100%)',
+              boxShadow: '0 2px 12px rgba(59,130,246,0.35)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '0.9';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+              e.currentTarget.style.boxShadow = '0 4px 18px rgba(59,130,246,0.45)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '1';
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 2px 12px rgba(59,130,246,0.35)';
+            }}
+          >
+            <Plus size={16} strokeWidth={2.5} />
+            New Habit
+          </button>
         </div>
 
-        {/* List */}
-        <div className="flex-1 overflow-y-auto px-8 py-6">
+        {/* Streak leaderboard */}
+        {habitsWithStatus.length > 0 && (
+          <div className="px-8 pt-4 flex-shrink-0">
+            <StreakLeaderboard habits={habitsWithStatus} />
+          </div>
+        )}
+
+        {/* Filter tabs */}
+        {habitsWithStatus.length > 0 && (
+          <div className="px-8 pt-3 flex-shrink-0">
+            <FilterTabs active={filter} onChange={setFilter} counts={filterCounts} />
+          </div>
+        )}
+
+        {/* ── Habit list ── */}
+        <div className="flex-1 overflow-y-auto px-8 py-5">
           {isLoading ? (
-            <div className="text-center py-12 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-              Loading...
+            <div className="flex flex-col gap-3">
+              {[...Array(4)].map((_, i) => (
+                <div
+                  key={i}
+                  className="rounded-2xl h-[76px] animate-pulse"
+                  style={{ backgroundColor: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)' }}
+                />
+              ))}
             </div>
           ) : habitsWithStatus.length === 0 ? (
             /* Empty state */
-            <div className="flex flex-col items-center justify-center py-20 gap-5 text-center">
-              <div className="text-6xl">🌱</div>
-              <div>
-                <p className="text-xl font-semibold mb-1" style={{ color: 'var(--color-text-primary)' }}>
-                  Build your first habit
-                </p>
-                <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                  Small, consistent actions compound into big results.
-                  <br />Start with something you can do every day.
-                </p>
-              </div>
-              <button
-                onClick={openCreate}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white transition-all"
-                style={{ backgroundColor: 'var(--color-accent)', boxShadow: 'var(--shadow-md)' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)';
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                  e.currentTarget.style.boxShadow = 'var(--shadow-lg)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--color-accent)';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = 'var(--shadow-md)';
-                }}
-              >
-                <Plus size={18} />
-                Add your first habit
-              </button>
+            <EmptyState
+              icon="🎯"
+              title="Build better habits"
+              description="Track daily habits and watch your streaks grow"
+              actionLabel="Create Habit"
+              onAction={openCreate}
+            />
+          ) : sortedHabits.length === 0 ? (
+            /* Empty filter state */
+            <div className="flex flex-col items-center py-16 gap-3">
+              <span style={{ fontSize: 40 }}>
+                {filter === 'completed' ? '⏳' : '✅'}
+              </span>
+              <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                {filter === 'completed'
+                  ? 'No habits completed today yet.'
+                  : 'All habits completed today! 🎉'}
+              </p>
             </div>
           ) : (
-            <div className="flex flex-col gap-6">
-              {/* Ungrouped or grouped habits */}
+            <div className="flex flex-col gap-2">
               {groupKeys.map((groupKey) => {
                 const groupHabits = grouped.get(groupKey) ?? [];
                 return (
-                  <div key={groupKey}>
+                  <div key={groupKey ?? '__ungrouped__'} className="flex flex-col">
                     {/* Group header */}
-                    {groupKey && (
-                      <div className="flex items-center gap-3 mb-3">
-                        <span
-                          className="text-xs font-semibold uppercase tracking-wider"
-                          style={{ color: 'var(--color-text-muted)' }}
-                        >
-                          {groupKey}
-                        </span>
-                        <div className="flex-1 h-px" style={{ backgroundColor: 'var(--color-border)' }} />
-                      </div>
-                    )}
+                    <GroupHeader name={groupKey !== '' ? groupKey : 'Other'} />
 
-                    <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-2 mt-1">
                       {groupHabits.map((habit) => (
                         <HabitItem
                           key={habit.id}
@@ -318,91 +564,82 @@ export function HabitsPage() {
                   </div>
                 );
               })}
-
-              {/* Completed section divider (when some habits are done) */}
-              {completedCount > 0 && completedCount < habitsWithStatus.length && (
-                <div className="flex items-center gap-3 mt-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
-                    ✓ Completed today
-                  </span>
-                  <div className="flex-1 h-px" style={{ backgroundColor: 'var(--color-border)' }} />
-                </div>
-              )}
             </div>
           )}
         </div>
       </div>
 
-      {/* Side panel */}
+      {/* ── Side panel ── */}
       {panel && (
         <div
           className="flex flex-col h-full overflow-y-auto flex-shrink-0"
           style={{
-            width: '22rem',
+            width: '23rem',
             borderLeft: '1px solid var(--color-border)',
             backgroundColor: 'var(--color-bg-elevated)',
             boxShadow: 'var(--shadow-popup)',
           }}
         >
-          <div className="p-6">
-            {panel.mode === 'stats' && panel.habit ? (
-              <>
-                {/* Stats panel header */}
-                <div className="flex items-center justify-between mb-5">
-                  <div className="flex items-center gap-3">
-                    {panel.habit.icon ? (
-                      <span
-                        className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-                        style={{ backgroundColor: `${panel.habit.color ?? 'var(--color-accent)'}22` }}
-                      >
-                        {panel.habit.icon}
-                      </span>
-                    ) : (
-                      <div
-                        className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{ backgroundColor: `${panel.habit.color ?? 'var(--color-accent)'}22` }}
-                      >
-                        <BarChart2 size={18} style={{ color: panel.habit.color ?? 'var(--color-accent)' }} />
-                      </div>
-                    )}
-                    <div>
-                      <h2 className="text-base font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-                        {panel.habit.name}
-                      </h2>
-                      {panel.habit.groupName && (
-                        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                          {panel.habit.groupName}
-                        </p>
-                      )}
+          {panel.mode === 'stats' && panel.habit ? (
+            <>
+              {/* Stats panel header */}
+              <div
+                className="flex items-center justify-between px-6 pt-5 pb-4 flex-shrink-0 sticky top-0 z-10"
+                style={{
+                  backgroundColor: 'var(--color-bg-elevated)',
+                  borderBottom: '1px solid var(--color-border)',
+                }}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  {panel.habit.icon ? (
+                    <span
+                      className="w-9 h-9 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+                      style={{ backgroundColor: `${panel.habit.color ?? 'var(--color-accent)'}22` }}
+                    >
+                      {panel.habit.icon}
+                    </span>
+                  ) : (
+                    <div
+                      className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: `${panel.habit.color ?? 'var(--color-accent)'}22` }}
+                    >
+                      <BarChart2 size={16} style={{ color: panel.habit.color ?? 'var(--color-accent)' }} />
                     </div>
-                  </div>
-                  <button
-                    onClick={closePanel}
-                    className="p-1.5 rounded-md transition-colors flex-shrink-0"
-                    style={{ color: 'var(--color-text-muted)' }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
-                      e.currentTarget.style.color = 'var(--color-text-primary)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = 'var(--color-text-muted)';
-                    }}
-                  >
-                    <X size={16} />
-                  </button>
+                  )}
+                  <h2 className="text-sm font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>
+                    {panel.habit.name}
+                  </h2>
                 </div>
+                <button
+                  onClick={closePanel}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-150 flex-shrink-0"
+                  style={{ color: 'var(--color-text-muted)' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+                    e.currentTarget.style.color = 'var(--color-text-primary)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = 'var(--color-text-muted)';
+                  }}
+                >
+                  <X size={15} />
+                </button>
+              </div>
+              <div className="p-6">
                 <StatsLoader habit={panel.habit} />
-              </>
-            ) : (
+              </div>
+            </>
+          ) : (
+            <div className="p-6">
               <HabitForm
                 habit={panel.mode === 'edit' ? panel.habit : undefined}
                 existingGroups={existingGroups}
                 onSave={handleSave}
                 onCancel={closePanel}
               />
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>

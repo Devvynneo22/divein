@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Plus, ChevronDown, Check } from 'lucide-react';
+import { X, Plus, ChevronDown, Check, Calendar } from 'lucide-react';
+import * as chrono from 'chrono-node';
+import { format, parseISO, addDays } from 'date-fns';
 import type { TaskStatus, TaskPriority, CreateTaskInput } from '@/shared/types/task';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -33,6 +35,253 @@ function sanitizeTag(tag: string): string {
   // Reject bare hex color strings (3, 4, 6, or 8 hex digits, with or without #)
   if (/^#?[0-9a-fA-F]{3,8}$/.test(trimmed)) return '';
   return trimmed;
+}
+
+// ─── NaturalDateInput ─────────────────────────────────────────────────────────
+
+export interface NaturalDateInputProps {
+  value: string | null; // ISO date string YYYY-MM-DD
+  onChange: (date: string | null) => void;
+  placeholder?: string;
+}
+
+export function NaturalDateInput({
+  value,
+  onChange,
+  placeholder = 'e.g. tomorrow, next friday, Mar 5',
+}: NaturalDateInputProps) {
+  const [inputText, setInputText] = useState('');
+  // Ref mirrors inputText to avoid stale-closure bugs in commit/setQuick
+  const inputTextRef = useRef('');
+  const [isFocused, setIsFocused] = useState(false);
+  const [parsedPreview, setParsedPreview] = useState<Date | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const calendarInputRef = useRef<HTMLInputElement>(null);
+
+  // Live-parse as user types (drives preview badge only)
+  useEffect(() => {
+    const trimmed = inputText.trim();
+    if (!trimmed) { setParsedPreview(null); return; }
+    setParsedPreview(chrono.parseDate(trimmed, new Date()) ?? null);
+  }, [inputText]);
+
+  // Commit on Enter / blur — always reads from ref to avoid stale closures
+  const commit = useCallback(() => {
+    const trimmed = inputTextRef.current.trim();
+    if (trimmed) {
+      const parsed = chrono.parseDate(trimmed, new Date());
+      if (parsed) {
+        onChange(format(parsed, 'yyyy-MM-dd'));
+      } else if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+        onChange(trimmed);
+      } else {
+        onChange(null); // clear on unrecognized input
+      }
+    }
+    // Always reset working state
+    inputTextRef.current = '';
+    setInputText('');
+    setParsedPreview(null);
+  }, [onChange]);
+
+  // Quick chip helper — clears the input then commits the supplied ISO date
+  const setQuick = useCallback((iso: string | null) => {
+    inputTextRef.current = '';
+    setInputText('');
+    setParsedPreview(null);
+    onChange(iso);
+    // Blur so onBlur fires (commit is a no-op since ref is empty) and isFocused resets
+    inputRef.current?.blur();
+  }, [onChange]);
+
+  const formatDisplayDate = (iso: string): string => {
+    try { return format(parseISO(iso), 'EEE, MMM d'); }
+    catch { return iso; }
+  };
+
+  const displayValue = isFocused ? inputText : (value ? formatDisplayDate(value) : '');
+
+  const todayISO    = format(new Date(), 'yyyy-MM-dd');
+  const tomorrowISO = format(addDays(new Date(), 1), 'yyyy-MM-dd');
+  const nextWeekISO = format(addDays(new Date(), 7), 'yyyy-MM-dd');
+
+  const CHIP_STYLE: React.CSSProperties = {
+    fontSize: 11,
+    padding: '3px 9px',
+    borderRadius: 999,
+    border: '1px solid var(--color-border)',
+    backgroundColor: 'var(--color-bg-tertiary)',
+    color: 'var(--color-text-secondary)',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    transition: 'all 0.15s',
+  };
+
+  return (
+    <div style={{ width: '100%' }}>
+      {/* ── Input row ─────────────────────────────────────────────────────── */}
+      <div style={{ position: 'relative' }}>
+        <input
+          ref={inputRef}
+          type="text"
+          value={displayValue}
+          placeholder={placeholder}
+          onChange={(e) => {
+            setInputText(e.target.value);
+            inputTextRef.current = e.target.value;
+          }}
+          onFocus={() => {
+            setIsFocused(true);
+            setInputText('');
+            inputTextRef.current = '';
+          }}
+          onBlur={() => {
+            commit();
+            setIsFocused(false);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              commit();
+              inputRef.current?.blur();
+            }
+            if (e.key === 'Escape') {
+              inputTextRef.current = '';
+              setInputText('');
+              setParsedPreview(null);
+              inputRef.current?.blur();
+            }
+          }}
+          style={{
+            width: '100%',
+            padding: '7px 32px 7px 10px',
+            borderRadius: 8,
+            border: `1px solid ${isFocused ? 'var(--color-accent)' : 'var(--color-border)'}`,
+            backgroundColor: 'var(--color-bg-tertiary)',
+            color: 'var(--color-text-primary)',
+            fontSize: 13,
+            outline: 'none',
+            fontFamily: 'inherit',
+            boxSizing: 'border-box',
+            transition: 'border-color 0.15s',
+          }}
+        />
+
+        {/* Calendar icon fallback */}
+        <button
+          type="button"
+          tabIndex={-1}
+          // Prevent blur on the text input when clicking this button
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            const el = calendarInputRef.current;
+            if (!el) return;
+            const elAny = el as HTMLInputElement & { showPicker?: () => void };
+            if (typeof elAny.showPicker === 'function') { elAny.showPicker(); } else { el.click(); }
+          }}
+          title="Open date picker"
+          style={{
+            position: 'absolute',
+            right: 6,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 22,
+            height: 22,
+            borderRadius: 5,
+            border: 'none',
+            backgroundColor: 'transparent',
+            cursor: 'pointer',
+            color: 'var(--color-text-muted)',
+            padding: 0,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'; e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+        >
+          <Calendar size={13} />
+        </button>
+
+        {/* Hidden native date input (fallback) */}
+        <input
+          ref={calendarInputRef}
+          type="date"
+          value={value ?? ''}
+          onChange={(e) => onChange(e.target.value || null)}
+          style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0 }}
+          tabIndex={-1}
+        />
+      </div>
+
+      {/* ── Live preview / error hint ──────────────────────────────────────── */}
+      {isFocused && inputText.trim() && (
+        <div style={{ marginTop: 4 }}>
+          {parsedPreview ? (
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '2px 8px',
+              borderRadius: 999,
+              fontSize: 12,
+              fontWeight: 500,
+              backgroundColor: 'var(--color-success-soft, rgba(34,197,94,0.1))',
+              color: 'var(--color-success, #22c55e)',
+              border: '1px solid rgba(34,197,94,0.2)',
+            }}>
+              ✓ {format(parsedPreview, 'EEEE, MMM d')}
+            </span>
+          ) : (
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '2px 8px',
+              borderRadius: 999,
+              fontSize: 12,
+              color: 'var(--color-danger, #ef4444)',
+              opacity: 0.8,
+            }}>
+              Unrecognized date
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* ── Quick chips (shown while focused) ─────────────────────────────── */}
+      {isFocused && (
+        <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
+          {([
+            { label: 'Today',     iso: todayISO },
+            { label: 'Tomorrow',  iso: tomorrowISO },
+            { label: 'Next week', iso: nextWeekISO },
+          ] as const).map(({ label, iso }) => (
+            <button
+              key={label}
+              type="button"
+              // onMouseDown + preventDefault keeps focus on text input until we manually blur
+              onMouseDown={(e) => { e.preventDefault(); setQuick(iso); }}
+              style={CHIP_STYLE}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-hover)'; e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-text-secondary)'; }}
+            >
+              {label}
+            </button>
+          ))}
+          <button
+            type="button"
+            onMouseDown={(e) => { e.preventDefault(); setQuick(null); }}
+            style={{ ...CHIP_STYLE, backgroundColor: 'transparent', color: 'var(--color-text-muted)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+          >
+            Clear
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Inline dropdown ──────────────────────────────────────────────────────────
@@ -190,7 +439,7 @@ export function TaskCreateModal({ isOpen, onClose, onCreate, defaultStatus }: Ta
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState<TaskStatus>(defaultStatus ?? 'inbox');
   const [priority, setPriority] = useState<TaskPriority>(0);
-  const [dueDate, setDueDate] = useState('');
+  const [dueDate, setDueDate] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [estimatedMin, setEstimatedMin] = useState('');
@@ -206,7 +455,7 @@ export function TaskCreateModal({ isOpen, onClose, onCreate, defaultStatus }: Ta
       setTitle('');
       setStatus(defaultStatus ?? 'inbox');
       setPriority(0);
-      setDueDate('');
+      setDueDate(null);
       setTags([]);
       setTagInput('');
       setEstimatedMin('');
@@ -358,7 +607,7 @@ export function TaskCreateModal({ isOpen, onClose, onCreate, defaultStatus }: Ta
           />
 
           {/* Two-column grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, alignItems: 'start' }}>
             <FieldDropdown
               label="Status"
               value={status}
@@ -372,29 +621,14 @@ export function TaskCreateModal({ isOpen, onClose, onCreate, defaultStatus }: Ta
               onChange={setPriority}
             />
 
-            {/* Due date */}
+            {/* Due date — natural language input */}
             <div>
               <label style={{ display: 'block', fontSize: 11, fontWeight: 500, color: 'var(--color-text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Due Date
               </label>
-              <input
-                type="date"
+              <NaturalDateInput
                 value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '7px 10px',
-                  borderRadius: 8,
-                  border: '1px solid var(--color-border)',
-                  backgroundColor: 'var(--color-bg-tertiary)',
-                  color: dueDate ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                  fontSize: 13,
-                  outline: 'none',
-                  fontFamily: 'inherit',
-                  boxSizing: 'border-box',
-                }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent)'; }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
+                onChange={setDueDate}
               />
             </div>
 

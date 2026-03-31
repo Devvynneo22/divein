@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { Task, TaskStatus } from '@/shared/types/task';
 import { TaskListRow } from './TaskListRow';
 import type { TaskGroup } from './taskViewUtils';
+import { SkeletonRow } from '@/shared/components/Skeleton';
 
 interface TaskListProps {
   tasks: Task[];
@@ -10,10 +11,14 @@ interface TaskListProps {
   selectedTaskIds?: string[];
   onSelectTask: (id: string) => void;
   onToggleSelect?: (id: string, e: React.MouseEvent) => void;
+  /** Direct toggle from checkbox (no event needed) */
+  onToggleSelectById?: (id: string) => void;
   onHoverTask?: (id: string | null) => void;
   onStatusChange: (id: string, status: TaskStatus) => void;
   onDelete: (id: string) => void;
   blockedTaskIds?: Set<string>;
+  /** When true, renders skeleton rows instead of data rows */
+  isLoading?: boolean;
 }
 
 type SortKey = 'title' | 'priority' | 'dueDate' | 'status' | 'createdAt';
@@ -33,20 +38,59 @@ export function TaskList({
   selectedTaskIds = [],
   onSelectTask,
   onToggleSelect,
+  onToggleSelectById,
   onHoverTask,
   onStatusChange,
   onDelete,
   blockedTaskIds,
+  isLoading = false,
 }: TaskListProps) {
   const [sortKey] = useState<SortKey>('createdAt');
   const [sortDir] = useState<SortDir>('desc');
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
+  const lastSelectedIndexRef = useRef<number>(-1);
 
   const sorted = tasks;
 
   const handleHeaderClick = (_key: SortKey) => {
     // Sorting is controlled by the parent toolbar now.
   };
+
+  // Build a flat list of all visible tasks for range-select purposes
+  const flatTasks: Task[] = groupedTasks && groupedTasks.length > 1
+    ? groupedTasks.flatMap((g) => g.tasks)
+    : sorted;
+
+  /**
+   * Handle a checkbox click with optional shift-range support.
+   * When shift is held, toggles the range from lastSelectedIndex to the clicked index.
+   */
+  const handleToggleSelectWithRange = useCallback(
+    (taskId: string, shiftKey: boolean) => {
+      const clickedIndex = flatTasks.findIndex((t) => t.id === taskId);
+      if (clickedIndex === -1) {
+        onToggleSelectById?.(taskId);
+        return;
+      }
+
+      if (shiftKey && lastSelectedIndexRef.current >= 0) {
+        const start = Math.min(lastSelectedIndexRef.current, clickedIndex);
+        const end = Math.max(lastSelectedIndexRef.current, clickedIndex);
+        const rangeIds = flatTasks.slice(start, end + 1).map((t) => t.id);
+        // Add all tasks in range that aren't already selected
+        rangeIds.forEach((id) => {
+          if (!selectedTaskIds.includes(id)) {
+            onToggleSelectById?.(id);
+          }
+        });
+        // Don't update lastSelectedIndexRef on range-extend — anchor stays
+      } else {
+        onToggleSelectById?.(taskId);
+        lastSelectedIndexRef.current = clickedIndex;
+      }
+    },
+    [flatTasks, onToggleSelectById, selectedTaskIds],
+  );
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -87,6 +131,33 @@ export function TaskList({
     );
   };
 
+  function renderRow(task: Task, idx: number) {
+    return (
+      <TaskListRow
+        key={task.id}
+        task={task}
+        isSelected={task.id === selectedTaskId || idx === focusedIndex}
+        isMultiSelected={selectedTaskIds.includes(task.id)}
+        isBlocked={blockedTaskIds?.has(task.id) ?? false}
+        onSelect={(e) => {
+          if (onToggleSelect && (e.shiftKey || e.metaKey || e.ctrlKey)) {
+            onToggleSelect(task.id, e);
+          } else {
+            setFocusedIndex(idx);
+            onSelectTask(task.id);
+          }
+        }}
+        onToggleSelect={(id, shiftKey) => {
+          handleToggleSelectWithRange(id, shiftKey ?? false);
+        }}
+        onMouseEnter={() => onHoverTask?.(task.id)}
+        onMouseLeave={() => onHoverTask?.(null)}
+        onStatusChange={(status) => onStatusChange(task.id, status)}
+        onDelete={() => onDelete(task.id)}
+      />
+    );
+  }
+
   return (
     <div
       role="grid"
@@ -111,12 +182,14 @@ export function TaskList({
           gap: 8,
         }}
       >
-        {/* Status header — fixed width to match row */}
+        {/* Checkbox column spacer */}
+        <div style={{ width: 16, flexShrink: 0 }} />
+        {/* Status icon spacer */}
         <div style={{ width: 18, flexShrink: 0 }} />
         <div style={{ width: 12, flexShrink: 0 }} />
 
         {COLUMNS.map((col) => {
-          if (col.key === 'status') return null; // status is the icon area above
+          if (col.key === 'status') return null;
           const isTitle = col.key === 'title';
           return (
             <button
@@ -151,7 +224,13 @@ export function TaskList({
       </div>
 
       {/* Rows */}
-      {sorted.length === 0 ? (
+      {isLoading ? (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {Array.from({ length: 8 }, (_, i) => (
+            <SkeletonRow key={i} />
+          ))}
+        </div>
+      ) : sorted.length === 0 ? (
         <div
           style={{
             display: 'flex',
@@ -182,53 +261,13 @@ export function TaskList({
               {group.label} · {group.tasks.length}
             </div>
             {group.tasks.map((task) => {
-              const idx = sorted.findIndex((t) => t.id === task.id);
-              return (
-                <TaskListRow
-                  key={task.id}
-                  task={task}
-                  isSelected={task.id === selectedTaskId || idx === focusedIndex}
-                  isMultiSelected={selectedTaskIds.includes(task.id)}
-                  isBlocked={blockedTaskIds?.has(task.id) ?? false}
-                  onSelect={(e) => {
-                    if (onToggleSelect && (e.shiftKey || e.metaKey || e.ctrlKey)) {
-                      onToggleSelect(task.id, e);
-                    } else {
-                      setFocusedIndex(idx);
-                      onSelectTask(task.id);
-                    }
-                  }}
-                  onMouseEnter={() => onHoverTask?.(task.id)}
-                  onMouseLeave={() => onHoverTask?.(null)}
-                  onStatusChange={(status) => onStatusChange(task.id, status)}
-                  onDelete={() => onDelete(task.id)}
-                />
-              );
+              const idx = flatTasks.findIndex((t) => t.id === task.id);
+              return renderRow(task, idx);
             })}
           </div>
         ))
       ) : (
-        sorted.map((task, idx) => (
-          <TaskListRow
-            key={task.id}
-            task={task}
-            isSelected={task.id === selectedTaskId || idx === focusedIndex}
-            isMultiSelected={selectedTaskIds.includes(task.id)}
-            isBlocked={blockedTaskIds?.has(task.id) ?? false}
-            onSelect={(e) => {
-              if (onToggleSelect && (e.shiftKey || e.metaKey || e.ctrlKey)) {
-                onToggleSelect(task.id, e);
-              } else {
-                setFocusedIndex(idx);
-                onSelectTask(task.id);
-              }
-            }}
-            onMouseEnter={() => onHoverTask?.(task.id)}
-            onMouseLeave={() => onHoverTask?.(null)}
-            onStatusChange={(status) => onStatusChange(task.id, status)}
-            onDelete={() => onDelete(task.id)}
-          />
-        ))
+        sorted.map((task, idx) => renderRow(task, idx))
       )}
     </div>
   );

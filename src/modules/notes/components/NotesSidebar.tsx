@@ -1,10 +1,20 @@
-import { useState } from 'react';
-import { Search, Plus, Trash2, Star, FileText, X } from 'lucide-react';
-import { useNoteTree, useFavorites, useNoteSearch, useNoteStats, useDebouncedValue, useNotes, useCreateOrOpenDailyNote } from '../hooks/useNotes';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Search, Plus, Trash2, Star, FileText, X, Tag } from 'lucide-react';
+import {
+  useNoteTree,
+  useFavorites,
+  useNoteSearch,
+  useNoteStats,
+  useDebouncedValue,
+  useNotes,
+  useCreateOrOpenDailyNote,
+  useUpdateNote,
+} from '../hooks/useNotes';
+import { SkeletonRow } from '@/shared/components/Skeleton';
 import { NoteTreeItem } from './NoteTreeItem';
 import { NoteSearchResults } from './NoteSearchResults';
 import { TrashPanel } from './TrashPanel';
-import type { NoteTreeNode } from '@/shared/types/note';
+import type { Note, NoteTreeNode } from '@/shared/types/note';
 
 interface NotesSidebarProps {
   selectedId: string | null;
@@ -17,7 +27,79 @@ interface NotesSidebarProps {
   onTogglePin: (id: string, pinned: boolean) => void;
   onRename: (id: string) => void;
   onShowTemplates: () => void;
+  // Tag filter
+  activeTag: string | null;
+  onTagFilter: (tag: string | null) => void;
 }
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const SYSTEM_TAG_RE = /^(__daily__|__\w+__|(\d{4}-\d{2}-\d{2}))$/;
+
+function isSystemTag(tag: string): boolean {
+  return SYSTEM_TAG_RE.test(tag);
+}
+
+function tagHue(tag: string): number {
+  let hash = 0;
+  for (let i = 0; i < tag.length; i++) {
+    hash = tag.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return Math.abs(hash) % 360;
+}
+
+function tagColor(tag: string): string {
+  return `hsl(${tagHue(tag)}, 65%, 55%)`;
+}
+
+// ─── RenameInput ─────────────────────────────────────────────────────────────
+
+interface RenameInputProps {
+  value: string;
+  onChange: (v: string) => void;
+  onCommit: () => void;
+  onCancel: () => void;
+}
+
+function RenameInput({ value, onChange, onCommit, onCancel }: RenameInputProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, []);
+
+  return (
+    <input
+      ref={inputRef}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') { e.preventDefault(); onCommit(); }
+        if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+        e.stopPropagation();
+      }}
+      onBlur={onCommit}
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        flex: 1,
+        minWidth: 0,
+        fontSize: 13,
+        fontFamily: 'inherit',
+        fontWeight: 500,
+        color: 'var(--color-text-primary)',
+        backgroundColor: 'var(--color-bg-elevated)',
+        border: '1px solid var(--color-accent)',
+        borderRadius: 4,
+        padding: '1px 5px',
+        outline: 'none',
+        lineHeight: 1.4,
+      }}
+    />
+  );
+}
+
+// ─── NotesSidebar ────────────────────────────────────────────────────────────
 
 export function NotesSidebar({
   selectedId,
@@ -30,16 +112,22 @@ export function NotesSidebar({
   onTogglePin,
   onRename,
   onShowTemplates,
+  activeTag,
+  onTagFilter,
 }: NotesSidebarProps) {
   const [rawQuery, setRawQuery] = useState('');
   const [showTrash, setShowTrash] = useState(false);
+  const [renamingNoteId, setRenamingNoteId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
   const searchQuery = useDebouncedValue(rawQuery, 300);
 
-  const { data: tree = [] } = useNoteTree();
+  const { data: tree = [], isLoading: treeLoading } = useNoteTree();
   const { data: favorites = [] } = useFavorites();
   const { data: searchResults = [] } = useNoteSearch(searchQuery);
   const { data: stats } = useNoteStats();
-  const { data: allNotes = [] } = useNotes();
+  const { data: allNotes = [], isLoading: notesLoading } = useNotes();
+  const isNotesLoading = treeLoading || notesLoading;
+  const updateNote = useUpdateNote();
 
   const dailyNoteMutation = useCreateOrOpenDailyNote();
 
@@ -48,7 +136,45 @@ export function NotesSidebar({
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, 5);
 
+  // Aggregate unique user tags + counts
+  const tagCounts = new Map<string, number>();
+  for (const note of allNotes) {
+    if (note.isTrashed) continue;
+    for (const tag of note.tags) {
+      if (!isSystemTag(tag)) {
+        tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+      }
+    }
+  }
+  const userTags = Array.from(tagCounts.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+
+  // Notes filtered by active tag (for tag-filter view)
+  const tagFilteredNotes = activeTag
+    ? allNotes.filter((n) => !n.isTrashed && n.tags.includes(activeTag))
+    : [];
+
   const isSearching = rawQuery.trim().length > 0;
+
+  // ─── Inline rename helpers ───────────────────────────────────────
+
+  const startRename = useCallback((note: Note, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRenamingNoteId(note.id);
+    setRenameValue(note.title);
+  }, []);
+
+  const commitRename = useCallback((id: string) => {
+    if (renameValue.trim()) {
+      updateNote.mutate({ id, data: { title: renameValue.trim() } });
+    }
+    setRenamingNoteId(null);
+  }, [renameValue, updateNote]);
+
+  const cancelRename = useCallback(() => {
+    setRenamingNoteId(null);
+  }, []);
+
+  // ─── Trash view ────────────────────────────────────────────────
 
   if (showTrash) {
     return (
@@ -134,6 +260,53 @@ export function NotesSidebar({
             </button>
           )}
         </div>
+
+        {/* Tag filter banner */}
+        {activeTag && !isSearching && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              marginTop: 6,
+              padding: '4px 8px',
+              borderRadius: 6,
+              backgroundColor: 'var(--color-accent-soft)',
+              border: '1px solid var(--color-accent)',
+            }}
+          >
+            <Tag size={10} style={{ color: 'var(--color-accent)', flexShrink: 0 }} />
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 500,
+                color: 'var(--color-accent)',
+                flex: 1,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              #{activeTag}
+            </span>
+            <button
+              onClick={() => onTagFilter(null)}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                color: 'var(--color-accent)',
+                display: 'flex',
+                alignItems: 'center',
+                flexShrink: 0,
+              }}
+              title="Clear tag filter"
+            >
+              <X size={11} />
+            </button>
+          </div>
+        )}
       </div>
 
       {isSearching ? (
@@ -148,6 +321,72 @@ export function NotesSidebar({
             }}
             onClear={() => setRawQuery('')}
           />
+        </div>
+      ) : activeTag ? (
+        /* ── Tag-filtered note list ── */
+        <div className="flex-1 overflow-y-auto py-2">
+          <SectionHeader
+            icon={<Tag size={11} />}
+            label={`#${activeTag}`}
+            extra={
+              <button
+                onClick={() => onTagFilter(null)}
+                title="Clear filter"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  color: 'var(--color-text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginLeft: 'auto',
+                  marginRight: 4,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+              >
+                <X size={11} />
+              </button>
+            }
+          />
+          {tagFilteredNotes.length === 0 ? (
+            <div
+              className="px-4 py-3 text-sm"
+              style={{ color: 'var(--color-text-muted)' }}
+            >
+              No notes with this tag
+            </div>
+          ) : (
+            tagFilteredNotes.map((note) => (
+              <div
+                key={note.id}
+                onClick={() => onSelect(note.id)}
+                className="group flex items-center gap-2 py-1.5 px-2 mx-2 rounded-lg cursor-pointer"
+                style={{
+                  backgroundColor: note.id === selectedId ? 'var(--color-accent-soft)' : 'transparent',
+                  color: note.id === selectedId ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                  transition: 'background-color 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  if (note.id !== selectedId) e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+                }}
+                onMouseLeave={(e) => {
+                  if (note.id !== selectedId) e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <span className="shrink-0 text-sm leading-none">
+                  {note.icon ?? (
+                    <FileText
+                      size={13}
+                      style={{ color: note.id === selectedId ? 'var(--color-accent)' : 'var(--color-text-muted)' }}
+                    />
+                  )}
+                </span>
+                <span className="text-sm truncate flex-1">{note.title}</span>
+              </div>
+            ))
+          )}
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto py-2">
@@ -164,24 +403,37 @@ export function NotesSidebar({
                       day: 'numeric',
                     })
                   : note.title;
+                const isRenaming = renamingNoteId === note.id;
+
                 return (
                   <div
                     key={note.id}
-                    onClick={() => onSelect(note.id)}
-                    className="group flex items-center gap-2 py-1.5 px-2 mx-2 rounded-lg cursor-pointer transition-colors"
+                    onClick={() => { if (!isRenaming) onSelect(note.id); }}
+                    onDoubleClick={(e) => startRename(note, e)}
+                    className="group flex items-center gap-2 py-1.5 px-2 mx-2 rounded-lg cursor-pointer"
                     style={{
                       backgroundColor: note.id === selectedId ? 'var(--color-accent-soft)' : 'transparent',
                       color: note.id === selectedId ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                      transition: 'background-color 0.15s ease',
                     }}
                     onMouseEnter={(e) => {
-                      if (note.id !== selectedId) e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+                      if (note.id !== selectedId) e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
                     }}
                     onMouseLeave={(e) => {
                       if (note.id !== selectedId) e.currentTarget.style.backgroundColor = 'transparent';
                     }}
                   >
                     <span className="shrink-0 text-sm leading-none">📅</span>
-                    <span className="text-sm truncate flex-1">{shortLabel}</span>
+                    {isRenaming ? (
+                      <RenameInput
+                        value={renameValue}
+                        onChange={setRenameValue}
+                        onCommit={() => commitRename(note.id)}
+                        onCancel={cancelRename}
+                      />
+                    ) : (
+                      <span className="text-sm truncate flex-1">{shortLabel}</span>
+                    )}
                   </div>
                 );
               })}
@@ -192,44 +444,143 @@ export function NotesSidebar({
           {favorites.length > 0 && (
             <div className="mb-3">
               <SectionHeader icon={<Star size={11} />} label="Favorites" />
-              {favorites.map((note) => (
-                <div
-                  key={note.id}
-                  onClick={() => onSelect(note.id)}
-                  className="group flex items-center gap-2 py-2 px-2 mx-2 rounded-lg cursor-pointer transition-colors"
-                  style={{
-                    backgroundColor: note.id === selectedId ? 'var(--color-accent-soft)' : 'transparent',
-                    color: note.id === selectedId ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (note.id !== selectedId) {
-                      e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (note.id !== selectedId) {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }
-                  }}
-                >
-                  <span className="shrink-0 text-sm leading-none">
-                    {note.icon ?? (
-                      <FileText
-                        size={14}
-                        style={{ color: note.id === selectedId ? 'var(--color-accent)' : 'var(--color-text-muted)' }}
+              {favorites.map((note) => {
+                const isRenaming = renamingNoteId === note.id;
+                return (
+                  <div
+                    key={note.id}
+                    onClick={() => { if (!isRenaming) onSelect(note.id); }}
+                    onDoubleClick={(e) => startRename(note, e)}
+                    className="group flex items-center gap-2 py-2 px-2 mx-2 rounded-lg cursor-pointer"
+                    style={{
+                      backgroundColor: note.id === selectedId ? 'var(--color-accent-soft)' : 'transparent',
+                      color: note.id === selectedId ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                      transition: 'background-color 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (note.id !== selectedId) {
+                        e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (note.id !== selectedId) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    <span className="shrink-0 text-sm leading-none">
+                      {note.icon ?? (
+                        <FileText
+                          size={14}
+                          style={{ color: note.id === selectedId ? 'var(--color-accent)' : 'var(--color-text-muted)' }}
+                        />
+                      )}
+                    </span>
+                    {isRenaming ? (
+                      <RenameInput
+                        value={renameValue}
+                        onChange={setRenameValue}
+                        onCommit={() => commitRename(note.id)}
+                        onCancel={cancelRename}
                       />
+                    ) : (
+                      <span className="text-sm font-medium truncate flex-1">{note.title}</span>
                     )}
-                  </span>
-                  <span className="text-sm font-medium truncate flex-1">{note.title}</span>
-                </div>
-              ))}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Tags */}
+          {userTags.length > 0 && (
+            <div className="mb-3">
+              <SectionHeader icon={<Tag size={11} />} label="Tags" />
+              {userTags.map(([tag, count]) => {
+                const isActive = activeTag === tag;
+                const color = tagColor(tag);
+                return (
+                  <div
+                    key={tag}
+                    onClick={() => onTagFilter(isActive ? null : tag)}
+                    className="group flex items-center gap-2 py-1.5 px-2 mx-2 rounded-lg cursor-pointer"
+                    style={{
+                      backgroundColor: isActive ? 'var(--color-accent-soft)' : 'transparent',
+                      transition: 'background-color 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive) e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    {/* Colored dot */}
+                    <span
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        backgroundColor: color,
+                        flexShrink: 0,
+                        display: 'inline-block',
+                      }}
+                    />
+                    <span
+                      className="text-sm truncate flex-1"
+                      style={{
+                        color: isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                        fontWeight: isActive ? 600 : 400,
+                      }}
+                    >
+                      #{tag}
+                    </span>
+                    <span
+                      className="text-xs"
+                      style={{
+                        color: isActive ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                        backgroundColor: isActive ? 'transparent' : 'var(--color-bg-elevated)',
+                        padding: '1px 5px',
+                        borderRadius: 10,
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    >
+                      {count}
+                    </span>
+                    {isActive && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onTagFilter(null); }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: 0,
+                          cursor: 'pointer',
+                          color: 'var(--color-accent)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          flexShrink: 0,
+                        }}
+                        title="Clear filter"
+                      >
+                        <X size={11} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
 
           {/* Pages tree */}
           <div>
             <SectionHeader icon={<FileText size={11} />} label="Pages" />
-            {tree.length === 0 ? (
+            {isNotesLoading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '2px 8px' }}>
+                {Array.from({ length: 6 }, (_, i) => (
+                  <SkeletonRow key={i} />
+                ))}
+              </div>
+            ) : tree.length === 0 ? (
               <div
                 className="px-4 py-3 text-sm"
                 style={{ color: 'var(--color-text-muted)' }}
@@ -289,7 +640,7 @@ export function NotesSidebar({
           style={{ color: 'var(--color-text-muted)' }}
           onMouseEnter={(e) => {
             e.currentTarget.style.color = 'var(--color-text-secondary)';
-            e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+            e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.color = 'var(--color-text-muted)';
@@ -306,7 +657,7 @@ export function NotesSidebar({
           style={{ color: 'var(--color-text-muted)' }}
           onMouseEnter={(e) => {
             e.currentTarget.style.color = 'var(--color-text-primary)';
-            e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+            e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.color = 'var(--color-text-muted)';
@@ -349,7 +700,17 @@ export function NotesSidebar({
   );
 }
 
-function SectionHeader({ icon, label }: { icon: React.ReactNode; label: string }) {
+// ─── SectionHeader ────────────────────────────────────────────────────────────
+
+function SectionHeader({
+  icon,
+  label,
+  extra,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  extra?: React.ReactNode;
+}) {
   return (
     <div
       className="flex items-center gap-1.5 px-4 mb-1"
@@ -362,6 +723,7 @@ function SectionHeader({ icon, label }: { icon: React.ReactNode; label: string }
       >
         {label}
       </span>
+      {extra}
     </div>
   );
 }

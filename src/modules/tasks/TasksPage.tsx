@@ -9,6 +9,7 @@ import {
   Settings2,
   BookmarkPlus,
   X,
+  Maximize2,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -21,11 +22,15 @@ import {
 import { taskService } from '@/shared/lib/taskService';
 import type { Task, TaskStatus, TaskPriority, CreateTaskInput, UpdateTaskInput } from '@/shared/types/task';
 import { useTaskSettingsStore } from '@/shared/stores/taskSettingsStore';
+import { useAppSettingsStore } from '@/shared/stores/appSettingsStore';
+import type { TaskDensity } from '@/shared/stores/appSettingsStore';
+import { useZenModeStore, useZenShortcut } from '@/shared/stores/zenModeStore';
 
 // ─── Component imports ────────────────────────────────────────────────────────
 import { TaskBoard } from './components/TaskBoard';
 import { TaskList } from './components/TaskList';
 import { TaskTodayView } from './components/TaskTodayView';
+import { ZenTaskView } from './components/ZenTaskView';
 import { TaskDetail } from './components/TaskDetail';
 import { TaskCreateModal } from './components/TaskCreateModal';
 import { TaskToolbar } from './components/TaskToolbar';
@@ -34,6 +39,7 @@ import { TaskToast } from './components/TaskToast';
 import { TaskBatchFAB } from './components/TaskBatchFAB';
 import { TaskCommandPalette } from './components/TaskCommandPalette';
 import { CustomStatusManager } from './components/CustomStatusManager';
+import { EmptyState } from '@/shared/components/EmptyState';
 import { groupTasks, sortTasks, type TaskGroupBy, type TaskSortBy } from './components/taskViewUtils';
 import { parseQuickAdd } from './lib/nlpQuickAdd';
 
@@ -47,6 +53,8 @@ interface TaskFilters {
   priority?: TaskPriority[];
   tags?: string[];
   dueBefore?: string;
+  /** Client-side only: filter tasks with no due date set */
+  noDueDate?: boolean;
 }
 
 interface ToastData {
@@ -54,6 +62,23 @@ interface ToastData {
   task: Task;
   subtasks: Task[];
 }
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const ACTIVE_VIEW_KEY = 'divein-tasks-active-view';
+
+interface SmartViewDef {
+  id: string;
+  label: string;
+  icon: string;
+}
+
+const SMART_VIEWS: SmartViewDef[] = [
+  { id: 'smart-overdue',       label: 'Overdue',       icon: '🔥' },
+  { id: 'smart-due-today',     label: 'Due Today',     icon: '📅' },
+  { id: 'smart-high-priority', label: 'High Priority', icon: '⚡' },
+  { id: 'smart-no-due-date',   label: 'No Due Date',   icon: '📭' },
+];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -81,7 +106,7 @@ export function TasksPage() {
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [commandPaletteTaskId, setCommandPaletteTaskId] = useState<string | null>(null);
   const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null);
-  const [filters, setFilters] = useState<TaskFilters>({});
+  const [filters, setFiltersRaw] = useState<TaskFilters>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [groupBy, setGroupBy] = useState<TaskGroupBy>('status');
   const [sortBy, setSortBy] = useState<TaskSortBy>('manual');
@@ -93,8 +118,49 @@ export function TasksPage() {
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
   const [saveViewName, setSaveViewName] = useState('');
   const [showSaveViewInput, setShowSaveViewInput] = useState(false);
+  const [hoveredViewPill, setHoveredViewPill] = useState<string | null>(null);
+
+  // ─── Active view — persisted to localStorage ───────────────────────────────
+
+  const [activeViewId, setActiveViewIdState] = useState<string | null>(() => {
+    try { return localStorage.getItem(ACTIVE_VIEW_KEY); } catch { return null; }
+  });
+
+  const setActiveViewId = useCallback((id: string | null) => {
+    setActiveViewIdState(id);
+    try {
+      if (id) localStorage.setItem(ACTIVE_VIEW_KEY, id);
+      else localStorage.removeItem(ACTIVE_VIEW_KEY);
+    } catch { /* ignore */ }
+  }, []);
+
+  /**
+   * Manual filter change — clears active view (marks it dirty).
+   * Use this for all user-driven filter changes (toolbar, chips, etc.).
+   */
+  const handleFilterChange = useCallback((newFilters: TaskFilters) => {
+    setFiltersRaw(newFilters);
+    setActiveViewId(null);
+  }, [setActiveViewId]);
 
   const { savedViews, addSavedView, removeSavedView } = useTaskSettingsStore();
+  const taskDensity = useAppSettingsStore((s) => s.app.taskDensity);
+  const updateAppSettings = useAppSettingsStore((s) => s.updateApp);
+  const [hoveredDensity, setHoveredDensity] = useState<TaskDensity | null>(null);
+
+  // ─── Zen mode ─────────────────────────────────────────────────────────────
+  const isZen = useZenModeStore((s) => s.isZen);
+  const setZen = useZenModeStore((s) => s.setZen);
+  const toggleZen = useZenModeStore((s) => s.toggleZen);
+  useZenShortcut();
+
+  // When entering zen mode, auto-switch to Today view
+  useEffect(() => {
+    if (isZen && activeView !== 'today') {
+      setActiveView('today');
+      setSelectedTaskId(null);
+    }
+  }, [isZen, activeView]);
 
   const quickAddRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
@@ -103,7 +169,7 @@ export function TasksPage() {
   const applyView = useCallback((viewId: string) => {
     const view = savedViews.find((v) => v.id === viewId);
     if (!view) return;
-    setFilters({
+    setFiltersRaw({
       status: view.filters.status as TaskStatus[] | undefined,
       priority: view.filters.priority as TaskPriority[] | undefined,
       tags: view.filters.tags,
@@ -111,7 +177,37 @@ export function TasksPage() {
     });
     if (view.groupBy) setGroupBy(view.groupBy as TaskGroupBy);
     if (view.sortBy) setSortBy(view.sortBy as TaskSortBy);
-  }, [savedViews]);
+    setActiveViewId(viewId);
+  }, [savedViews, setActiveViewId]);
+
+  /** Apply a built-in smart view — sets appropriate filters. */
+  const applySmartView = useCallback((viewId: string) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split('T')[0];
+    const todayEnd = todayStr + 'T23:59:59';
+
+    switch (viewId) {
+      case 'smart-overdue':
+        setFiltersRaw({
+          dueBefore: todayStr + 'T00:00:00',
+          status: ['inbox', 'todo', 'in_progress', 'in_review'] as TaskStatus[],
+        });
+        break;
+      case 'smart-due-today':
+        setFiltersRaw({ dueBefore: todayEnd });
+        break;
+      case 'smart-high-priority':
+        setFiltersRaw({ priority: [3, 4] as TaskPriority[] });
+        break;
+      case 'smart-no-due-date':
+        setFiltersRaw({ noDueDate: true });
+        break;
+      default:
+        return;
+    }
+    setActiveViewId(viewId);
+  }, [setActiveViewId]);
 
   /** Save current filter/group/sort as a named view. */
   const handleSaveView = useCallback(() => {
@@ -157,6 +253,8 @@ export function TasksPage() {
       f.dueBefore = today + 'T23:59:59';
     }
 
+    // noDueDate is handled client-side in the tasks memo below — not passed to the API
+
     return f;
   }, [filters, searchQuery, activeView]);
 
@@ -168,8 +266,14 @@ export function TasksPage() {
   const deleteTask = useDeleteTask();
   const reorderTask = useReorderTask();
 
-  // Root tasks only
-  const tasks = useMemo(() => allTasks.filter((t) => t.parentId === null), [allTasks]);
+  // Root tasks only — also apply noDueDate client-side filter
+  const tasks = useMemo(() => {
+    let result = allTasks.filter((t) => t.parentId === null);
+    if (filters.noDueDate) {
+      result = result.filter((t) => t.dueDate === null);
+    }
+    return result;
+  }, [allTasks, filters.noDueDate]);
 
   // Compute a set of task IDs that are actively blocked (have non-done/cancelled blockers)
   const blockedTaskIds = useMemo((): Set<string> => {
@@ -334,6 +438,7 @@ export function TasksPage() {
       (filters.priority && filters.priority.length > 0) ||
       (filters.tags && filters.tags.length > 0) ||
       !!filters.dueBefore ||
+      !!filters.noDueDate ||
       !!searchQuery,
     [filters, searchQuery],
   );
@@ -371,6 +476,13 @@ export function TasksPage() {
     }
     // Normal single-select — open detail panel
     setSelectedTaskId(id);
+  }, []);
+
+  /** Direct toggle by id — used by checkboxes (no mouse event) */
+  const handleToggleSelectById = useCallback((id: string) => {
+    setSelectedTaskIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   }, []);
 
   const clearSelection = useCallback(() => setSelectedTaskIds([]), []);
@@ -443,7 +555,8 @@ export function TasksPage() {
           break;
         }
         case 'Escape': {
-          if (selectedTaskId) setSelectedTaskId(null);
+          if (selectedTaskIds.length > 0) { setSelectedTaskIds([]); }
+          else if (selectedTaskId) setSelectedTaskId(null);
           else if (showCreateModal) setShowCreateModal(false);
           break;
         }
@@ -496,11 +609,6 @@ export function TasksPage() {
           }
           break;
         }
-        case 'k': {
-          // 'k' alone is handled by ArrowUp above via fallthrough; this is a separate guard
-          // for Cmd+K / Ctrl+K which opens the command palette
-          break;
-        }
       }
 
       // Cmd+K / Ctrl+K — open contextual command palette for focused/hovered task
@@ -511,14 +619,32 @@ export function TasksPage() {
           setCommandPaletteTaskId(targetId);
         }
       }
+
+      // Ctrl+A / Cmd+A — select all visible tasks
+      if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
+        e.preventDefault();
+        setSelectedTaskIds(tasks.map((t) => t.id));
+      }
     }
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [selectedTaskId, hoveredTaskId, tasks, updateTask, handleDelete, showCreateModal]);
+  }, [selectedTaskId, hoveredTaskId, tasks, updateTask, handleDelete, showCreateModal, selectedTaskIds]);
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
   function renderActiveView() {
+    // Show empty state only when there are truly no tasks at all (not just filtered)
+    if (allTasks.length === 0 && !isLoading) {
+      return (
+        <EmptyState
+          icon="✅"
+          title="No tasks yet"
+          description="Create your first task to start organizing your work"
+          actionLabel="Create Task"
+          onAction={() => { setCreateModalDefaultStatus(getDefaultStatusForView(activeView)); setShowCreateModal(true); }}
+        />
+      );
+    }
     switch (activeView) {
       case 'board':
         return (
@@ -548,6 +674,7 @@ export function TasksPage() {
             selectedTaskIds={selectedTaskIds}
             onSelectTask={setSelectedTaskId}
             onToggleSelect={handleToggleSelect}
+            onToggleSelectById={handleToggleSelectById}
             onHoverTask={setHoveredTaskId}
             onStatusChange={handleStatusChange}
             onDelete={handleDelete}
@@ -571,6 +698,7 @@ export function TasksPage() {
             selectedTaskIds={selectedTaskIds}
             onSelectTask={setSelectedTaskId}
             onToggleSelect={handleToggleSelect}
+            onToggleSelectById={handleToggleSelectById}
             onHoverTask={setHoveredTaskId}
             onStatusChange={handleStatusChange}
             onDelete={handleDelete}
@@ -604,31 +732,69 @@ export function TasksPage() {
           <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
             Tasks
           </h1>
-          <button
-            onClick={() => { setCreateModalDefaultStatus(getDefaultStatusForView(activeView)); setShowCreateModal(true); }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '7px 14px',
-              borderRadius: 8,
-              border: 'none',
-              backgroundColor: 'var(--color-accent)',
-              color: 'white',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent)'; }}
-          >
-            <Plus size={14} />
-            New Task
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* Zen mode toggle */}
+            <button
+              onClick={() => toggleZen()}
+              title="Enter Focus Mode (Alt+Z)"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '7px 12px',
+                borderRadius: 8,
+                border: '1px solid var(--color-border)',
+                backgroundColor: isZen ? 'var(--color-accent-soft)' : 'transparent',
+                color: isZen ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                if (!isZen) {
+                  e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
+                  e.currentTarget.style.color = 'var(--color-text-primary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isZen) {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = 'var(--color-text-muted)';
+                }
+              }}
+            >
+              <Maximize2 size={13} />
+              Zen
+            </button>
+
+            <button
+              onClick={() => { setCreateModalDefaultStatus(getDefaultStatusForView(activeView)); setShowCreateModal(true); }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '7px 14px',
+                borderRadius: 8,
+                border: 'none',
+                backgroundColor: 'var(--color-accent)',
+                color: 'white',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent)'; }}
+            >
+              <Plus size={14} />
+              New Task
+            </button>
+          </div>
         </div>
 
-        {/* View tabs + saved views + board controls */}
+        {/* View tabs + board controls */}
         <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           {/* Built-in view tabs */}
           {VIEW_TABS.map(({ key, label, Icon }) => {
@@ -664,144 +830,60 @@ export function TasksPage() {
             );
           })}
 
-          {/* Divider */}
-          {savedViews.length > 0 && (
-            <div style={{ width: 1, height: 24, backgroundColor: 'var(--color-border)', margin: '0 4px', alignSelf: 'center' }} />
-          )}
-
-          {/* Saved views as tabs */}
-          {savedViews.map((view) => {
-            const isHovered = hoveredTab === `view-${view.id}`;
-            return (
-              <div
-                key={view.id}
-                style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
-                onMouseEnter={() => setHoveredTab(`view-${view.id}`)}
-                onMouseLeave={() => setHoveredTab(null)}
-              >
+          {/* ── Density toggle ──────────────────────────────────────── */}
+          <div style={{ width: 1, height: 24, backgroundColor: 'var(--color-border)', margin: '0 6px', alignSelf: 'center' }} />
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2,
+              alignSelf: 'center',
+            }}
+            title="Density"
+          >
+            {(['compact', 'default', 'spacious'] as TaskDensity[]).map((d) => {
+              const isActive = taskDensity === d;
+              const isHov = hoveredDensity === d;
+              // Icon: compact = tight lines, default = medium lines, spacious = wide lines
+              const icon = d === 'compact' ? '≡' : d === 'default' ? '☰' : '⊞';
+              const label = d === 'compact' ? 'Compact' : d === 'default' ? 'Default' : 'Spacious';
+              return (
                 <button
-                  onClick={() => applyView(view.id)}
+                  key={d}
+                  title={label}
+                  onClick={() => updateAppSettings({ taskDensity: d })}
+                  onMouseEnter={() => setHoveredDensity(d)}
+                  onMouseLeave={() => setHoveredDensity(null)}
                   style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 6,
+                    border: isActive
+                      ? '1px solid var(--color-accent)'
+                      : `1px solid ${isHov ? 'var(--color-border-hover)' : 'var(--color-border)'}`,
+                    backgroundColor: isActive
+                      ? 'var(--color-accent-soft)'
+                      : isHov
+                      ? 'var(--color-bg-hover)'
+                      : 'var(--color-bg-elevated)',
+                    color: isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                    fontSize: 14,
+                    fontWeight: isActive ? 700 : 400,
+                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 6,
-                    padding: '8px 12px',
-                    borderRadius: '8px 8px 0 0',
-                    border: 'none',
-                    borderBottom: '2px solid transparent',
-                    backgroundColor: isHovered ? 'var(--color-bg-hover)' : 'transparent',
-                    color: 'var(--color-text-secondary)',
-                    fontSize: 13,
-                    fontWeight: 400,
-                    cursor: 'pointer',
+                    justifyContent: 'center',
+                    padding: 0,
+                    transition: 'all 0.12s ease',
                     fontFamily: 'inherit',
-                    transition: 'all 0.15s',
-                    whiteSpace: 'nowrap',
+                    lineHeight: 1,
                   }}
                 >
-                  🔖 {view.name}
+                  {icon}
                 </button>
-                {isHovered && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); removeSavedView(view.id); }}
-                    title="Remove view"
-                    style={{
-                      position: 'absolute',
-                      right: -6,
-                      top: 4,
-                      width: 16,
-                      height: 16,
-                      borderRadius: '50%',
-                      border: 'none',
-                      backgroundColor: 'var(--color-bg-tertiary)',
-                      color: 'var(--color-text-muted)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: 0,
-                      zIndex: 2,
-                    }}
-                  >
-                    <X size={9} />
-                  </button>
-                )}
-              </div>
-            );
-          })}
-
-          {/* Save View input / button */}
-          {showSaveViewInput ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4, alignSelf: 'center' }}>
-              <input
-                autoFocus
-                type="text"
-                placeholder="View name…"
-                value={saveViewName}
-                onChange={(e) => setSaveViewName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSaveView();
-                  if (e.key === 'Escape') { setShowSaveViewInput(false); setSaveViewName(''); }
-                }}
-                style={{
-                  width: 140,
-                  fontSize: 12,
-                  padding: '4px 8px',
-                  borderRadius: 6,
-                  border: '1px solid var(--color-accent)',
-                  backgroundColor: 'var(--color-bg-tertiary)',
-                  color: 'var(--color-text-primary)',
-                  outline: 'none',
-                  fontFamily: 'inherit',
-                }}
-              />
-              <button
-                onClick={handleSaveView}
-                disabled={!saveViewName.trim()}
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: saveViewName.trim() ? 'var(--color-accent)' : 'var(--color-text-muted)',
-                  background: 'none',
-                  border: 'none',
-                  cursor: saveViewName.trim() ? 'pointer' : 'default',
-                  padding: '4px 6px',
-                }}
-              >
-                Save
-              </button>
-              <button
-                onClick={() => { setShowSaveViewInput(false); setSaveViewName(''); }}
-                style={{ fontSize: 12, color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px' }}
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowSaveViewInput(true)}
-              title="Save current filter/group/sort as a view"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-                padding: '6px 10px',
-                border: 'none',
-                borderRadius: '6px 6px 0 0',
-                backgroundColor: 'transparent',
-                color: 'var(--color-text-muted)',
-                fontSize: 12,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                alignSelf: 'center',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-accent)'; e.currentTarget.style.backgroundColor = 'var(--color-accent-soft)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
-            >
-              <BookmarkPlus size={13} />
-              Save View
-            </button>
-          )}
+              );
+            })}
+          </div>
 
           {/* Board-only controls: Swimlane + Status Manager */}
           {activeView === 'board' && (
@@ -866,8 +948,8 @@ export function TasksPage() {
         </div>
       </div>
 
-      {/* ── Toolbar + quick add ───────────────────────────────────────────── */}
-      <div
+      {/* ── Toolbar + quick add (hidden in zen mode) ─────────────────────── */}
+      {!isZen && <div
         style={{
           padding: '8px 28px',
           flexShrink: 0,
@@ -875,19 +957,18 @@ export function TasksPage() {
           alignItems: 'center',
           gap: 8,
           backgroundColor: 'var(--color-bg-primary)',
-          borderBottom: hasActiveFilters ? '1px solid var(--color-border)' : undefined,
         }}
       >
         {/* TaskToolbar handles search + filter + group + sort internally */}
         <TaskToolbar
           searchQuery={searchQuery}
-          onSearch={setSearchQuery}
+          onSearch={(q) => { setSearchQuery(q); setActiveViewId(null); }}
           groupBy={groupBy}
-          onGroupByChange={(value) => setGroupBy(value as TaskGroupBy)}
+          onGroupByChange={(value) => { setGroupBy(value as TaskGroupBy); setActiveViewId(null); }}
           sortBy={sortBy}
-          onSortByChange={(value) => setSortBy(value as TaskSortBy)}
+          onSortByChange={(value) => { setSortBy(value as TaskSortBy); setActiveViewId(null); }}
           filters={filters}
-          onFilterChange={setFilters}
+          onFilterChange={handleFilterChange}
           onNewTask={() => { setCreateModalDefaultStatus(getDefaultStatusForView(activeView)); setShowCreateModal(true); }}
         />
 
@@ -937,10 +1018,289 @@ export function TasksPage() {
             />
           </div>
         </div>
-      </div>
+      </div>}
+
+      {/* ── Saved Views Bar (hidden in zen mode) ─────────────────────────── */}
+      {!isZen && <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          padding: '6px 28px',
+          flexShrink: 0,
+          borderBottom: '1px solid var(--color-border)',
+          backgroundColor: 'var(--color-bg-primary)',
+          overflowX: 'auto',
+          scrollbarWidth: 'none',
+        }}
+      >
+        {/* ── Smart views (built-in, always shown) ── */}
+        {SMART_VIEWS.map((sv) => {
+          const isActive = activeViewId === sv.id;
+          const isHovered = hoveredViewPill === sv.id;
+          return (
+            <button
+              key={sv.id}
+              onClick={() => applySmartView(sv.id)}
+              onMouseEnter={() => setHoveredViewPill(sv.id)}
+              onMouseLeave={() => setHoveredViewPill(null)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '4px 10px',
+                borderRadius: 999,
+                border: isActive
+                  ? '1px solid var(--color-accent)'
+                  : `1px solid ${isHovered ? 'var(--color-border-hover)' : 'var(--color-border)'}`,
+                backgroundColor: isActive
+                  ? 'var(--color-accent)'
+                  : isHovered
+                  ? 'var(--color-bg-tertiary)'
+                  : 'var(--color-bg-elevated)',
+                color: isActive ? '#ffffff' : 'var(--color-text-secondary)',
+                fontSize: 12,
+                fontWeight: isActive ? 600 : 400,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                transition: 'all 0.15s ease',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+              }}
+            >
+              <span style={{ fontSize: 13 }}>{sv.icon}</span>
+              {sv.label}
+            </button>
+          );
+        })}
+
+        {/* Divider between smart views and user views */}
+        {savedViews.length > 0 && (
+          <div
+            style={{
+              width: 1,
+              height: 18,
+              backgroundColor: 'var(--color-border)',
+              margin: '0 4px',
+              flexShrink: 0,
+            }}
+          />
+        )}
+
+        {/* ── User saved views ── */}
+        {savedViews.map((view) => {
+          const isActive = activeViewId === view.id;
+          const isHovered = hoveredViewPill === `view-${view.id}`;
+          return (
+            <div
+              key={view.id}
+              style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}
+              onMouseEnter={() => setHoveredViewPill(`view-${view.id}`)}
+              onMouseLeave={() => setHoveredViewPill(null)}
+            >
+              <button
+                onClick={() => applyView(view.id)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: isHovered ? '4px 24px 4px 10px' : '4px 10px',
+                  borderRadius: 999,
+                  border: isActive
+                    ? '1px solid var(--color-accent)'
+                    : `1px solid ${isHovered ? 'var(--color-border-hover)' : 'var(--color-border)'}`,
+                  backgroundColor: isActive
+                    ? 'var(--color-accent)'
+                    : isHovered
+                    ? 'var(--color-bg-tertiary)'
+                    : 'var(--color-bg-elevated)',
+                  color: isActive ? '#ffffff' : 'var(--color-text-secondary)',
+                  fontSize: 12,
+                  fontWeight: isActive ? 600 : 400,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <span style={{ fontSize: 13 }}>📋</span>
+                {view.name}
+              </button>
+
+              {/* Delete button — shown on hover */}
+              {isHovered && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeSavedView(view.id);
+                    if (activeViewId === view.id) setActiveViewId(null);
+                  }}
+                  title="Remove view"
+                  style={{
+                    position: 'absolute',
+                    right: 6,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: 14,
+                    height: 14,
+                    borderRadius: '50%',
+                    border: 'none',
+                    backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : 'var(--color-bg-secondary)',
+                    color: isActive ? '#ffffff' : 'var(--color-text-muted)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0,
+                    zIndex: 2,
+                  }}
+                >
+                  <X size={8} />
+                </button>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Divider before save button */}
+        <div
+          style={{
+            width: 1,
+            height: 18,
+            backgroundColor: 'var(--color-border)',
+            margin: '0 4px',
+            flexShrink: 0,
+          }}
+        />
+
+        {/* ── Save current view button / inline input ── */}
+        {showSaveViewInput ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            <input
+              autoFocus
+              type="text"
+              placeholder="View name…"
+              value={saveViewName}
+              onChange={(e) => setSaveViewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSaveView();
+                if (e.key === 'Escape') { setShowSaveViewInput(false); setSaveViewName(''); }
+              }}
+              style={{
+                width: 140,
+                fontSize: 12,
+                padding: '4px 8px',
+                borderRadius: 6,
+                border: '1px solid var(--color-accent)',
+                backgroundColor: 'var(--color-bg-elevated)',
+                color: 'var(--color-text-primary)',
+                outline: 'none',
+                fontFamily: 'inherit',
+              }}
+            />
+            <button
+              onClick={handleSaveView}
+              disabled={!saveViewName.trim()}
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: saveViewName.trim() ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                background: 'none',
+                border: 'none',
+                cursor: saveViewName.trim() ? 'pointer' : 'default',
+                padding: '4px 6px',
+                fontFamily: 'inherit',
+              }}
+            >
+              Save
+            </button>
+            <button
+              onClick={() => { setShowSaveViewInput(false); setSaveViewName(''); }}
+              style={{
+                fontSize: 12,
+                color: 'var(--color-text-muted)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px 6px',
+                fontFamily: 'inherit',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowSaveViewInput(true)}
+            title="Save current filter/group/sort as a view"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '4px 10px',
+              border: '1px dashed var(--color-border)',
+              borderRadius: 999,
+              backgroundColor: 'transparent',
+              color: 'var(--color-text-muted)',
+              fontSize: 12,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              transition: 'all 0.15s ease',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = 'var(--color-accent)';
+              e.currentTarget.style.borderColor = 'var(--color-accent)';
+              e.currentTarget.style.backgroundColor = 'var(--color-accent-soft)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--color-text-muted)';
+              e.currentTarget.style.borderColor = 'var(--color-border)';
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <BookmarkPlus size={12} />
+            Save view
+          </button>
+        )}
+
+        {/* Clear active view — only shown when a view is active */}
+        {activeViewId && (
+          <button
+            onClick={() => {
+              setActiveViewId(null);
+              setFiltersRaw({});
+            }}
+            title="Clear active view"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '4px 8px',
+              border: 'none',
+              borderRadius: 999,
+              backgroundColor: 'transparent',
+              color: 'var(--color-text-muted)',
+              fontSize: 11,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              transition: 'color 0.15s ease',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              marginLeft: 2,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-danger, #ef4444)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+          >
+            <X size={10} />
+            Clear view
+          </button>
+        )}
+      </div>}
 
       {/* ── Filter chips ──────────────────────────────────────────────────── */}
-      {hasActiveFilters && (
+      {!isZen && hasActiveFilters && (
         <div
           style={{
             padding: '6px 28px',
@@ -952,8 +1312,8 @@ export function TasksPage() {
           <TaskFilterChips
             filters={filters}
             onRemoveFilter={(key, value) => {
-              setFilters((prev) => {
-                const updated = { ...prev };
+              handleFilterChange((() => {
+                const updated = { ...filters };
                 if (value === undefined) {
                   delete (updated as Record<string, unknown>)[key];
                 } else {
@@ -964,35 +1324,47 @@ export function TasksPage() {
                   }
                 }
                 return updated;
-              });
+              })());
             }}
-            onClearAll={() => { setFilters({}); setSearchQuery(''); }}
+            onClearAll={() => { handleFilterChange({}); setSearchQuery(''); }}
           />
         </div>
       )}
 
       {/* ── Content area ──────────────────────────────────────────────────── */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
-        {/* Main view — shrinks when detail panel is open */}
-        <div
-          style={{
-            flex: 1,
-            overflow: 'hidden',
-            transition: 'margin-right 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-            marginRight: selectedTask ? 420 : 0,
-          }}
-        >
-          {renderActiveView()}
-        </div>
+        {isZen ? (
+          /* ── Zen / Focus mode ── */
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <ZenTaskView
+              tasks={sortedTasks}
+              onStatusChange={handleStatusChange}
+            />
+          </div>
+        ) : (
+          <>
+            {/* Main view — shrinks when detail panel is open */}
+            <div
+              style={{
+                flex: 1,
+                overflow: 'hidden',
+                transition: 'margin-right 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                marginRight: selectedTask ? 420 : 0,
+              }}
+            >
+              {renderActiveView()}
+            </div>
 
-        {/* Detail panel — fixed right slide-in */}
-        {selectedTask && (
-          <TaskDetail
-            task={selectedTask}
-            onUpdate={(data: UpdateTaskInput) => updateTask.mutate({ id: selectedTask.id, data })}
-            onDelete={() => handleDelete(selectedTask.id)}
-            onClose={() => setSelectedTaskId(null)}
-          />
+            {/* Detail panel — fixed right slide-in */}
+            {selectedTask && (
+              <TaskDetail
+                task={selectedTask}
+                onUpdate={(data: UpdateTaskInput) => updateTask.mutate({ id: selectedTask.id, data })}
+                onDelete={() => handleDelete(selectedTask.id)}
+                onClose={() => setSelectedTaskId(null)}
+              />
+            )}
+          </>
         )}
       </div>
 

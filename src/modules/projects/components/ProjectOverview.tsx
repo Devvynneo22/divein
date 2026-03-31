@@ -1,10 +1,9 @@
 import { useState, useRef } from 'react';
 import {
-  CheckSquare, FileText, Clock, BarChart3,
-  Target, Plus, Trash2, Edit3, Check, X, Calendar,
-  AlertCircle, TrendingUp, Activity,
+  FileText, Clock, Target, Plus, Trash2, Edit3, Check, X, Calendar,
+  AlertTriangle, Activity, CheckSquare, TrendingUp,
 } from 'lucide-react';
-import { format, parseISO, differenceInDays, isPast, isAfter } from 'date-fns';
+import { format, parseISO, differenceInDays, isPast } from 'date-fns';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { taskService } from '@/shared/lib/taskService';
 import type { Task } from '@/shared/types/task';
@@ -18,6 +17,8 @@ import {
   useDeleteMilestone,
 } from '../hooks/useProjects';
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 interface ProjectOverviewProps {
   projectId: string;
   stats: ProjectStats;
@@ -30,7 +31,7 @@ interface ProjectOverviewProps {
 function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
-  if (h > 0) return `${h}h ${m}m`;
+  if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
   if (m > 0) return `${m}m`;
   return '0m';
 }
@@ -47,14 +48,59 @@ const PRIORITY_COLOR: Record<number, string> = {
 };
 
 const STATUS_PILL: Record<string, { bg: string; text: string; label: string }> = {
-  inbox:       { bg: 'var(--color-bg-tertiary)',  text: 'var(--color-text-muted)',   label: 'Inbox' },
-  backlog:     { bg: 'var(--color-bg-tertiary)',  text: 'var(--color-text-muted)',   label: 'Backlog' },
-  todo:        { bg: 'rgba(100,116,139,0.15)',     text: '#94a3b8',                   label: 'To Do' },
-  in_progress: { bg: 'var(--color-warning-soft)', text: 'var(--color-warning)',      label: 'In Progress' },
-  in_review:   { bg: 'rgba(168,85,247,0.12)',      text: '#a855f7',                   label: 'In Review' },
-  done:        { bg: 'var(--color-success-soft)', text: 'var(--color-success)',      label: 'Done' },
-  cancelled:   { bg: 'var(--color-danger-soft)',  text: 'var(--color-danger)',       label: 'Cancelled' },
+  inbox:       { bg: 'var(--color-bg-tertiary)',  text: 'var(--color-text-muted)',  label: 'Inbox' },
+  backlog:     { bg: 'var(--color-bg-tertiary)',  text: 'var(--color-text-muted)',  label: 'Backlog' },
+  todo:        { bg: 'rgba(100,116,139,0.15)',    text: '#94a3b8',                  label: 'To Do' },
+  in_progress: { bg: 'var(--color-warning-soft)', text: 'var(--color-warning)',    label: 'In Progress' },
+  in_review:   { bg: 'rgba(168,85,247,0.12)',     text: '#a855f7',                 label: 'In Review' },
+  done:        { bg: 'var(--color-success-soft)', text: 'var(--color-success)',    label: 'Done' },
+  cancelled:   { bg: 'var(--color-danger-soft)',  text: 'var(--color-danger)',     label: 'Cancelled' },
 };
+
+// ─── Animated SVG progress ring ───────────────────────────────────────────────
+
+function ProgressRing({
+  pct,
+  accent,
+}: {
+  pct: number;
+  accent: string;
+}) {
+  const r = 32;
+  const circumference = 2 * Math.PI * r; // ≈201
+  const strokeDashoffset = circumference - (pct / 100) * circumference;
+  // Derive a display color: use accent unless it's a gradient
+  const strokeColor = accent.includes('gradient') ? 'var(--color-accent)' : accent;
+
+  return (
+    <svg width="88" height="88" viewBox="0 0 88 88" style={{ transform: 'rotate(-90deg)' }}>
+      {/* Track */}
+      <circle
+        cx="44"
+        cy="44"
+        r={r}
+        fill="none"
+        strokeWidth="8"
+        stroke="var(--color-bg-tertiary)"
+      />
+      {/* Fill arc */}
+      <circle
+        cx="44"
+        cy="44"
+        r={r}
+        fill="none"
+        strokeWidth="8"
+        stroke={strokeColor}
+        strokeLinecap="round"
+        strokeDasharray={circumference}
+        strokeDashoffset={strokeDashoffset}
+        style={{ transition: 'stroke-dashoffset 0.7s ease' }}
+      />
+    </svg>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export function ProjectOverview({
   projectId,
@@ -86,7 +132,11 @@ export function ProjectOverview({
 
   const inProgressCount = tasks.filter((t) => t.status === 'in_progress').length;
   const overdueCount = tasks.filter(
-    (t) => t.dueDate && isPast(parseISO(t.dueDate)) && t.status !== 'done' && t.status !== 'cancelled',
+    (t) =>
+      t.dueDate &&
+      isPast(parseISO(t.dueDate)) &&
+      t.status !== 'done' &&
+      t.status !== 'cancelled',
   ).length;
 
   const recentTasks = [...tasks]
@@ -103,79 +153,103 @@ export function ProjectOverview({
     createTask.mutate();
   }
 
-  function progressBarColor(pct: number) {
-    if (pct >= 100) return 'var(--color-success)';
-    if (pct >= 60)  return '#3b82f6';
-    if (pct >= 30)  return 'var(--color-warning)';
-    return 'var(--color-danger)';
-  }
+  const accentDisplay = accentColor.includes('gradient')
+    ? 'var(--color-accent)'
+    : accentColor;
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Stats row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard
-          icon={<BarChart3 size={16} />}
-          label="Total Tasks"
-          value={String(stats.totalTasks)}
-          accent={accentColor}
-        />
-        <StatCard
-          icon={<CheckSquare size={16} />}
-          label="Done"
-          value={String(stats.completedTasks)}
-          sub={`${completionPct}% complete`}
-          accent="var(--color-success)"
-        />
-        <StatCard
-          icon={<TrendingUp size={16} />}
-          label="In Progress"
-          value={String(inProgressCount)}
-          accent="var(--color-warning)"
-        />
-        <StatCard
-          icon={<AlertCircle size={16} />}
-          label="Overdue"
-          value={String(overdueCount)}
-          accent={overdueCount > 0 ? 'var(--color-danger)' : 'var(--color-text-muted)'}
-        />
-      </div>
 
-      {/* Overall progress bar */}
-      {stats.totalTasks > 0 && (
-        <div
-          className="px-4 py-3 rounded-xl"
-          style={{
-            backgroundColor: 'var(--color-bg-secondary)',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-              Overall Progress
-            </span>
-            <span className="text-sm font-bold tabular-nums" style={{ color: progressBarColor(completionPct) }}>
-              {completionPct}%
-            </span>
-          </div>
-          <div
-            className="h-2 w-full rounded-full overflow-hidden"
-            style={{ backgroundColor: 'var(--color-bg-tertiary)' }}
-          >
+      {/* ── Hero stats dashboard ── */}
+      <div
+        className="rounded-2xl overflow-hidden"
+        style={{
+          backgroundColor: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        {/* Top: completion ring + big numbers */}
+        <div className="flex items-center gap-6 p-5">
+          {/* Progress ring */}
+          <div className="relative flex-shrink-0">
+            <ProgressRing pct={completionPct} accent={accentColor} />
             <div
-              className="h-full rounded-full transition-all duration-700"
-              style={{ width: `${completionPct}%`, backgroundColor: progressBarColor(completionPct) }}
+              className="absolute inset-0 flex flex-col items-center justify-center"
+              style={{ transform: 'rotate(0deg)' }}
+            >
+              <span
+                className="text-xl font-bold tabular-nums leading-none"
+                style={{ color: accentDisplay }}
+              >
+                {completionPct}%
+              </span>
+              <span
+                className="text-[10px] leading-tight mt-0.5"
+                style={{ color: 'var(--color-text-muted)' }}
+              >
+                done
+              </span>
+            </div>
+          </div>
+
+          {/* Big stat callouts */}
+          <div className="flex-1 grid grid-cols-2 gap-4">
+            <BigStatCallout
+              value={stats.totalTasks}
+              label="Total Tasks"
+              accent={accentDisplay}
+            />
+            <BigStatCallout
+              value={stats.completedTasks}
+              label="Completed"
+              accent="var(--color-success)"
+            />
+            <BigStatCallout
+              value={inProgressCount}
+              label="In Progress"
+              accent="var(--color-warning)"
+            />
+            <BigStatCallout
+              value={stats.totalNotes}
+              label="Notes"
+              accent="#a855f7"
             />
           </div>
-          <p className="text-xs mt-1.5" style={{ color: 'var(--color-text-muted)' }}>
-            {stats.completedTasks} of {stats.totalTasks} tasks completed
-          </p>
         </div>
-      )}
 
-      {/* Quick-add task */}
+        {/* Divider */}
+        <div style={{ height: '1px', backgroundColor: 'var(--color-border)' }} />
+
+        {/* Bottom: At-a-glance pills */}
+        <div className="flex items-center gap-3 px-5 py-3 flex-wrap">
+          <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+            At a glance
+          </span>
+          <AtAGlancePill
+            icon={<AlertTriangle size={11} />}
+            label={`${overdueCount} overdue`}
+            danger={overdueCount > 0}
+          />
+          <AtAGlancePill
+            icon={<TrendingUp size={11} />}
+            label={`${inProgressCount} in progress`}
+          />
+          {stats.totalTimeSeconds > 0 && (
+            <AtAGlancePill
+              icon={<Clock size={11} />}
+              label={formatDuration(stats.totalTimeSeconds) + ' logged'}
+              accent={accentDisplay}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* ── Quick-add task ── */}
       <section>
-        <h3 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--color-text-muted)' }}>
+        <h3
+          className="text-xs font-bold uppercase tracking-widest mb-3"
+          style={{ color: 'var(--color-text-muted)' }}
+        >
           Quick Add Task
         </h3>
         <form onSubmit={handleQuickAdd} className="flex gap-2">
@@ -199,7 +273,10 @@ export function ProjectOverview({
             disabled={!quickTitle.trim()}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ backgroundColor: 'var(--color-accent)', color: '#fff' }}
-            onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)'; }}
+            onMouseEnter={(e) => {
+              if (!(e.currentTarget as HTMLButtonElement).disabled)
+                e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)';
+            }}
             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent)'; }}
           >
             <Plus size={15} />
@@ -208,14 +285,19 @@ export function ProjectOverview({
         </form>
       </section>
 
-      {/* Recent Tasks */}
+      {/* ── Recent Tasks ── */}
       <section>
-        <h3 className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
+        <h3
+          className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-1.5"
+          style={{ color: 'var(--color-text-muted)' }}
+        >
           <Activity size={13} />
           Recent Tasks
         </h3>
         {recentTasks.length === 0 ? (
-          <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>No tasks yet. Add one above!</p>
+          <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+            No tasks yet. Add one above!
+          </p>
         ) : (
           <div className="flex flex-col gap-2">
             {recentTasks.map((task) => {
@@ -237,6 +319,11 @@ export function ProjectOverview({
                       title={PRIORITY_LABEL[task.priority]}
                     />
                   )}
+                  <CheckSquare
+                    size={14}
+                    className="flex-shrink-0"
+                    style={{ color: isDone ? 'var(--color-success)' : 'var(--color-text-muted)' }}
+                  />
                   <span
                     className="text-sm flex-1 min-w-0 truncate"
                     style={{
@@ -259,14 +346,19 @@ export function ProjectOverview({
         )}
       </section>
 
-      {/* Recent Notes */}
+      {/* ── Recent Notes ── */}
       <section>
-        <h3 className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
+        <h3
+          className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-1.5"
+          style={{ color: 'var(--color-text-muted)' }}
+        >
           <FileText size={13} />
           Recent Notes
         </h3>
         {recentNotes.length === 0 ? (
-          <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>No notes yet.</p>
+          <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+            No notes yet.
+          </p>
         ) : (
           <div className="flex flex-col gap-2">
             {recentNotes.map((note) => (
@@ -280,16 +372,25 @@ export function ProjectOverview({
               >
                 <span className="text-base flex-shrink-0 mt-0.5">{note.icon ?? '📝'}</span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
+                  <p
+                    className="text-sm font-medium truncate"
+                    style={{ color: 'var(--color-text-primary)' }}
+                  >
                     {note.title || 'Untitled'}
                   </p>
                   {note.contentText && (
-                    <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--color-text-muted)' }}>
+                    <p
+                      className="text-xs mt-0.5 truncate"
+                      style={{ color: 'var(--color-text-muted)' }}
+                    >
                       {note.contentText}
                     </p>
                   )}
                 </div>
-                <span className="text-[11px] flex-shrink-0 mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                <span
+                  className="text-[11px] flex-shrink-0 mt-0.5"
+                  style={{ color: 'var(--color-text-muted)' }}
+                >
                   {format(parseISO(note.updatedAt), 'MMM d')}
                 </span>
               </div>
@@ -298,27 +399,40 @@ export function ProjectOverview({
         )}
       </section>
 
-      {/* Milestones */}
-      <MilestonesSection projectId={projectId} tasks={tasks} accentColor={accentColor} />
+      {/* ── Milestones ── */}
+      <MilestonesSection
+        projectId={projectId}
+        tasks={tasks}
+        accentColor={accentColor}
+      />
 
-      {/* Time summary */}
+      {/* ── Time summary ── */}
       {stats.totalTimeSeconds > 0 && (
         <section>
-          <h3 className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
+          <h3
+            className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-1.5"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
             <Clock size={13} />
             Time Logged
           </h3>
           <div
             className="flex items-center justify-between px-4 py-3 rounded-xl"
             style={{
-              backgroundColor: accentColor + '10',
-              border: `1px solid ${accentColor}30`,
+              backgroundColor: accentDisplay + '10',
+              border: `1px solid ${accentDisplay}30`,
             }}
           >
-            <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+            <span
+              className="text-sm font-medium"
+              style={{ color: 'var(--color-text-secondary)' }}
+            >
               Total across all entries
             </span>
-            <span className="text-xl font-bold tabular-nums" style={{ color: accentColor }}>
+            <span
+              className="text-xl font-bold tabular-nums"
+              style={{ color: accentDisplay }}
+            >
               {formatDuration(stats.totalTimeSeconds)}
             </span>
           </div>
@@ -328,44 +442,61 @@ export function ProjectOverview({
   );
 }
 
-// ─── StatCard ────────────────────────────────────────────────────────────────
+// ─── BigStatCallout ───────────────────────────────────────────────────────────
 
-function StatCard({
+function BigStatCallout({
+  value,
+  label,
+  accent,
+}: {
+  value: number;
+  label: string;
+  accent: string;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span
+        className="text-3xl font-bold tabular-nums leading-none"
+        style={{ color: accent }}
+      >
+        {value}
+      </span>
+      <span
+        className="text-[11px] font-medium leading-tight"
+        style={{ color: 'var(--color-text-muted)' }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+// ─── AtAGlancePill ────────────────────────────────────────────────────────────
+
+function AtAGlancePill({
   icon,
   label,
-  value,
-  sub,
+  danger = false,
   accent,
 }: {
   icon: React.ReactNode;
   label: string;
-  value: string;
-  sub?: string;
-  accent: string;
+  danger?: boolean;
+  accent?: string;
 }) {
+  const color = danger
+    ? 'var(--color-danger)'
+    : accent ?? 'var(--color-text-muted)';
+  const bg = danger ? 'var(--color-danger-soft)' : 'var(--color-bg-tertiary)';
+
   return (
-    <div
-      className="px-4 py-3 rounded-xl flex flex-col gap-1"
-      style={{
-        backgroundColor: 'var(--color-bg-secondary)',
-        border: '1px solid var(--color-border)',
-      }}
+    <span
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+      style={{ backgroundColor: bg, color }}
     >
-      <div className="flex items-center gap-2">
-        <span style={{ color: accent }}>{icon}</span>
-        <span className="text-[11px] uppercase tracking-wide font-semibold" style={{ color: 'var(--color-text-muted)' }}>
-          {label}
-        </span>
-      </div>
-      <div className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
-        {value}
-      </div>
-      {sub && (
-        <div className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
-          {sub}
-        </div>
-      )}
-    </div>
+      {icon}
+      {label}
+    </span>
   );
 }
 
@@ -385,11 +516,15 @@ function MilestonesSection({
   const updateMilestone = useUpdateMilestone();
   const deleteMilestone = useDeleteMilestone();
 
-  const [showForm, setShowForm]       = useState(false);
-  const [editingId, setEditingId]     = useState<string | null>(null);
-  const [formName, setFormName]       = useState('');
-  const [formDesc, setFormDesc]       = useState('');
-  const [formDue, setFormDue]         = useState('');
+  const [showForm, setShowForm]   = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formName, setFormName]   = useState('');
+  const [formDesc, setFormDesc]   = useState('');
+  const [formDue, setFormDue]     = useState('');
+
+  const accentDisplay = accentColor.includes('gradient')
+    ? 'var(--color-accent)'
+    : accentColor;
 
   function resetForm() {
     setFormName(''); setFormDesc(''); setFormDue('');
@@ -399,9 +534,21 @@ function MilestonesSection({
   function handleSave() {
     if (!formName.trim()) return;
     if (editingId) {
-      updateMilestone.mutate({ id: editingId, data: { name: formName.trim(), description: formDesc.trim() || null, dueDate: formDue || null } });
+      updateMilestone.mutate({
+        id: editingId,
+        data: {
+          name: formName.trim(),
+          description: formDesc.trim() || null,
+          dueDate: formDue || null,
+        },
+      });
     } else {
-      createMilestone.mutate({ projectId, name: formName.trim(), description: formDesc.trim() || undefined, dueDate: formDue || undefined });
+      createMilestone.mutate({
+        projectId,
+        name: formName.trim(),
+        description: formDesc.trim() || undefined,
+        dueDate: formDue || undefined,
+      });
     }
     resetForm();
   }
@@ -430,7 +577,10 @@ function MilestonesSection({
   return (
     <section>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-bold uppercase tracking-widest flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
+        <h3
+          className="text-xs font-bold uppercase tracking-widest flex items-center gap-1.5"
+          style={{ color: 'var(--color-text-muted)' }}
+        >
           <Target size={13} />
           Milestones
         </h3>
@@ -459,7 +609,11 @@ function MilestonesSection({
             onChange={(e) => setFormName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSave()}
             className="w-full px-3 py-1.5 rounded-lg text-sm focus:outline-none"
-            style={{ backgroundColor: 'var(--color-bg-primary)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
+            style={{
+              backgroundColor: 'var(--color-bg-primary)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-primary)',
+            }}
             onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent)'; }}
             onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
           />
@@ -469,7 +623,11 @@ function MilestonesSection({
             value={formDesc}
             onChange={(e) => setFormDesc(e.target.value)}
             className="w-full px-3 py-1.5 rounded-lg text-sm focus:outline-none"
-            style={{ backgroundColor: 'var(--color-bg-primary)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
+            style={{
+              backgroundColor: 'var(--color-bg-primary)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-primary)',
+            }}
             onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent)'; }}
             onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
           />
@@ -479,7 +637,11 @@ function MilestonesSection({
               value={formDue}
               onChange={(e) => setFormDue(e.target.value)}
               className="px-3 py-1.5 rounded-lg text-sm focus:outline-none"
-              style={{ backgroundColor: 'var(--color-bg-primary)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
+              style={{
+                backgroundColor: 'var(--color-bg-primary)',
+                border: '1px solid var(--color-border)',
+                color: 'var(--color-text-primary)',
+              }}
               onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent)'; }}
               onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
             />
@@ -506,7 +668,9 @@ function MilestonesSection({
       )}
 
       {milestones.length === 0 && !showForm ? (
-        <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>No milestones yet.</p>
+        <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+          No milestones yet.
+        </p>
       ) : (
         <div className="flex flex-col gap-2">
           {milestones.map((milestone) => {
@@ -533,9 +697,20 @@ function MilestonesSection({
                   <button
                     onClick={() => handleToggle(milestone)}
                     className="mt-0.5 flex-shrink-0 transition-colors"
-                    style={{ color: milestone.status === 'completed' ? 'var(--color-success)' : 'var(--color-text-muted)' }}
-                    onMouseEnter={(e) => { if (milestone.status !== 'completed') e.currentTarget.style.color = 'var(--color-success)'; }}
-                    onMouseLeave={(e) => { if (milestone.status !== 'completed') e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+                    style={{
+                      color:
+                        milestone.status === 'completed'
+                          ? 'var(--color-success)'
+                          : 'var(--color-text-muted)',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (milestone.status !== 'completed')
+                        e.currentTarget.style.color = 'var(--color-success)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (milestone.status !== 'completed')
+                        e.currentTarget.style.color = 'var(--color-text-muted)';
+                    }}
                   >
                     <Target size={16} />
                   </button>
@@ -543,14 +718,21 @@ function MilestonesSection({
                     <span
                       className="text-sm font-medium"
                       style={{
-                        textDecoration: milestone.status === 'completed' ? 'line-through' : 'none',
-                        color: milestone.status === 'completed' ? 'var(--color-text-muted)' : 'var(--color-text-primary)',
+                        textDecoration:
+                          milestone.status === 'completed' ? 'line-through' : 'none',
+                        color:
+                          milestone.status === 'completed'
+                            ? 'var(--color-text-muted)'
+                            : 'var(--color-text-primary)',
                       }}
                     >
                       {milestone.name}
                     </span>
                     {milestone.description && (
-                      <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                      <p
+                        className="text-xs mt-0.5"
+                        style={{ color: 'var(--color-text-muted)' }}
+                      >
                         {milestone.description}
                       </p>
                     )}
@@ -577,13 +759,25 @@ function MilestonesSection({
 
                 {total > 0 && (
                   <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--color-bg-tertiary)' }}>
+                    <div
+                      className="flex-1 h-1.5 rounded-full overflow-hidden"
+                      style={{ backgroundColor: 'var(--color-bg-tertiary)' }}
+                    >
                       <div
                         className="h-full rounded-full transition-all"
-                        style={{ width: `${pct}%`, backgroundColor: milestone.status === 'completed' ? 'var(--color-success)' : accentColor }}
+                        style={{
+                          width: `${pct}%`,
+                          backgroundColor:
+                            milestone.status === 'completed'
+                              ? 'var(--color-success)'
+                              : accentDisplay,
+                        }}
                       />
                     </div>
-                    <span className="text-[11px] flex-shrink-0" style={{ color: 'var(--color-text-muted)' }}>
+                    <span
+                      className="text-[11px] flex-shrink-0"
+                      style={{ color: 'var(--color-text-muted)' }}
+                    >
                       {done}/{total}
                     </span>
                   </div>
@@ -591,9 +785,20 @@ function MilestonesSection({
 
                 {milestone.dueDate && (
                   <div className="flex items-center gap-1 mt-1.5">
-                    <Calendar size={11} style={{ color: isOverdue ? 'var(--color-danger)' : 'var(--color-text-muted)' }} />
-                    <span className="text-[11px]" style={{ color: isOverdue ? 'var(--color-danger)' : 'var(--color-text-muted)' }}>
-                      {format(parseISO(milestone.dueDate), 'MMM d, yyyy')} · {daysUntilLabel(milestone.dueDate)}
+                    <Calendar
+                      size={11}
+                      style={{
+                        color: isOverdue ? 'var(--color-danger)' : 'var(--color-text-muted)',
+                      }}
+                    />
+                    <span
+                      className="text-[11px]"
+                      style={{
+                        color: isOverdue ? 'var(--color-danger)' : 'var(--color-text-muted)',
+                      }}
+                    >
+                      {format(parseISO(milestone.dueDate), 'MMM d, yyyy')} ·{' '}
+                      {daysUntilLabel(milestone.dueDate)}
                     </span>
                   </div>
                 )}

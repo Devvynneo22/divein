@@ -1,4 +1,5 @@
-import { Play, Pause, SkipForward, RotateCcw, Timer, Clock } from 'lucide-react';
+import { useState } from 'react';
+import { Play, Pause, SkipForward, RotateCcw } from 'lucide-react';
 import type { PomodoroPhase } from '@/shared/types/timer';
 
 interface TimerControlsProps {
@@ -22,142 +23,189 @@ export function TimerControls({
   onSkip,
   onModeChange,
 }: TimerControlsProps) {
-  // Button text and icon for play/pause
-  const playLabel = isRunning
-    ? 'Pause'
-    : phase === 'work'
-      ? 'Start Focus'
-      : phase === 'short_break'
-        ? 'Start Break'
-        : 'Start Rest';
+  const [playHovered, setPlayHovered] = useState(false);
+  const [resetHovered, setResetHovered] = useState(false);
+  const [skipHovered, setSkipHovered] = useState(false);
 
   return (
-    <div className="flex flex-col items-center gap-5 w-full">
-      {/* ─── Mode toggle ──────────────────────────────────────────────── */}
-      <div
-        className="flex items-center gap-1 p-1 rounded-lg"
-        style={{ backgroundColor: 'var(--color-bg-tertiary)' }}
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 20,
+        width: '100%',
+      }}
+    >
+      {/* ── Reset (left flanking) ──────────────────────────────────── */}
+      <button
+        onClick={onStop}
+        onMouseEnter={() => setResetHovered(true)}
+        onMouseLeave={() => setResetHovered(false)}
+        title="Reset & stop"
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: '1px solid var(--color-border)',
+          backgroundColor: resetHovered
+            ? 'color-mix(in srgb, var(--color-danger) 12%, transparent)'
+            : 'var(--color-bg-secondary)',
+          color: resetHovered ? 'var(--color-danger)' : 'var(--color-text-muted)',
+          cursor: 'pointer',
+          transform: resetHovered ? 'scale(1.08)' : 'scale(1)',
+          boxShadow: resetHovered ? 'var(--shadow-md)' : 'none',
+          transition: 'all 0.18s ease',
+        }}
       >
-        <button
-          onClick={() => onModeChange('pomodoro')}
-          disabled={isRunning && hasActiveEntry}
-          title={isRunning ? 'Stop timer to switch modes' : undefined}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          style={
-            isPomodoroMode
-              ? {
-                  backgroundColor: 'var(--color-accent)',
-                  color: '#fff',
-                  boxShadow: 'var(--shadow-sm)',
-                }
-              : { color: 'var(--color-text-secondary)' }
-          }
-        >
-          <Timer size={13} />
-          Pomodoro
-        </button>
-        <button
-          onClick={() => onModeChange('stopwatch')}
-          disabled={isRunning && hasActiveEntry}
-          title={isRunning ? 'Stop timer to switch modes' : undefined}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          style={
-            !isPomodoroMode
-              ? {
-                  backgroundColor: 'var(--color-accent)',
-                  color: '#fff',
-                  boxShadow: 'var(--shadow-sm)',
-                }
-              : { color: 'var(--color-text-secondary)' }
-          }
-        >
-          <Clock size={13} />
-          Stopwatch
-        </button>
-      </div>
+        <RotateCcw size={17} />
+      </button>
 
-      {/* ─── Main controls row ──────────────────────────────────────── */}
-      <div className="flex items-center justify-center gap-4">
-        {/* Reset — ghost text button */}
-        <button
-          onClick={onStop}
-          title="Reset & stop"
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all"
-          style={{ color: 'var(--color-text-muted)' }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-danger)';
-            (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-              'var(--color-danger-soft, color-mix(in srgb, var(--color-danger) 12%, transparent))';
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-muted)';
-            (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent';
-          }}
-        >
-          <RotateCcw size={14} />
-          Reset
-        </button>
+      {/* ── Play / Pause (hero, 64px) ─────────────────────────────── */}
+      <button
+        onClick={onPlayPause}
+        onMouseEnter={() => setPlayHovered(true)}
+        onMouseLeave={() => setPlayHovered(false)}
+        title={isRunning ? 'Pause' : 'Start'}
+        style={{
+          width: 64,
+          height: 64,
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: 'none',
+          background: isPomodoroMode
+            ? phase === 'short_break'
+              ? 'linear-gradient(135deg, var(--color-success), #4ade80)'
+              : phase === 'long_break'
+                ? 'linear-gradient(135deg, #2dd4bf, #5eead4)'
+                : 'linear-gradient(135deg, var(--color-accent), #60a5fa)'
+            : 'linear-gradient(135deg, var(--color-accent), #60a5fa)',
+          color: '#fff',
+          cursor: 'pointer',
+          transform: playHovered ? 'scale(1.08)' : 'scale(1)',
+          boxShadow: playHovered
+            ? `0 0 40px color-mix(in srgb, var(--color-accent) 40%, transparent), var(--shadow-lg)`
+            : `0 0 24px color-mix(in srgb, var(--color-accent) 25%, transparent), var(--shadow-md)`,
+          transition: 'all 0.18s ease',
+        }}
+      >
+        {isRunning ? (
+          <Pause size={26} fill="white" strokeWidth={0} />
+        ) : (
+          <Play size={26} fill="white" strokeWidth={0} style={{ marginLeft: 3 }} />
+        )}
+      </button>
 
-        {/* Play / Pause — hero pill */}
-        <button
-          onClick={onPlayPause}
-          title={isRunning ? 'Pause' : 'Start'}
-          className="flex items-center justify-center gap-2 rounded-full font-bold text-white transition-all active:scale-95"
-          style={{
-            minWidth: 164,
-            height: 52,
-            fontSize: '0.95rem',
-            background: 'var(--color-accent)',
-            boxShadow: `0 0 32px color-mix(in srgb, var(--color-accent) 35%, transparent), var(--shadow-md)`,
-            padding: '0 1.5rem',
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.filter = 'brightness(1.12)';
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.filter = 'none';
-          }}
-        >
-          {isRunning ? (
-            <>
-              <Pause size={20} fill="white" strokeWidth={0} />
-              Pause
-            </>
-          ) : (
-            <>
-              <Play size={20} fill="white" strokeWidth={0} />
-              {playLabel}
-            </>
-          )}
-        </button>
+      {/* ── Skip / Next phase (right flanking, Pomodoro only) ──────── */}
+      <button
+        onClick={onSkip}
+        onMouseEnter={() => setSkipHovered(true)}
+        onMouseLeave={() => setSkipHovered(false)}
+        title={isPomodoroMode ? 'Skip to next phase' : 'Only available in Pomodoro mode'}
+        disabled={!isPomodoroMode}
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: '1px solid var(--color-border)',
+          backgroundColor:
+            isPomodoroMode && skipHovered
+              ? 'var(--color-bg-tertiary)'
+              : 'var(--color-bg-secondary)',
+          color:
+            isPomodoroMode && skipHovered
+              ? 'var(--color-text-primary)'
+              : 'var(--color-text-muted)',
+          cursor: isPomodoroMode ? 'pointer' : 'not-allowed',
+          opacity: isPomodoroMode ? 1 : 0.3,
+          transform: isPomodoroMode && skipHovered ? 'scale(1.08)' : 'scale(1)',
+          boxShadow: isPomodoroMode && skipHovered ? 'var(--shadow-md)' : 'none',
+          transition: 'all 0.18s ease',
+        }}
+      >
+        <SkipForward size={17} />
+      </button>
+    </div>
+  );
+}
 
-        {/* Skip — secondary pill, Pomodoro only */}
-        <button
-          onClick={onSkip}
-          title={isPomodoroMode ? 'Skip to next phase' : 'Only available in Pomodoro mode'}
-          disabled={!isPomodoroMode}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-          style={{
-            color: isPomodoroMode ? 'var(--color-text-secondary)' : 'var(--color-text-muted)',
-            backgroundColor: 'var(--color-bg-tertiary)',
-          }}
-          onMouseEnter={(e) => {
-            if (isPomodoroMode) {
-              (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-primary)';
-              (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                'var(--color-bg-elevated)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-secondary)';
-            (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-              'var(--color-bg-tertiary)';
-          }}
-        >
-          <SkipForward size={14} />
-          Skip
-        </button>
-      </div>
+// Export mode switcher separately so TimerPage can use it
+interface ModeSwitcherProps {
+  isPomodoroMode: boolean;
+  isManualMode: boolean;
+  isRunning: boolean;
+  hasActiveEntry: boolean;
+  onModeChange: (mode: 'stopwatch' | 'pomodoro' | 'manual') => void;
+}
+
+export function ModeSwitcher({
+  isPomodoroMode,
+  isManualMode,
+  isRunning,
+  hasActiveEntry,
+  onModeChange,
+}: ModeSwitcherProps) {
+  const isLocked = isRunning && hasActiveEntry;
+
+  const modes: { key: 'stopwatch' | 'pomodoro' | 'manual'; label: string }[] = [
+    { key: 'stopwatch', label: '⏱ Stopwatch' },
+    { key: 'pomodoro', label: '🍅 Pomodoro' },
+    { key: 'manual', label: '✍️ Manual' },
+  ];
+
+  const active: 'stopwatch' | 'pomodoro' | 'manual' = isManualMode
+    ? 'manual'
+    : isPomodoroMode
+      ? 'pomodoro'
+      : 'stopwatch';
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 3,
+        padding: '4px',
+        borderRadius: 10,
+        backgroundColor: 'var(--color-bg-tertiary)',
+        border: '1px solid var(--color-border)',
+      }}
+    >
+      {modes.map(({ key, label }) => {
+        const isActive = active === key;
+        return (
+          <button
+            key={key}
+            onClick={() => onModeChange(key)}
+            disabled={isLocked}
+            title={isLocked ? 'Stop timer to switch modes' : undefined}
+            style={{
+              padding: '5px 14px',
+              borderRadius: 7,
+              fontSize: '0.78rem',
+              fontWeight: 600,
+              border: 'none',
+              cursor: isLocked ? 'not-allowed' : 'pointer',
+              opacity: isLocked && !isActive ? 0.5 : 1,
+              backgroundColor: isActive ? 'var(--color-accent)' : 'transparent',
+              color: isActive ? '#fff' : 'var(--color-text-secondary)',
+              boxShadow: isActive ? 'var(--shadow-sm)' : 'none',
+              transition: 'all 0.15s ease',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {label}
+          </button>
+        );
+      })}
     </div>
   );
 }

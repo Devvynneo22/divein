@@ -15,6 +15,7 @@ export function CardForm({ deckId, initialData, onSave, onCancel, isLoading }: C
   const [back, setBack] = useState(initialData?.back ?? '');
   const [tags, setTags] = useState<string[]>(initialData?.tags ?? []);
   const [tagInput, setTagInput] = useState('');
+  const [previewRevealed, setPreviewRevealed] = useState(false);
   const frontRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -50,6 +51,8 @@ export function CardForm({ deckId, initialData, onSave, onCancel, isLoading }: C
     setTags(tags.filter((t) => t !== tag));
   }
 
+  const hasContent = front.trim() || back.trim();
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       {/* Side-by-side Front / Back */}
@@ -58,7 +61,7 @@ export function CardForm({ deckId, initialData, onSave, onCancel, isLoading }: C
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <div
-              className="w-5 h-5 rounded flex items-center justify-center text-xs font-bold text-white"
+              className="w-5 h-5 rounded flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
               style={{ backgroundColor: 'var(--color-accent)' }}
             >
               Q
@@ -72,8 +75,9 @@ export function CardForm({ deckId, initialData, onSave, onCancel, isLoading }: C
             value={front}
             onChange={(e) => setFront(e.target.value)}
             placeholder="Enter the question or prompt…"
-            rows={5}
-            className="input-base px-3 py-2.5 rounded-xl text-sm resize-none leading-relaxed"
+            rows={4}
+            className="input-base px-3 py-2.5 rounded-xl text-sm leading-relaxed"
+            style={{ resize: 'none' }}
           />
         </div>
 
@@ -81,7 +85,7 @@ export function CardForm({ deckId, initialData, onSave, onCancel, isLoading }: C
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <div
-              className="w-5 h-5 rounded flex items-center justify-center text-xs font-bold text-white"
+              className="w-5 h-5 rounded flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
               style={{ backgroundColor: 'var(--color-success)' }}
             >
               A
@@ -94,8 +98,9 @@ export function CardForm({ deckId, initialData, onSave, onCancel, isLoading }: C
             value={back}
             onChange={(e) => setBack(e.target.value)}
             placeholder="Enter the answer…"
-            rows={5}
-            className="input-base px-3 py-2.5 rounded-xl text-sm resize-none leading-relaxed"
+            rows={4}
+            className="input-base px-3 py-2.5 rounded-xl text-sm leading-relaxed"
+            style={{ resize: 'none' }}
           />
         </div>
       </div>
@@ -120,17 +125,17 @@ export function CardForm({ deckId, initialData, onSave, onCancel, isLoading }: C
               style={{
                 backgroundColor: 'var(--color-accent-soft)',
                 color: 'var(--color-accent)',
-                border: '1px solid var(--color-accent-muted)',
+                border: '1px solid var(--color-border)',
               }}
             >
               {tag}
               <button
                 type="button"
                 onClick={() => removeTag(tag)}
-                className="rounded-full p-0.5 transition-colors"
+                className="rounded-full p-0.5 transition-all"
                 style={{ color: 'var(--color-accent)' }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent-muted)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.7'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
               >
                 <X size={9} />
               </button>
@@ -147,6 +152,91 @@ export function CardForm({ deckId, initialData, onSave, onCancel, isLoading }: C
           />
         </div>
       </div>
+
+      {/* Live mini preview */}
+      {hasContent && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>
+              👁 Preview
+            </span>
+            <button
+              type="button"
+              onClick={() => setPreviewRevealed((v) => !v)}
+              className="text-xs px-2 py-0.5 rounded-full transition-all"
+              style={{
+                backgroundColor: 'var(--color-bg-tertiary)',
+                color: 'var(--color-text-muted)',
+                border: '1px solid var(--color-border)',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-elevated)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
+            >
+              {previewRevealed ? 'Hide answer' : 'Reveal answer'}
+            </button>
+          </div>
+          <div
+            className="rounded-xl p-4 flex flex-col gap-3"
+            style={{
+              backgroundColor: 'var(--color-bg-tertiary)',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            {/* Front preview */}
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-text-muted)' }}>
+                Question
+              </div>
+              <p className="text-sm font-medium leading-relaxed" style={{ color: 'var(--color-text-primary)' }}>
+                {front || <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>No question yet…</span>}
+              </p>
+            </div>
+
+            {/* Divider */}
+            <div style={{ height: '1px', backgroundColor: 'var(--color-border)' }} />
+
+            {/* Back preview */}
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-text-muted)' }}>
+                Answer
+              </div>
+              <p
+                className="text-sm leading-relaxed"
+                style={{
+                  color: 'var(--color-text-secondary)',
+                  filter: previewRevealed ? 'none' : 'blur(5px)',
+                  transition: 'filter 0.2s ease',
+                  userSelect: previewRevealed ? 'text' : 'none',
+                  cursor: 'pointer',
+                }}
+                onClick={() => setPreviewRevealed((v) => !v)}
+                title={previewRevealed ? 'Click to hide' : 'Click to reveal'}
+              >
+                {back || <span style={{ fontStyle: 'italic' }}>No answer yet…</span>}
+              </p>
+            </div>
+
+            {/* Tags preview */}
+            {tags.length > 0 && (
+              <div className="flex gap-1 flex-wrap">
+                {tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="text-xs px-2 py-0.5 rounded-full"
+                    style={{
+                      backgroundColor: 'var(--color-bg-elevated)',
+                      color: 'var(--color-text-muted)',
+                      border: '1px solid var(--color-border)',
+                    }}
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: 'var(--color-border)' }}>

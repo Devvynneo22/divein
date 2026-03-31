@@ -22,6 +22,7 @@ import { AddColumnPanel } from './components/AddColumnPanel';
 import { tableService } from '@/shared/lib/tableService';
 import { exportTableToCSV, downloadCSV, parseCSVToRows, type CSVParseResult } from '@/shared/lib/csvService';
 import type { TableDef, TableFilter, TableSort, ColumnDef } from '@/shared/types/table';
+import { EmptyState } from '@/shared/components/EmptyState';
 
 // ─── Row count wrapper for TableCard ──────────────────────────────────────────
 
@@ -806,32 +807,13 @@ export function TablesPage() {
           <LoadingSpinner text="Loading tables…" />
         ) : tables.length === 0 ? (
           /* ── Empty state ─────────────────────────────────────────────────── */
-          <div className="flex flex-col items-center justify-center py-24 gap-5 text-center">
-            <div
-              className="w-20 h-20 rounded-3xl flex items-center justify-center text-4xl"
-              style={{ backgroundColor: 'var(--color-bg-secondary)', boxShadow: 'var(--shadow-md)' }}
-            >
-              📊
-            </div>
-            <div>
-              <p className="text-lg font-bold mb-1" style={{ color: 'var(--color-text-primary)' }}>
-                Create your first table
-              </p>
-              <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                Organize structured data with flexible columns, filters, and views.
-              </p>
-            </div>
-            <button
-              onClick={() => setShowCreateForm(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
-              style={{ backgroundColor: 'var(--color-accent)', color: 'white', boxShadow: 'var(--shadow-sm)' }}
-              onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.85'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
-            >
-              <Plus size={15} />
-              New Table
-            </button>
-          </div>
+          <EmptyState
+            icon="📊"
+            title="No tables yet"
+            description="Create a table to organize structured data with formulas and filters"
+            actionLabel="Create Table"
+            onAction={() => setShowCreateForm(true)}
+          />
         ) : filteredTables.length === 0 ? (
           /* ── No search results ───────────────────────────────────────────── */
           <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">

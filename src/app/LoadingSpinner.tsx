@@ -1,3 +1,8 @@
+// NOTE: LoadingSpinner is intended for full-page / suspense boundaries.
+// For loading states inside content areas (lists, cards, dashboards), prefer
+// the Skeleton components from '@/shared/components/Skeleton' instead —
+// they provide a better user experience by matching the final content shape.
+
 interface LoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg';
   text?: string;

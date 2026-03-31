@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { Task, TaskStatus, TaskPriority } from '@/shared/types/task';
 import { TaskCard } from './TaskCard';
 import { useAppSettingsStore } from '@/shared/stores/appSettingsStore';
+import { DENSITY_CONFIGS } from '../lib/densityConfig';
 
 // Soft WIP limit per column — show a warning if exceeded
 const WIP_LIMIT = 5;
@@ -101,10 +102,11 @@ export function TaskBoardColumn({
   const [isAddHovered, setIsAddHovered] = useState(false);
   const [isMoreHovered, setIsMoreHovered] = useState(false);
   const density = useAppSettingsStore((s) => s.app.taskDensity);
+  const dc = DENSITY_CONFIGS[density];
 
   const accentColor = STATUS_ACCENT[status];
   const isWipExceeded = tasks.length > WIP_LIMIT;
-  const columnCardGap = density === 'compact' ? '4px' : density === 'spacious' ? '12px' : '8px';
+  const columnCardGap = `${dc.card.gap}px`;
   const columnCardPaddingH = density === 'compact' ? '6px' : '8px';
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -129,7 +131,7 @@ export function TaskBoardColumn({
   return (
     <div
       style={{
-        width: compactMode ? '220px' : '300px',
+        width: compactMode ? '220px' : `${dc.column.width}px`,
         flexShrink: 0,
         display: 'flex',
         flexDirection: 'column',
@@ -189,7 +191,7 @@ export function TaskBoardColumn({
             </div>
             <span
               style={{
-                fontSize: '13px',
+                fontSize: `${dc.column.headerSize}px`,
                 fontWeight: 700,
                 color: isWipExceeded ? 'var(--color-danger, #ef4444)' : 'var(--color-text-primary)',
                 flex: 1,
@@ -327,6 +329,12 @@ export function TaskBoardColumn({
                   onToggleSelect(task.id, e);
                 } else {
                   onSelectTask(task.id);
+                }
+              }}
+              onToggleSelect={(id) => {
+                if (onToggleSelect) {
+                  // Synthesize a minimal mouse event-like object for the toggle
+                  onToggleSelect(id, { shiftKey: false, metaKey: true, ctrlKey: true, preventDefault: () => {}, stopPropagation: () => {} } as React.MouseEvent);
                 }
               }}
               onMouseEnter={() => onHoverTask?.(task.id)}

@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import type { Task, TaskStatus, TaskPriority } from '@/shared/types/task';
 import { useAppSettingsStore } from '@/shared/stores/appSettingsStore';
 import { useTaskSettingsStore } from '@/shared/stores/taskSettingsStore';
-import type { TaskDensity } from '@/shared/stores/appSettingsStore';
+import { DENSITY_CONFIGS } from '../lib/densityConfig';
 
 // Lock icon for blocked tasks
 function LockIcon({ size = 12, color = 'currentColor' }: { size?: number; color?: string }) {
@@ -20,6 +20,7 @@ interface TaskCardProps {
   isMultiSelected?: boolean;
   isBlocked?: boolean;
   onSelect: (e: React.MouseEvent<HTMLDivElement>) => void;
+  onToggleSelect?: (id: string) => void;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
   onStatusChange: (status: TaskStatus) => void;
@@ -144,25 +145,7 @@ function isOverdue(dateStr: string): boolean {
   return date < today;
 }
 
-// ─── Density config ───────────────────────────────────────────────────────────
-
-const DENSITY_PADDING: Record<TaskDensity, string> = {
-  compact:  '10px 12px',
-  default:  '14px 16px',
-  spacious: '20px 20px',
-};
-
-const DENSITY_FONT_SIZE: Record<TaskDensity, string> = {
-  compact:  '13px',
-  default:  '14px',
-  spacious: '15px',
-};
-
-const DENSITY_META_FONT_SIZE: Record<TaskDensity, string> = {
-  compact:  '10px',
-  default:  '11px',
-  spacious: '12px',
-};
+// Density config is imported from densityConfig.ts — no local constants needed.
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -303,6 +286,7 @@ export function TaskCard({
   isMultiSelected = false,
   isBlocked = false,
   onSelect,
+  onToggleSelect,
   onMouseEnter: onMouseEnterProp,
   onMouseLeave: onMouseLeaveProp,
   onStatusChange,
@@ -323,9 +307,12 @@ export function TaskCard({
   const showIssueKeys = useAppSettingsStore((s) => s.app.showIssueKeys);
   const tagColors = useTaskSettingsStore((s) => s.tagColors);
 
+  const dc = DENSITY_CONFIGS[density];
+
   const priorityBorderColor = PRIORITY_BORDER_COLOR[task.priority] ?? 'transparent';
   const overdueDate = task.dueDate ? isOverdue(task.dueDate) : false;
-  const hasCover = !!(task.coverImage && showCoverImages);
+  // Respect both global showCoverImages setting and density config
+  const hasCover = !!(task.coverImage && showCoverImages && dc.card.showCover);
   const hasAssignees = !!(task.assignees && task.assignees.length > 0);
 
   const cardBg = isMultiSelected ? 'var(--color-accent-soft)' : 'var(--color-bg-elevated)';
@@ -382,7 +369,7 @@ export function TaskCard({
       style={{
         position: 'relative',
         backgroundColor: cardBg,
-        borderRadius: '12px',
+        borderRadius: `${dc.card.borderRadius}px`,
         borderTop: task.priority > 0 ? `3px solid ${priorityBorderColor}` : `1px solid ${cardBorderColor}`,
         borderRight: `1px solid ${cardBorderColor}`,
         borderBottom: `1px solid ${cardBorderColor}`,
@@ -405,7 +392,7 @@ export function TaskCard({
             width: '100%',
             height: '110px',
             overflow: 'hidden',
-            borderRadius: '11px 11px 0 0',
+            borderRadius: `${dc.card.borderRadius - 1}px ${dc.card.borderRadius - 1}px 0 0`,
             flexShrink: 0,
           }}
         >
@@ -426,7 +413,48 @@ export function TaskCard({
       )}
 
       {/* ── Card Body ─────────────────────────────────────────────────────── */}
-      <div style={{ padding: DENSITY_PADDING[density] }}>
+      <div style={{ padding: `${dc.card.padding}px`, minHeight: dc.card.minHeight > 0 ? `${dc.card.minHeight}px` : undefined }}>
+
+        {/* Multi-select checkbox — top-left corner, hidden until hover or selected */}
+        {(isHovered || isMultiSelected) && (
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleSelect?.(task.id);
+            }}
+            style={{
+              position: 'absolute',
+              top: hasCover ? '118px' : '8px',
+              left: '8px',
+              width: 16,
+              height: 16,
+              borderRadius: 4,
+              border: isMultiSelected
+                ? '2px solid var(--color-accent)'
+                : '1.5px solid var(--color-border-hover, #94a3b8)',
+              backgroundColor: isMultiSelected ? 'var(--color-accent)' : 'var(--color-bg-elevated)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              zIndex: 11,
+              boxSizing: 'border-box',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+            }}
+          >
+            {isMultiSelected && (
+              <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                <path
+                  d="M1 4L3.5 6.5L9 1"
+                  stroke="white"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            )}
+          </div>
+        )}
 
         {/* Quick action buttons — visible on hover */}
         {isHovered && (
@@ -488,7 +516,7 @@ export function TaskCard({
         )}
 
         {/* ── Issue Key + Tags row ─────────────────────────────────────── */}
-        {(showIssueKeys && task.issueKey || task.tags.length > 0) && (
+        {(showIssueKeys && task.issueKey || (dc.card.showTags && task.tags.length > 0)) && (
           <div
             style={{
               display: 'flex',
@@ -514,8 +542,8 @@ export function TaskCard({
               </span>
             )}
 
-            {/* Tags — solid vibrant pills */}
-            {task.tags.slice(0, 3).map((tag) => {
+            {/* Tags — solid vibrant pills (hidden in compact density) */}
+            {dc.card.showTags && task.tags.slice(0, 3).map((tag) => {
               const label = normalizeTagLabel(tag);
               const style = getTagStyle(label, tagColors);
               return (
@@ -546,7 +574,7 @@ export function TaskCard({
         {/* ── Title ────────────────────────────────────────────────────── */}
         <div
           style={{
-            fontSize: DENSITY_FONT_SIZE[density],
+            fontSize: `${dc.card.titleSize}px`,
             fontWeight: 600,
             color: 'var(--color-text-primary)',
             lineHeight: '1.45',
@@ -565,7 +593,7 @@ export function TaskCard({
           <span
             style={({
               display: '-webkit-box',
-              WebkitLineClamp: 2,
+              WebkitLineClamp: dc.card.titleLines,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
             } as React.CSSProperties)}
@@ -573,6 +601,25 @@ export function TaskCard({
             {task.title}
           </span>
         </div>
+
+        {/* ── Description snippet (spacious only) ─────────────────── */}
+        {dc.card.showDescription && task.description && (
+          <div
+            style={{
+              fontSize: `${dc.card.metaSize}px`,
+              color: 'var(--color-text-secondary)',
+              lineHeight: '1.5',
+              marginBottom: '8px',
+              overflow: 'hidden',
+              display: '-webkit-box',
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              WebkitLineClamp: 2 as any,
+              WebkitBoxOrient: 'vertical' as React.CSSProperties['WebkitBoxOrient'],
+            } as React.CSSProperties}
+          >
+            {task.description.slice(0, 120)}
+          </div>
+        )}
 
         {/* Priority badge */}
         {task.priority > 0 && (
@@ -649,7 +696,7 @@ export function TaskCard({
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '3px',
-                  fontSize: DENSITY_META_FONT_SIZE[density],
+                  fontSize: `${dc.card.metaSize}px`,
                   color: overdueDate ? '#ef4444' : 'var(--color-text-muted)',
                   fontWeight: overdueDate ? 700 : 400,
                   backgroundColor: overdueDate ? 'rgba(239,68,68,0.08)' : 'transparent',
@@ -672,7 +719,7 @@ export function TaskCard({
               >
                 <span
                   style={{
-                    fontSize: DENSITY_META_FONT_SIZE[density],
+                    fontSize: `${dc.card.metaSize}px`,
                     color: subtaskProgress.done === subtaskProgress.total
                       ? '#22c55e'
                       : 'var(--color-text-muted)',

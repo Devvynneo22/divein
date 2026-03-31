@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { StatusBar } from './StatusBar';
+import { ToastContainer } from '@/shared/components/ToastContainer';
 
 export function Layout() {
   return (
@@ -24,6 +25,9 @@ export function Layout() {
         {/* Status bar */}
         <StatusBar />
       </div>
+
+      {/* Global toast overlay — fixed portal, outside scroll areas */}
+      <ToastContainer />
     </div>
   );
 }

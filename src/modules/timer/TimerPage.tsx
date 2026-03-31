@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Plus, ListTodo, X } from 'lucide-react';
+import { X, ListTodo, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 import { startOfDay, endOfDay } from 'date-fns';
 import { useTimerStore } from '@/shared/stores/timerStore';
 import {
@@ -12,10 +12,13 @@ import {
   useTasks,
 } from './hooks/useTimer';
 import { TimerDisplay } from './components/TimerDisplay';
-import { TimerControls } from './components/TimerControls';
+import { TimerControls, ModeSwitcher } from './components/TimerControls';
 import { TimeEntryList } from './components/TimeEntryList';
 import { PomodoroSettings } from './components/PomodoroSettings';
+import { TimerReports } from './components/TimerReports';
 import type { PomodoroPhase } from '@/shared/types/timer';
+
+type PageTab = 'timer' | 'reports';
 
 function getPhaseTotalSeconds(
   phase: PomodoroPhase,
@@ -30,11 +33,20 @@ function getPhaseTotalSeconds(
 
 export function TimerPage() {
   const store = useTimerStore();
+  const [pageTab, setPageTab] = useState<PageTab>('timer');
   const [description, setDescription] = useState('');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [taskDropdownOpen, setTaskDropdownOpen] = useState(false);
   const [taskSearch, setTaskSearch] = useState('');
   const taskDropdownRef = useRef<HTMLDivElement>(null);
+
+  // ─── Manual mode state ──────────────────────────────────────────────────────
+  const [isManualMode, setIsManualMode] = useState(false);
+  const [showManualForm, setShowManualForm] = useState(false);
+  const [manualDesc, setManualDesc] = useState('');
+  const [manualStart, setManualStart] = useState('');
+  const [manualEnd, setManualEnd] = useState('');
+  const [addManualHovered, setAddManualHovered] = useState(false);
 
   // ─── Tasks for linking ──────────────────────────────────────────────────────
   const { data: tasks = [] } = useTasks();
@@ -65,13 +77,16 @@ export function TimerPage() {
   );
   const { data: todayTotalSec = 0, refetch: refetchTotal } = useTodayTotal();
 
+  // All entries (unfiltered) for Reports tab
+  const { data: allEntries = [] } = useTimeEntries();
+
   // ─── Mutations ───────────────────────────────────────────────────────────────
   const startTimer = useStartTimer();
   const stopTimer = useStopTimer();
   const createManualEntry = useCreateManualEntry();
   const deleteEntry = useDeleteEntry();
 
-  // ─── Tick interval — drives the real-time display ─────────────────────────
+  // ─── Tick interval ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!store.isRunning) return;
     const interval = setInterval(() => {
@@ -80,7 +95,7 @@ export function TimerPage() {
     return () => clearInterval(interval);
   }, [store.isRunning, store.tick]);
 
-  // ─── Refetch entries/total when a timer stops ─────────────────────────────
+  // ─── Refetch on stop ────────────────────────────────────────────────────────
   useEffect(() => {
     if (!store.isRunning) {
       void refetchEntries();
@@ -88,7 +103,7 @@ export function TimerPage() {
     }
   }, [store.isRunning, refetchEntries, refetchTotal]);
 
-  // ─── Handlers ────────────────────────────────────────────────────────────────
+  // ─── Handlers ───────────────────────────────────────────────────────────────
   function handlePlayPause() {
     if (store.isRunning) {
       useTimerStore.setState({ isRunning: false, _startEpoch: null });
@@ -138,8 +153,14 @@ export function TimerPage() {
     store.skipPhase();
   }
 
-  function handleModeChange(mode: 'stopwatch' | 'pomodoro') {
+  function handleModeChange(mode: 'stopwatch' | 'pomodoro' | 'manual') {
     if (store.isRunning) return;
+    if (mode === 'manual') {
+      setIsManualMode(true);
+      setShowManualForm(true);
+      return;
+    }
+    setIsManualMode(false);
     useTimerStore.setState({
       isPomodoroMode: mode === 'pomodoro',
       phase: 'work',
@@ -159,20 +180,26 @@ export function TimerPage() {
     });
   }
 
-  function handleAddManualEntry() {
-    const now = new Date();
-    const startTime = new Date(now.getTime() - 25 * 60 * 1000).toISOString();
+  function handleSubmitManualEntry() {
+    if (!manualStart || !manualEnd) return;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const startISO = new Date(`${todayStr}T${manualStart}:00`).toISOString();
+    const endISO = new Date(`${todayStr}T${manualEnd}:00`).toISOString();
+
     createManualEntry.mutate(
       {
-        startTime,
-        endTime: now.toISOString(),
-        description: 'Manual entry',
+        startTime: startISO,
+        endTime: endISO,
+        description: manualDesc.trim() || undefined,
         isPomodoro: false,
       },
       {
         onSuccess: () => {
           void refetchEntries();
           void refetchTotal();
+          setManualDesc('');
+          setManualStart('');
+          setManualEnd('');
         },
       },
     );
@@ -188,115 +215,240 @@ export function TimerPage() {
 
   const isSessionLocked = store.isRunning && !!store.currentEntryId;
 
+  // ─── Tab bar items ────────────────────────────────────────────────────────
+  const pageTabs: { id: PageTab; label: string }[] = [
+    { id: 'timer', label: '⏱ Timer' },
+    { id: 'reports', label: '📊 Reports' },
+  ];
+
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* ══════════════════════════════════════════════════════════════════
-          Left panel — Timer hero + controls + settings
-      ══════════════════════════════════════════════════════════════════ */}
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        overflow: 'hidden',
+      }}
+    >
+      {/* ── Top-level tab bar ─────────────────────────────────────────── */}
       <div
-        className="flex flex-col overflow-y-auto"
-        style={{ flex: '0 0 480px', minWidth: 0, borderRight: '1px solid var(--color-border)' }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 2,
+          padding: '10px 24px 0',
+          borderBottom: '1px solid var(--color-border)',
+          flexShrink: 0,
+          backgroundColor: 'var(--color-bg-primary)',
+        }}
       >
-        {/* Page header */}
-        <div className="px-6 pt-6 pb-0">
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
+        {pageTabs.map((tab) => {
+          const isActive = pageTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setPageTab(tab.id)}
+              style={{
+                padding: '8px 16px',
+                fontSize: '0.85rem',
+                fontWeight: isActive ? 700 : 400,
+                border: 'none',
+                borderBottom: isActive
+                  ? '2px solid var(--color-accent)'
+                  : '2px solid transparent',
+                backgroundColor: 'transparent',
+                color: isActive ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                marginBottom: -1,
+                borderRadius: 0,
+              }}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Reports tab ──────────────────────────────────────────────── */}
+      {pageTab === 'reports' && (
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <TimerReports entries={allEntries} />
+        </div>
+      )}
+
+      {/* ── Timer tab ────────────────────────────────────────────────── */}
+      {pageTab === 'timer' && (
+      <div
+        style={{
+          display: 'flex',
+          flex: 1,
+          overflow: 'hidden',
+        }}
+      >
+      {/* ════════════════════════════════════════════════════════════════
+          LEFT PANEL — Timer focus area (~55%)
+      ════════════════════════════════════════════════════════════════ */}
+      <div
+        style={{
+          flex: '0 0 55%',
+          minWidth: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          borderRight: '1px solid var(--color-border)',
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            padding: '24px 28px 0',
+            flexShrink: 0,
+          }}
+        >
+          <h1
+            style={{
+              fontSize: '1.4rem',
+              fontWeight: 800,
+              color: 'var(--color-text-primary)',
+              margin: 0,
+            }}
+          >
             Timer
           </h1>
-          <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-            {store.isPomodoroMode ? 'Pomodoro — stay focused, rest well' : 'Track your time freely'}
+          <p
+            style={{
+              fontSize: '0.82rem',
+              color: 'var(--color-text-muted)',
+              marginTop: 3,
+              marginBottom: 0,
+            }}
+          >
+            {store.isPomodoroMode
+              ? 'Pomodoro — stay focused, rest well'
+              : isManualMode
+                ? 'Log time manually'
+                : 'Track your time freely'}
           </p>
         </div>
 
-        {/* ── Timer ring hero ──────────────────────────────────────────────── */}
+        {/* Scrollable content */}
         <div
-          className="flex flex-col items-center gap-6 px-6 py-8"
           style={{
-            background:
-              'radial-gradient(ellipse 80% 60% at 50% 0%, var(--color-bg-secondary) 0%, transparent 75%)',
+            flex: 1,
+            overflowY: 'auto',
+            padding: '20px 28px 32px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 24,
           }}
         >
-          <TimerDisplay
+          {/* ── Mode switcher ─────────────────────────────────────────── */}
+          <ModeSwitcher
             isPomodoroMode={store.isPomodoroMode}
+            isManualMode={isManualMode}
             isRunning={store.isRunning}
-            phase={store.phase}
-            secondsElapsed={store.secondsElapsed}
-            secondsRemaining={store.secondsRemaining}
-            totalSeconds={totalSeconds}
-            pomodoroCount={store.pomodoroCount}
-            longBreakAfter={store.settings.longBreakAfter}
-          />
-
-          <TimerControls
-            isRunning={store.isRunning}
-            isPomodoroMode={store.isPomodoroMode}
-            phase={store.phase}
             hasActiveEntry={!!store.currentEntryId}
-            onPlayPause={handlePlayPause}
-            onStop={handleStop}
-            onSkip={handleSkip}
             onModeChange={handleModeChange}
           />
-        </div>
 
-        {/* ── Session label + task link ─────────────────────────────────────── */}
-        <div className="px-5 pb-4">
-          <div
-            className="rounded-xl p-4 flex flex-col gap-3"
-            style={{
-              backgroundColor: 'var(--color-bg-secondary)',
-              border: '1px solid var(--color-border)',
-              boxShadow: 'var(--shadow-sm)',
-            }}
-          >
-            {/* "What are you working on?" description */}
-            <div>
-              <input
-                type="text"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                disabled={isSessionLocked}
-                placeholder="What are you working on?"
-                className="w-full text-sm font-medium bg-transparent focus:outline-none disabled:opacity-50"
-                style={{
-                  color: 'var(--color-text-primary)',
-                  caretColor: 'var(--color-accent)',
-                }}
+          {/* ── Timer ring ────────────────────────────────────────────── */}
+          {!isManualMode && (
+            <div
+              style={{
+                width: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 4,
+                background:
+                  'radial-gradient(ellipse 90% 65% at 50% 10%, color-mix(in srgb, var(--color-bg-secondary) 80%, transparent) 0%, transparent 70%)',
+                borderRadius: 24,
+                padding: '16px 0',
+              }}
+            >
+              <TimerDisplay
+                isPomodoroMode={store.isPomodoroMode}
+                isRunning={store.isRunning}
+                phase={store.phase}
+                secondsElapsed={store.secondsElapsed}
+                secondsRemaining={store.secondsRemaining}
+                totalSeconds={totalSeconds}
+                pomodoroCount={store.pomodoroCount}
+                longBreakAfter={store.settings.longBreakAfter}
               />
-              {description === '' && !isSessionLocked && (
-                <div
-                  className="h-px mt-2"
-                  style={{ backgroundColor: 'var(--color-border)' }}
-                />
-              )}
             </div>
+          )}
 
-            {/* Task selector */}
-            <div>
-              <label
-                className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
-                style={{ color: 'var(--color-text-muted)' }}
+          {/* ── Task selector ─────────────────────────────────────────── */}
+          {!isManualMode && (
+            <div
+              style={{
+                width: '100%',
+                maxWidth: 360,
+              }}
+            >
+              <div
+                style={{
+                  position: 'relative',
+                  borderRadius: 10,
+                  border: taskDropdownOpen
+                    ? '1px solid var(--color-accent)'
+                    : '1px solid var(--color-border)',
+                  backgroundColor: 'var(--color-bg-secondary)',
+                  boxShadow: taskDropdownOpen ? '0 0 0 3px color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'var(--shadow-sm)',
+                  transition: 'all 0.15s ease',
+                }}
+                ref={taskDropdownRef}
               >
-                Link to task
-              </label>
-              <div className="relative" ref={taskDropdownRef}>
                 {selectedTask ? (
                   <div
-                    className="flex items-center gap-2 text-sm rounded-lg px-2.5 py-1.5"
                     style={{
-                      backgroundColor: 'var(--color-bg-tertiary)',
-                      color: 'var(--color-text-primary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '9px 12px',
                     }}
                   >
-                    <ListTodo size={13} className="shrink-0" style={{ color: 'var(--color-accent)' }} />
-                    <span className="truncate flex-1">{selectedTask.title}</span>
+                    <ListTodo
+                      size={14}
+                      style={{ color: 'var(--color-accent)', flexShrink: 0 }}
+                    />
+                    <span
+                      style={{
+                        flex: 1,
+                        fontSize: '0.85rem',
+                        color: 'var(--color-text-primary)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {selectedTask.title}
+                    </span>
                     <button
                       onClick={() => {
                         setSelectedTaskId(null);
                         setTaskSearch('');
                       }}
                       disabled={isSessionLocked}
-                      className="shrink-0 w-5 h-5 rounded flex items-center justify-center transition-colors disabled:opacity-50"
-                      style={{ color: 'var(--color-text-muted)' }}
+                      title="Clear linked task"
+                      style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: 4,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: 'none',
+                        backgroundColor: 'transparent',
+                        color: 'var(--color-text-muted)',
+                        cursor: isSessionLocked ? 'not-allowed' : 'pointer',
+                        opacity: isSessionLocked ? 0.4 : 1,
+                        flexShrink: 0,
+                        padding: 0,
+                      }}
                       onMouseEnter={(e) => {
                         (e.currentTarget as HTMLButtonElement).style.color =
                           'var(--color-text-primary)';
@@ -305,13 +457,23 @@ export function TimerPage() {
                         (e.currentTarget as HTMLButtonElement).style.color =
                           'var(--color-text-muted)';
                       }}
-                      title="Remove linked task"
                     >
-                      <X size={12} />
+                      <X size={13} />
                     </button>
                   </div>
                 ) : (
-                  <>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '9px 12px',
+                      gap: 8,
+                    }}
+                  >
+                    <ListTodo
+                      size={14}
+                      style={{ color: 'var(--color-text-muted)', flexShrink: 0 }}
+                    />
                     <input
                       type="text"
                       value={taskSearch}
@@ -321,113 +483,480 @@ export function TimerPage() {
                       }}
                       onFocus={() => setTaskDropdownOpen(true)}
                       disabled={isSessionLocked}
-                      placeholder="Search tasks… (optional)"
-                      className="w-full bg-transparent text-sm focus:outline-none disabled:opacity-50"
+                      placeholder="Link to task (optional)"
                       style={{
+                        flex: 1,
+                        background: 'transparent',
+                        border: 'none',
+                        outline: 'none',
+                        fontSize: '0.85rem',
                         color: 'var(--color-text-primary)',
+                        cursor: isSessionLocked ? 'not-allowed' : 'text',
+                        opacity: isSessionLocked ? 0.5 : 1,
                       }}
                     />
-                    {taskDropdownOpen && filteredTasks.length > 0 && (
-                      <div
-                        className="absolute z-20 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-xl"
+                  </div>
+                )}
+
+                {/* Floating task dropdown */}
+                {taskDropdownOpen && filteredTasks.length > 0 && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      top: 'calc(100% + 4px)',
+                      zIndex: 30,
+                      borderRadius: 10,
+                      border: '1px solid var(--color-border)',
+                      backgroundColor: 'var(--color-bg-elevated)',
+                      boxShadow: 'var(--shadow-popup)',
+                      maxHeight: 200,
+                      overflowY: 'auto',
+                    }}
+                  >
+                    {filteredTasks.map((task) => (
+                      <button
+                        key={task.id}
+                        onClick={() => {
+                          setSelectedTaskId(task.id);
+                          setTaskSearch('');
+                          setTaskDropdownOpen(false);
+                        }}
                         style={{
-                          border: '1px solid var(--color-border)',
-                          backgroundColor: 'var(--color-bg-elevated)',
-                          boxShadow: 'var(--shadow-popup)',
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          padding: '8px 12px',
+                          textAlign: 'left',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--color-text-primary)',
+                          fontSize: '0.85rem',
+                          transition: 'background-color 0.1s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                            'var(--color-bg-tertiary)';
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                            'transparent';
                         }}
                       >
-                        {filteredTasks.map((task) => (
-                          <button
-                            key={task.id}
-                            onClick={() => {
-                              setSelectedTaskId(task.id);
-                              setTaskSearch('');
-                              setTaskDropdownOpen(false);
-                            }}
-                            className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors"
-                            style={{ color: 'var(--color-text-primary)' }}
-                            onMouseEnter={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                                'var(--color-bg-tertiary)';
-                            }}
-                            onMouseLeave={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                                'transparent';
-                            }}
-                          >
-                            <ListTodo
-                              size={13}
-                              className="shrink-0"
-                              style={{ color: 'var(--color-text-muted)' }}
-                            />
-                            <span className="truncate">{task.title}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </>
+                        <ListTodo
+                          size={13}
+                          style={{ color: 'var(--color-text-muted)', flexShrink: 0 }}
+                        />
+                        <span
+                          style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {task.title}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
-            </div>
-          </div>
-        </div>
 
-        {/* ── Pomodoro settings ─────────────────────────────────────────────── */}
-        {store.isPomodoroMode && (
-          <div className="px-5 pb-6">
-            <PomodoroSettings settings={store.settings} onChange={store.updateSettings} />
-          </div>
-        )}
+              {/* Description input */}
+              <div
+                style={{
+                  marginTop: 8,
+                  borderRadius: 10,
+                  border: '1px solid var(--color-border)',
+                  backgroundColor: 'var(--color-bg-secondary)',
+                  boxShadow: 'var(--shadow-sm)',
+                }}
+              >
+                <input
+                  type="text"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  disabled={isSessionLocked}
+                  placeholder="What are you working on? (optional)"
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    background: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    fontSize: '0.85rem',
+                    color: 'var(--color-text-primary)',
+                    cursor: isSessionLocked ? 'not-allowed' : 'text',
+                    opacity: isSessionLocked ? 0.5 : 1,
+                    borderRadius: 10,
+                    boxSizing: 'border-box',
+                  }}
+                  onFocus={(e) => {
+                    (e.currentTarget as HTMLInputElement).parentElement!.style.border =
+                      '1px solid var(--color-accent)';
+                    (e.currentTarget as HTMLInputElement).parentElement!.style.boxShadow =
+                      '0 0 0 3px color-mix(in srgb, var(--color-accent) 12%, transparent)';
+                  }}
+                  onBlur={(e) => {
+                    (e.currentTarget as HTMLInputElement).parentElement!.style.border =
+                      '1px solid var(--color-border)';
+                    (e.currentTarget as HTMLInputElement).parentElement!.style.boxShadow =
+                      'var(--shadow-sm)';
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* ── Controls ──────────────────────────────────────────────── */}
+          {!isManualMode && (
+            <TimerControls
+              isRunning={store.isRunning}
+              isPomodoroMode={store.isPomodoroMode}
+              phase={store.phase}
+              hasActiveEntry={!!store.currentEntryId}
+              onPlayPause={handlePlayPause}
+              onStop={handleStop}
+              onSkip={handleSkip}
+              onModeChange={(m) => handleModeChange(m)}
+            />
+          )}
+
+          {/* ── Pomodoro settings (left panel, below controls) ─────────── */}
+          {store.isPomodoroMode && !isManualMode && (
+            <div style={{ width: '100%', maxWidth: 360 }}>
+              <PomodoroSettings
+                settings={store.settings}
+                onChange={store.updateSettings}
+              />
+            </div>
+          )}
+
+          {/* ── Manual mode placeholder ────────────────────────────────── */}
+          {isManualMode && (
+            <div
+              style={{
+                width: '100%',
+                maxWidth: 380,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <span style={{ fontSize: '3rem' }}>✍️</span>
+              <p
+                style={{
+                  fontSize: '0.9rem',
+                  color: 'var(--color-text-secondary)',
+                  margin: 0,
+                  textAlign: 'center',
+                }}
+              >
+                Use the form on the right to log time manually.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* ══════════════════════════════════════════════════════════════════
-          Right panel — Today's time entries
-      ══════════════════════════════════════════════════════════════════ */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+      {/* ════════════════════════════════════════════════════════════════
+          RIGHT PANEL — Today's log + settings
+      ════════════════════════════════════════════════════════════════ */}
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+      >
         {/* Panel header */}
         <div
-          className="px-6 pt-6 pb-3 flex items-center justify-between shrink-0"
-          style={{ borderBottom: '1px solid var(--color-border)' }}
+          style={{
+            padding: '24px 24px 16px',
+            borderBottom: '1px solid var(--color-border)',
+            flexShrink: 0,
+          }}
         >
-          <div>
-            <h2 className="text-base font-bold" style={{ color: 'var(--color-text-primary)' }}>
-              Today's Log
-            </h2>
-            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-              All time tracked today
-            </p>
-          </div>
-          <button
-            onClick={handleAddManualEntry}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+          <div
             style={{
-              color: 'var(--color-text-secondary)',
-              backgroundColor: 'var(--color-bg-secondary)',
-              border: '1px solid var(--color-border)',
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                'var(--color-bg-tertiary)';
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                'var(--color-bg-secondary)';
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
             }}
           >
-            <Plus size={13} />
-            Manual entry
-          </button>
+            <h2
+              style={{
+                fontSize: '1rem',
+                fontWeight: 700,
+                color: 'var(--color-text-primary)',
+                margin: 0,
+              }}
+            >
+              Today's Log
+            </h2>
+
+            {/* Toggle manual form */}
+            <button
+              onClick={() => setShowManualForm(!showManualForm)}
+              onMouseEnter={() => setAddManualHovered(true)}
+              onMouseLeave={() => setAddManualHovered(false)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '5px 12px',
+                borderRadius: 8,
+                fontSize: '0.78rem',
+                fontWeight: 500,
+                border: '1px solid var(--color-border)',
+                backgroundColor: addManualHovered
+                  ? 'var(--color-bg-tertiary)'
+                  : 'var(--color-bg-secondary)',
+                color: 'var(--color-text-secondary)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              {showManualForm ? (
+                <>
+                  <ChevronUp size={13} />
+                  Hide
+                </>
+              ) : (
+                <>
+                  <Plus size={13} />
+                  Add manual entry
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
-        {/* Entry list — scrollable */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        {/* Scrollable right content */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '16px 24px 32px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 20,
+          }}
+        >
+          {/* Entry list */}
           <TimeEntryList
             entries={todayEntries}
             todayTotalSec={todayTotalSec}
             onDelete={handleDeleteEntry}
+            onStartTimer={handlePlayPause}
           />
+
+          {/* ── Manual entry inline form ───────────────────────────────── */}
+          {showManualForm && (
+            <div
+              style={{
+                borderRadius: 12,
+                border: '1px solid var(--color-border)',
+                backgroundColor: 'var(--color-bg-secondary)',
+                boxShadow: 'var(--shadow-sm)',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Form header */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '10px 14px',
+                  borderBottom: '1px solid var(--color-border)',
+                  backgroundColor: 'var(--color-bg-elevated)',
+                }}
+              >
+                <span style={{ fontSize: '0.85rem' }}>✍️</span>
+                <span
+                  style={{
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    color: 'var(--color-text-primary)',
+                  }}
+                >
+                  Add Manual Entry
+                </span>
+              </div>
+
+              {/* Form body */}
+              <div
+                style={{
+                  padding: '14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                }}
+              >
+                {/* Description */}
+                <input
+                  type="text"
+                  value={manualDesc}
+                  onChange={(e) => setManualDesc(e.target.value)}
+                  placeholder="Description (optional)"
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    border: '1px solid var(--color-border)',
+                    backgroundColor: 'var(--color-bg-elevated)',
+                    color: 'var(--color-text-primary)',
+                    fontSize: '0.85rem',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--color-accent)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--color-border)';
+                  }}
+                />
+
+                {/* Time inputs */}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <label
+                      style={{
+                        display: 'block',
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                        color: 'var(--color-text-muted)',
+                        marginBottom: 4,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.06em',
+                      }}
+                    >
+                      Start
+                    </label>
+                    <input
+                      type="time"
+                      value={manualStart}
+                      onChange={(e) => setManualStart(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: 8,
+                        border: '1px solid var(--color-border)',
+                        backgroundColor: 'var(--color-bg-elevated)',
+                        color: 'var(--color-text-primary)',
+                        fontSize: '0.85rem',
+                        outline: 'none',
+                        fontVariantNumeric: 'tabular-nums',
+                        boxSizing: 'border-box',
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--color-accent)';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--color-border)';
+                      }}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label
+                      style={{
+                        display: 'block',
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                        color: 'var(--color-text-muted)',
+                        marginBottom: 4,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.06em',
+                      }}
+                    >
+                      End
+                    </label>
+                    <input
+                      type="time"
+                      value={manualEnd}
+                      onChange={(e) => setManualEnd(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: 8,
+                        border: '1px solid var(--color-border)',
+                        backgroundColor: 'var(--color-bg-elevated)',
+                        color: 'var(--color-text-primary)',
+                        fontSize: '0.85rem',
+                        outline: 'none',
+                        fontVariantNumeric: 'tabular-nums',
+                        boxSizing: 'border-box',
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--color-accent)';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--color-border)';
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Add button */}
+                <button
+                  onClick={handleSubmitManualEntry}
+                  disabled={!manualStart || !manualEnd}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    padding: '9px 0',
+                    borderRadius: 8,
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    border: 'none',
+                    backgroundColor:
+                      !manualStart || !manualEnd
+                        ? 'var(--color-bg-tertiary)'
+                        : 'var(--color-accent)',
+                    color:
+                      !manualStart || !manualEnd ? 'var(--color-text-muted)' : '#fff',
+                    cursor: !manualStart || !manualEnd ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.15s ease',
+                    width: '100%',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (manualStart && manualEnd) {
+                      (e.currentTarget as HTMLButtonElement).style.filter = 'brightness(1.1)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.filter = 'none';
+                  }}
+                >
+                  <Plus size={15} />
+                  Add Entry
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Pomodoro settings in right panel (non-Pomodoro mode) ──── */}
+          {!store.isPomodoroMode && !isManualMode && (
+            <PomodoroSettings
+              settings={store.settings}
+              onChange={store.updateSettings}
+            />
+          )}
         </div>
       </div>
+      </div>
+      )} {/* end timer tab */}
     </div>
   );
 }

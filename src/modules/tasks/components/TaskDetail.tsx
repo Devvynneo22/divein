@@ -16,6 +16,7 @@ import {
 import type { Task, TaskStatus, TaskPriority, UpdateTaskInput, CreateTaskInput } from '@/shared/types/task';
 import { useTaskSettingsStore } from '@/shared/stores/taskSettingsStore';
 import { useSubtasks, useCreateTask, useUpdateTask, useTasks } from '../hooks/useTasks';
+import { NaturalDateInput } from './TaskCreateModal';
 
 // ─── Status config ────────────────────────────────────────────────────────────
 
@@ -78,19 +79,6 @@ function formatDateTime(iso: string | null): string {
 function toDateInputValue(iso: string | null): string {
   if (!iso) return '';
   return iso.split('T')[0];
-}
-
-function formatQuickDateLabel(days: number): string {
-  if (days === 0) return 'Today';
-  if (days === 1) return 'Tomorrow';
-  if (days === 7) return 'Next week';
-  return `+${days}d`;
-}
-
-function offsetDate(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
 }
 
 // ─── Tag pill ────────────────────────────────────────────────────────────────
@@ -1033,82 +1021,19 @@ export function TaskDetail({ task, onUpdate, onDelete, onClose }: TaskDetailProp
 
             {/* Due date */}
             <PropertyRow label="Due date" icon={<Calendar size={12} />}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                <input
-                  type="date"
-                  value={toDateInputValue(task.dueDate)}
-                  onChange={(e) => onUpdate({ dueDate: e.target.value || null })}
-                  style={{
-                    fontSize: 13,
-                    color: task.dueDate ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                    backgroundColor: 'transparent',
-                    border: '1px solid transparent',
-                    borderRadius: 6,
-                    padding: '2px 6px',
-                    cursor: 'pointer',
-                    outline: 'none',
-                    fontFamily: 'inherit',
-                  }}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
-                  onBlur={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.backgroundColor = 'transparent'; }}
-                />
-                {[0, 1, 7].map((days) => (
-                  <button
-                    key={days}
-                    onClick={() => onUpdate({ dueDate: offsetDate(days) })}
-                    style={{
-                      fontSize: 11,
-                      padding: '3px 8px',
-                      borderRadius: 999,
-                      border: '1px solid var(--color-border)',
-                      backgroundColor: 'var(--color-bg-tertiary)',
-                      color: 'var(--color-text-secondary)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {formatQuickDateLabel(days)}
-                  </button>
-                ))}
-                {task.dueDate && (
-                  <button
-                    onClick={() => onUpdate({ dueDate: null })}
-                    style={{
-                      fontSize: 11,
-                      padding: '3px 8px',
-                      borderRadius: 999,
-                      border: '1px solid var(--color-border)',
-                      backgroundColor: 'transparent',
-                      color: 'var(--color-text-muted)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
+              <NaturalDateInput
+                value={toDateInputValue(task.dueDate)}
+                onChange={(date) => onUpdate({ dueDate: date })}
+              />
             </PropertyRow>
 
             {/* Start date */}
             <PropertyRow label="Start date" icon={<Calendar size={12} />}>
-              <input
-                type="date"
+              <NaturalDateInput
                 value={toDateInputValue(task.startDate)}
-                onChange={(e) => onUpdate({ startDate: e.target.value || null })}
-                style={{
-                  fontSize: 13,
-                  color: task.startDate ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                  backgroundColor: 'transparent',
-                  border: '1px solid transparent',
-                  borderRadius: 6,
-                  padding: '2px 6px',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  fontFamily: 'inherit',
-                }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+                onChange={(date) => onUpdate({ startDate: date })}
+                placeholder="e.g. today, next monday, Mar 5"
               />
-              {!task.startDate && <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Not set</span>}
             </PropertyRow>
 
             {/* Tags */}

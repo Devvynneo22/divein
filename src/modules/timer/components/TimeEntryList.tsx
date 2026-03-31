@@ -1,24 +1,26 @@
 import { useState } from 'react';
-import { Trash2, ListTodo, Clock } from 'lucide-react';
-import { format } from 'date-fns';
+import { Trash2, ListTodo } from 'lucide-react';
+import { format, getHours } from 'date-fns';
 import type { TimeEntry } from '@/shared/types/timer';
 import { useTasks } from '../hooks/useTimer';
+import { EmptyState } from '@/shared/components/EmptyState';
 
 interface TimeEntryListProps {
   entries: TimeEntry[];
   todayTotalSec: number;
   onDelete: (id: string) => void;
+  onStartTimer?: () => void;
 }
 
-function formatDurationHMS(sec: number): string {
-  if (sec <= 0) return '0:00:00';
+function formatDuration(sec: number): string {
+  if (sec <= 0) return '0:00';
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
   const s = sec % 60;
   if (h > 0) {
     return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   }
-  return `0:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 function formatTotalTime(sec: number): string {
@@ -29,200 +31,309 @@ function formatTotalTime(sec: number): string {
   return `${m}m`;
 }
 
-function formatTimeLabel(start: string): string {
-  return format(new Date(start), 'HH:mm');
+function formatTimeRange(start: string, end: string | null | undefined): string {
+  const startFmt = format(new Date(start), 'HH:mm');
+  if (!end) return startFmt;
+  const endFmt = format(new Date(end), 'HH:mm');
+  return `${startFmt}–${endFmt}`;
 }
 
-export function TimeEntryList({ entries, todayTotalSec, onDelete }: TimeEntryListProps) {
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
+function getHourLabel(isoString: string): string {
+  const h = getHours(new Date(isoString));
+  const period = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:00 ${period}`;
+}
+
+// Group entries by hour
+function groupByHour(entries: TimeEntry[]): Map<string, TimeEntry[]> {
+  const map = new Map<string, TimeEntry[]>();
+  for (const entry of entries) {
+    const label = getHourLabel(entry.startTime);
+    const group = map.get(label) ?? [];
+    group.push(entry);
+    map.set(label, group);
+  }
+  return map;
+}
+
+interface EntryRowProps {
+  entry: TimeEntry;
+  taskName: string | undefined;
+  onDelete: (id: string) => void;
+}
+
+function EntryRow({ entry, taskName, onDelete }: EntryRowProps) {
+  const [hovered, setHovered] = useState(false);
+  const [deleteHovered, setDeleteHovered] = useState(false);
+
+  const timeRange = formatTimeRange(entry.startTime, entry.endTime);
+  const duration = entry.isRunning
+    ? null
+    : formatDuration(entry.durationSec ?? 0);
+
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => { setHovered(false); setDeleteHovered(false); }}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '9px 12px',
+        borderRadius: 10,
+        backgroundColor: hovered ? 'var(--color-bg-tertiary)' : 'var(--color-bg-secondary)',
+        border: `1px solid ${hovered ? 'var(--color-border-hover)' : 'var(--color-border)'}`,
+        boxShadow: hovered ? 'var(--shadow-sm)' : 'none',
+        transition: 'all 0.15s ease',
+      }}
+    >
+      {/* Running indicator dot */}
+      {entry.isRunning ? (
+        <span
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            backgroundColor: 'var(--color-success)',
+            flexShrink: 0,
+            boxShadow: '0 0 6px var(--color-success)',
+            animation: 'pulse 1.5s ease-in-out infinite',
+          }}
+          title="Currently running"
+        />
+      ) : (
+        <span
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            backgroundColor: entry.isPomodoro
+              ? 'var(--color-accent)'
+              : 'var(--color-bg-tertiary)',
+            border: '1.5px solid var(--color-border)',
+            flexShrink: 0,
+          }}
+          title={entry.isPomodoro ? 'Pomodoro session' : undefined}
+        />
+      )}
+
+      {/* Main content */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p
+          style={{
+            fontSize: '0.85rem',
+            color: entry.description ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+            fontStyle: entry.description ? 'normal' : 'italic',
+            margin: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {entry.description ?? 'No task'}
+        </p>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            marginTop: 2,
+          }}
+        >
+          <span
+            style={{
+              fontSize: '0.72rem',
+              color: 'var(--color-text-muted)',
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {timeRange}
+          </span>
+          {taskName && (
+            <>
+              <span style={{ color: 'var(--color-border)', fontSize: '0.6rem' }}>•</span>
+              <span
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  fontSize: '0.72rem',
+                  color: 'var(--color-accent)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  maxWidth: 120,
+                }}
+              >
+                <ListTodo size={10} style={{ flexShrink: 0 }} />
+                {taskName}
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Duration badge */}
+      <span
+        style={{
+          flexShrink: 0,
+          fontSize: '0.75rem',
+          fontWeight: 600,
+          fontVariantNumeric: 'tabular-nums',
+          fontFamily: '"JetBrains Mono", "Fira Code", ui-monospace, monospace',
+          padding: '2px 8px',
+          borderRadius: 6,
+          backgroundColor: entry.isRunning
+            ? 'color-mix(in srgb, var(--color-success) 15%, transparent)'
+            : 'var(--color-bg-elevated)',
+          color: entry.isRunning ? 'var(--color-success)' : 'var(--color-text-secondary)',
+          border: `1px solid ${entry.isRunning ? 'color-mix(in srgb, var(--color-success) 30%, transparent)' : 'var(--color-border)'}`,
+        }}
+      >
+        {entry.isRunning ? '● live' : duration}
+      </span>
+
+      {/* Delete button */}
+      <button
+        onClick={() => onDelete(entry.id)}
+        onMouseEnter={() => setDeleteHovered(true)}
+        onMouseLeave={() => setDeleteHovered(false)}
+        title="Delete entry"
+        style={{
+          flexShrink: 0,
+          width: 28,
+          height: 28,
+          borderRadius: 7,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: 'none',
+          cursor: 'pointer',
+          opacity: hovered ? 1 : 0,
+          pointerEvents: hovered ? 'auto' : 'none',
+          backgroundColor: deleteHovered
+            ? 'color-mix(in srgb, var(--color-danger) 12%, transparent)'
+            : 'transparent',
+          color: deleteHovered ? 'var(--color-danger)' : 'var(--color-text-muted)',
+          transition: 'all 0.15s ease',
+        }}
+      >
+        <Trash2 size={13} />
+      </button>
+    </div>
+  );
+}
+
+export function TimeEntryList({ entries, todayTotalSec, onDelete, onStartTimer }: TimeEntryListProps) {
   const { data: tasks = [] } = useTasks();
   const taskMap = new Map(tasks.map((t) => [t.id, t]));
 
+  const grouped = groupByHour(entries);
+  const hourKeys = Array.from(grouped.keys());
+  // Show hour groups only if there are enough entries to warrant it
+  const useGroups = entries.length >= 4;
+
   return (
-    <div className="flex flex-col h-full">
-      {/* ─── Total today header ───────────────────────────────────────── */}
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+      }}
+    >
+      {/* ── Today total header ─────────────────────────────────────── */}
       <div
-        className="rounded-xl p-4 mb-4 flex items-center justify-between"
         style={{
-          background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border)',
-          boxShadow: 'var(--shadow-sm)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingBottom: 10,
+          borderBottom: '1px solid var(--color-border)',
         }}
       >
-        <div className="flex items-center gap-2">
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: 'var(--color-accent-soft, color-mix(in srgb, var(--color-accent) 15%, transparent))' }}
-          >
-            <Clock size={15} style={{ color: 'var(--color-accent)' }} />
-          </div>
-          <div>
-            <p
-              className="text-xs font-medium uppercase tracking-wider"
-              style={{ color: 'var(--color-text-muted)' }}
-            >
-              Today's total
-            </p>
-            <p
-              className="text-lg font-bold leading-tight tabular-nums"
-              style={{
-                color: 'var(--color-text-primary)',
-                fontFamily:
-                  '"JetBrains Mono", "Fira Code", ui-monospace, monospace',
-              }}
-            >
-              {formatTotalTime(todayTotalSec)}
-            </p>
-          </div>
-        </div>
         <span
-          className="text-xs px-2 py-0.5 rounded-full font-medium"
           style={{
-            backgroundColor: 'var(--color-bg-tertiary)',
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
             color: 'var(--color-text-muted)',
           }}
         >
-          {entries.length} {entries.length === 1 ? 'entry' : 'entries'}
+          Today
+        </span>
+        <span
+          style={{
+            fontSize: '0.78rem',
+            fontWeight: 600,
+            fontVariantNumeric: 'tabular-nums',
+            fontFamily: '"JetBrains Mono", "Fira Code", ui-monospace, monospace',
+            padding: '3px 10px',
+            borderRadius: 20,
+            backgroundColor: 'color-mix(in srgb, var(--color-accent) 12%, transparent)',
+            color: 'var(--color-accent)',
+            border: '1px solid color-mix(in srgb, var(--color-accent) 25%, transparent)',
+          }}
+        >
+          {formatTotalTime(todayTotalSec)}
         </span>
       </div>
 
-      {/* ─── Entries list ─────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto">
-        {entries.length === 0 ? (
-          <div
-            className="flex flex-col items-center justify-center py-16 gap-3 rounded-xl"
-            style={{
-              border: '1.5px dashed var(--color-border)',
-              color: 'var(--color-text-muted)',
-            }}
-          >
-            <Clock size={28} style={{ opacity: 0.35 }} />
-            <p className="text-sm font-medium">No time tracked yet today</p>
-            <p className="text-xs" style={{ color: 'var(--color-text-muted)', opacity: 0.7 }}>
-              Start the timer to log your first entry
-            </p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            {entries.map((entry) => {
-              const isHovered = hoveredId === entry.id;
-              const linkedTask = entry.taskId ? taskMap.get(entry.taskId) : undefined;
-              const startLabel = formatTimeLabel(entry.startTime);
-              const durationStr = entry.isRunning
-                ? '●  live'
-                : formatDurationHMS(entry.durationSec ?? 0);
-
-              return (
-                <div
-                  key={entry.id}
-                  onMouseEnter={() => setHoveredId(entry.id)}
-                  onMouseLeave={() => setHoveredId(null)}
-                  className="group flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all"
+      {/* ── Entry list ─────────────────────────────────────────────── */}
+      {entries.length === 0 ? (
+        <EmptyState
+          icon="⏱️"
+          title="No time logged yet"
+          description="Start a timer or pomodoro session to track your focus time"
+          actionLabel={onStartTimer ? "Start Timer" : undefined}
+          onAction={onStartTimer}
+        />
+      ) : useGroups ? (
+        // Grouped by hour
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {hourKeys.map((hourLabel) => {
+            const group = grouped.get(hourLabel) ?? [];
+            return (
+              <div key={hourLabel} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span
                   style={{
-                    backgroundColor: isHovered
-                      ? 'var(--color-bg-tertiary)'
-                      : 'var(--color-bg-secondary)',
-                    border: '1px solid var(--color-border)',
-                    boxShadow: isHovered ? 'var(--shadow-sm)' : 'none',
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.07em',
+                    color: 'var(--color-text-muted)',
+                    paddingLeft: 4,
+                    marginBottom: 2,
                   }}
                 >
-                  {/* Start time badge */}
-                  <div
-                    className="shrink-0 text-center"
-                    style={{ minWidth: 36 }}
-                  >
-                    <span
-                      className="text-xs font-semibold tabular-nums"
-                      style={{ color: 'var(--color-text-muted)' }}
-                    >
-                      {startLabel}
-                    </span>
-                  </div>
-
-                  {/* Separator dot */}
-                  <span
-                    className="shrink-0 w-1.5 h-1.5 rounded-full"
-                    style={{
-                      backgroundColor: entry.isPomodoro
-                        ? 'var(--color-accent)'
-                        : 'var(--color-bg-tertiary)',
-                      border: '1.5px solid var(--color-border)',
-                    }}
-                    title={entry.isPomodoro ? 'Pomodoro session' : undefined}
+                  {hourLabel}
+                </span>
+                {group.map((entry) => (
+                  <EntryRow
+                    key={entry.id}
+                    entry={entry}
+                    taskName={entry.taskId ? taskMap.get(entry.taskId)?.title : undefined}
+                    onDelete={onDelete}
                   />
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className="text-sm truncate leading-snug"
-                      style={{
-                        color: entry.description
-                          ? 'var(--color-text-primary)'
-                          : 'var(--color-text-muted)',
-                        fontStyle: entry.description ? 'normal' : 'italic',
-                      }}
-                    >
-                      {entry.description ?? 'No description'}
-                    </p>
-                    {linkedTask && (
-                      <p
-                        className="text-xs flex items-center gap-1 mt-0.5 truncate"
-                        style={{ color: 'var(--color-accent)' }}
-                      >
-                        <ListTodo size={11} className="shrink-0" />
-                        {linkedTask.title}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Duration */}
-                  <span
-                    className="shrink-0 text-xs font-semibold tabular-nums"
-                    style={{
-                      color: entry.isRunning
-                        ? 'var(--color-success)'
-                        : 'var(--color-text-secondary)',
-                      fontFamily:
-                        '"JetBrains Mono", "Fira Code", ui-monospace, monospace',
-                      minWidth: 54,
-                      textAlign: 'right',
-                    }}
-                  >
-                    {durationStr}
-                  </span>
-
-                  {/* Delete button — visible on hover */}
-                  <button
-                    onClick={() => onDelete(entry.id)}
-                    title="Delete entry"
-                    className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all"
-                    style={{
-                      color: 'var(--color-text-muted)',
-                      backgroundColor: 'transparent',
-                      opacity: isHovered ? 1 : 0,
-                      pointerEvents: isHovered ? 'auto' : 'none',
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.color =
-                        'var(--color-danger)';
-                      (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                        'var(--color-danger-soft, color-mix(in srgb, var(--color-danger) 12%, transparent))';
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.color =
-                        'var(--color-text-muted)';
-                      (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                        'transparent';
-                    }}
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        // Flat list
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {entries.map((entry) => (
+            <EntryRow
+              key={entry.id}
+              entry={entry}
+              taskName={entry.taskId ? taskMap.get(entry.taskId)?.title : undefined}
+              onDelete={onDelete}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

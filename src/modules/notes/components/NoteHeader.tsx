@@ -1,5 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { FileText, MoreHorizontal, FileDown, FileType } from 'lucide-react';
+import { format } from 'date-fns';
+import { PageIconPicker } from './PageIconPicker';
+import { exportNoteToMarkdown, exportNoteToPDF } from '@/shared/lib/exportService';
+import type { Note } from '@/shared/types/note';
+import { useNotes, useUpdateNote } from '../hooks/useNotes';
 
 // ─── IconAvatar ───────────────────────────────────────────────────────────────
 
@@ -64,10 +69,6 @@ function IconAvatar({ icon, onClick }: { icon: string | null; onClick: () => voi
     </button>
   );
 }
-import { format } from 'date-fns';
-import { PageIconPicker } from './PageIconPicker';
-import { exportNoteToMarkdown, exportNoteToPDF } from '@/shared/lib/exportService';
-import type { Note } from '@/shared/types/note';
 
 // ─── Cover presets ────────────────────────────────────────────────────────────
 
@@ -367,6 +368,384 @@ function CoverPickerModal({
   );
 }
 
+// ─── Tag utilities ────────────────────────────────────────────────────────────
+
+function tagColor(tag: string): string {
+  const colors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6'];
+  let hash = 0;
+  for (const c of tag) hash = (hash * 31 + c.charCodeAt(0)) & 0xffff;
+  return colors[hash % colors.length];
+}
+
+// ─── WordCountPill ────────────────────────────────────────────────────────────
+
+function WordCountPill({ wordCount }: { wordCount: number }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const readingTime = Math.ceil(wordCount / 200);
+  const chars = wordCount * 5;
+  const paragraphs = Math.ceil(wordCount / 8);
+
+  useEffect(() => {
+    if (!open) return;
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  if (!wordCount) return null;
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          fontSize: 11,
+          color: 'var(--color-text-muted)',
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          padding: '2px 6px',
+          borderRadius: 4,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+          transition: 'all 0.15s ease',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+          e.currentTarget.style.color = 'var(--color-text-secondary)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent';
+          e.currentTarget.style.color = 'var(--color-text-muted)';
+        }}
+      >
+        {wordCount.toLocaleString()} words · {readingTime} min read
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            marginTop: 4,
+            backgroundColor: 'var(--color-bg-elevated)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 8,
+            boxShadow: 'var(--shadow-popup)',
+            padding: '6px 0',
+            minWidth: 160,
+            zIndex: 100,
+          }}
+        >
+          {[
+            { label: 'Words', value: wordCount.toLocaleString() },
+            { label: 'Characters', value: chars.toLocaleString() },
+            { label: 'Paragraphs', value: paragraphs.toLocaleString() },
+          ].map(({ label, value }) => (
+            <div
+              key={label}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '5px 12px',
+                fontSize: 12,
+              }}
+            >
+              <span style={{ color: 'var(--color-text-muted)' }}>{label}</span>
+              <span style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>{value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── TagEditor ────────────────────────────────────────────────────────────────
+
+function TagEditor({ note }: { note: Note }) {
+  const { mutate: updateNote } = useUpdateNote();
+  const { data: allNotes } = useNotes();
+
+  const [addingTag, setAddingTag] = useState(false);
+  const [input, setInput] = useState('');
+  const [suggestionIndex, setSuggestionIndex] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Collect all unique tags from all notes
+  const allTags = useMemo<string[]>(() => {
+    if (!allNotes) return [];
+    const tagSet = new Set<string>();
+    for (const n of allNotes) {
+      for (const t of n.tags) tagSet.add(t);
+    }
+    return Array.from(tagSet).sort();
+  }, [allNotes]);
+
+  // Filter suggestions: match input, exclude already-applied tags
+  const suggestions = useMemo<string[]>(() => {
+    const trimmed = input.trim();
+    if (!trimmed) return [];
+    return allTags
+      .filter((t) => t.toLowerCase().includes(trimmed.toLowerCase()) && !note.tags.includes(t))
+      .slice(0, 8);
+  }, [input, allTags, note.tags]);
+
+  // Auto-focus when input opens
+  useEffect(() => {
+    if (addingTag && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [addingTag]);
+
+  // Reset suggestion index when suggestions or input changes
+  useEffect(() => {
+    setSuggestionIndex(-1);
+  }, [suggestions.length, input]);
+
+  function addTag(tag: string) {
+    const trimmed = tag.trim().toLowerCase().replace(/^#/, '');
+    if (!trimmed || note.tags.includes(trimmed)) return;
+    updateNote({ id: note.id, data: { tags: [...note.tags, trimmed] } });
+    setInput('');
+    setAddingTag(false);
+  }
+
+  function removeTag(tag: string) {
+    updateNote({ id: note.id, data: { tags: note.tags.filter((t) => t !== tag) } });
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (suggestionIndex >= 0 && suggestions[suggestionIndex]) {
+        addTag(suggestions[suggestionIndex]);
+      } else if (input.trim()) {
+        addTag(input.trim());
+      }
+    } else if (e.key === 'Escape') {
+      setInput('');
+      setAddingTag(false);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSuggestionIndex((i) => Math.min(i + 1, suggestions.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSuggestionIndex((i) => Math.max(i - 1, -1));
+    }
+  }
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 8,
+      }}
+    >
+      {/* Existing tag pills */}
+      {note.tags.map((tag) => {
+        const color = tagColor(tag);
+        return (
+          <span
+            key={tag}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '2px 8px 2px 6px',
+              borderRadius: 20,
+              fontSize: 11,
+              fontWeight: 500,
+              backgroundColor: 'var(--color-bg-tertiary)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-secondary)',
+              userSelect: 'none',
+            }}
+          >
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                backgroundColor: color,
+                flexShrink: 0,
+              }}
+            />
+            #{tag}
+            <button
+              onClick={() => removeTag(tag)}
+              title={`Remove #${tag}`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 14,
+                height: 14,
+                borderRadius: '50%',
+                border: 'none',
+                background: 'none',
+                cursor: 'pointer',
+                color: 'var(--color-text-muted)',
+                padding: 0,
+                fontSize: 13,
+                lineHeight: 1,
+                marginLeft: 1,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--color-danger-soft)';
+                e.currentTarget.style.color = 'var(--color-danger)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = 'var(--color-text-muted)';
+              }}
+            >
+              ×
+            </button>
+          </span>
+        );
+      })}
+
+      {/* Add tag input or button */}
+      {addingTag ? (
+        <div style={{ position: 'relative' }}>
+          <input
+            ref={inputRef}
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={() => {
+              // Delay to allow suggestion click to fire first
+              setTimeout(() => {
+                setInput('');
+                setAddingTag(false);
+              }, 160);
+            }}
+            placeholder="tag name..."
+            style={{
+              fontSize: 11,
+              padding: '2px 8px',
+              borderRadius: 20,
+              border: '1px solid var(--color-accent)',
+              backgroundColor: 'var(--color-bg-tertiary)',
+              color: 'var(--color-text-primary)',
+              outline: 'none',
+              width: 110,
+              fontFamily: 'inherit',
+            }}
+          />
+
+          {/* Autocomplete dropdown */}
+          {suggestions.length > 0 && (
+            <div
+              ref={dropdownRef}
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                marginTop: 4,
+                backgroundColor: 'var(--color-bg-elevated)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 8,
+                boxShadow: 'var(--shadow-popup)',
+                zIndex: 200,
+                minWidth: 148,
+                overflow: 'hidden',
+              }}
+            >
+              {suggestions.map((tag, i) => {
+                const color = tagColor(tag);
+                const isActive = i === suggestionIndex;
+                return (
+                  <button
+                    key={tag}
+                    onMouseDown={(e) => {
+                      e.preventDefault(); // prevent onBlur from firing first
+                      addTag(tag);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      width: '100%',
+                      padding: '5px 10px',
+                      fontSize: 12,
+                      border: 'none',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      backgroundColor: isActive ? 'var(--color-bg-tertiary)' : 'transparent',
+                      color: 'var(--color-text-secondary)',
+                      transition: 'background-color 0.1s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = isActive ? 'var(--color-bg-tertiary)' : 'transparent';
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: '50%',
+                        backgroundColor: color,
+                        flexShrink: 0,
+                      }}
+                    />
+                    #{tag}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
+        <button
+          onClick={() => setAddingTag(true)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 3,
+            fontSize: 11,
+            padding: '2px 7px',
+            borderRadius: 20,
+            border: '1px dashed var(--color-border)',
+            backgroundColor: 'transparent',
+            color: 'var(--color-text-muted)',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = 'var(--color-accent)';
+            e.currentTarget.style.color = 'var(--color-accent)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'var(--color-border)';
+            e.currentTarget.style.color = 'var(--color-text-muted)';
+          }}
+        >
+          + Add tag
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── NoteHeader ───────────────────────────────────────────────────────────────
 
 interface NoteHeaderProps {
@@ -581,18 +960,22 @@ export function NoteHeader({ note, childCount, onTitleChange, onIconChange, onCo
           </div>
         </div>
 
-        {/* Meta info */}
+        {/* Word count pill — clickable, shows breakdown dropdown */}
+        {note.wordCount > 0 && (
+          <div style={{ marginTop: 6 }}>
+            <WordCountPill wordCount={note.wordCount} />
+          </div>
+        )}
+
+        {/* Tag editor */}
+        <TagEditor note={note} />
+
+        {/* Meta info (created date + sub-page count) */}
         <div
           className="flex items-center gap-2 mt-3 text-sm"
           style={{ color: 'var(--color-text-muted)' }}
         >
           <span>Created {format(new Date(note.createdAt), 'MMM d, yyyy')}</span>
-          {note.wordCount > 0 && (
-            <>
-              <span style={{ opacity: 0.4 }}>·</span>
-              <span>{note.wordCount.toLocaleString()} words</span>
-            </>
-          )}
           {childCount > 0 && (
             <>
               <span style={{ opacity: 0.4 }}>·</span>
