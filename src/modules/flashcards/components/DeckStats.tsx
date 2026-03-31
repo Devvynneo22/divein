@@ -1,8 +1,36 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { addDays, format, startOfDay } from 'date-fns';
-import type { Deck, Card } from '@/shared/types/flashcard';
 
-// ─── Props ────────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface Deck {
+  id: string;
+  name: string;
+  description: string | null;
+  color: string | null;
+  newCardsPerDay: number;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface Card {
+  id: string;
+  deckId: string;
+  front: string;
+  back: string;
+  sourceNoteId: string | null;
+  tags: string[];
+  intervalDays: number;
+  repetitions: number;
+  easeFactor: number;
+  nextReview: string;
+  lastReviewed: string | null;
+  status: 'new' | 'learning' | 'review' | 'suspended';
+  createdAt: string;
+  updatedAt: string;
+}
 
 interface DeckStatsProps {
   deck: Deck;
@@ -12,587 +40,1071 @@ interface DeckStatsProps {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function isValidHex(hex: string): boolean {
+  return /^#([0-9A-Fa-f]{3}){1,2}$/.test(hex);
+}
+
 function hexToRgba(hex: string, alpha: number): string {
+  if (!isValidHex(hex)) return `rgba(99,102,241,${alpha})`;
   const clean = hex.replace('#', '');
-  const r = parseInt(clean.slice(0, 2), 16);
-  const g = parseInt(clean.slice(2, 4), 16);
-  const b = parseInt(clean.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  const full = clean.length === 3
+    ? clean.split('').map(c => c + c).join('')
+    : clean;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
 }
 
-function isValidHex(color: string): boolean {
-  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(color);
+// ─── Collapsible Section ──────────────────────────────────────────────────────
+
+interface CollapsibleSectionProps {
+  title: string;
+  children: React.ReactNode;
+  defaultExpanded?: boolean;
 }
 
-// ─── Section 1: Summary Stat Card ─────────────────────────────────────────────
+function CollapsibleSection({ title, children, defaultExpanded = true }: CollapsibleSectionProps) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
 
-interface StatCardProps {
-  icon: string;
-  label: string;
-  value: string | number;
-  accent?: string;
-}
-
-function StatCard({ icon, label, value, accent }: StatCardProps) {
   return (
     <div
-      className="flex-1 flex flex-col gap-2 px-5 py-4 rounded-2xl"
       style={{
-        backgroundColor: 'var(--color-bg-secondary)',
+        background: 'var(--color-bg-elevated)',
         border: '1px solid var(--color-border)',
-        minWidth: 0,
+        borderRadius: 12,
+        overflow: 'hidden',
+        boxShadow: 'var(--shadow-sm)',
       }}
     >
-      <div className="flex items-center gap-2">
-        <span style={{ fontSize: '16px' }}>{icon}</span>
-        <span className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>
-          {label}
-        </span>
-      </div>
-      <div
-        className="text-2xl font-bold tabular-nums"
-        style={{ color: accent ?? 'var(--color-text-primary)' }}
+      <button
+        onClick={() => setExpanded(e => !e)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '14px 18px',
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          color: 'var(--color-text-primary)',
+        }}
       >
-        {value}
-      </div>
+        <span style={{ fontWeight: 600, fontSize: 14, letterSpacing: '0.01em' }}>{title}</span>
+        <span
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            color: 'var(--color-text-muted)',
+            transition: 'transform 0.2s',
+            transform: expanded ? 'rotate(0deg)' : 'rotate(-90deg)',
+          }}
+        >
+          <ChevronDown size={16} />
+        </span>
+      </button>
+      {expanded && (
+        <div style={{ padding: '0 18px 18px' }}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── Section 2: Donut Chart ───────────────────────────────────────────────────
+// ─── XP Progress Ring ─────────────────────────────────────────────────────────
 
-const DONUT_R = 50;
-const CIRCUMFERENCE = 2 * Math.PI * DONUT_R; // ≈ 314.16
-
-interface MaturitySegment {
-  label: string;
-  count: number;
-  color: string;
-}
-
-interface DonutChartProps {
-  segments: MaturitySegment[];
-  total: number;
-}
-
-function DonutChart({ segments, total }: DonutChartProps) {
-  const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
-
-  // Compute segment dashes + offsets
-  let cumulativeLen = 0;
-  const computed = segments.map((seg) => {
-    const dashLen = total > 0 ? (seg.count / total) * CIRCUMFERENCE : 0;
-    const offset = -cumulativeLen;
-    cumulativeLen += dashLen;
-    return { ...seg, dashLen, offset };
-  });
-
-  const isEmpty = total === 0;
-
-  return (
-    <div className="flex flex-col items-center gap-5">
-      {/* SVG Donut */}
-      <div className="relative" style={{ width: 140, height: 140 }}>
-        <svg viewBox="0 0 120 120" width="140" height="140">
-          {/* Track */}
-          <circle
-            cx="60"
-            cy="60"
-            r={DONUT_R}
-            fill="none"
-            stroke="var(--color-bg-tertiary)"
-            strokeWidth="20"
-          />
-          {isEmpty ? null : computed.map((seg) => (
-            seg.count === 0 ? null : (
-              <circle
-                key={seg.label}
-                cx="60"
-                cy="60"
-                r={DONUT_R}
-                fill="none"
-                stroke={seg.color}
-                strokeWidth={hoveredLabel === seg.label ? 22 : 20}
-                strokeDasharray={`${seg.dashLen} ${CIRCUMFERENCE}`}
-                strokeDashoffset={seg.offset}
-                strokeLinecap="butt"
-                transform="rotate(-90 60 60)"
-                style={{ transition: 'stroke-width 0.15s ease', cursor: 'pointer' }}
-                onMouseEnter={() => setHoveredLabel(seg.label)}
-                onMouseLeave={() => setHoveredLabel(null)}
-              />
-            )
-          ))}
-          {/* Center label */}
-          <text
-            x="60"
-            y="56"
-            textAnchor="middle"
-            dominantBaseline="middle"
-            style={{ fontSize: '22px', fontWeight: 700, fill: 'var(--color-text-primary)' }}
-          >
-            {total}
-          </text>
-          <text
-            x="60"
-            y="72"
-            textAnchor="middle"
-            dominantBaseline="middle"
-            style={{ fontSize: '9px', fill: 'var(--color-text-muted)' }}
-          >
-            cards
-          </text>
-        </svg>
-      </div>
-
-      {/* Legend */}
-      <div className="grid grid-cols-2 gap-x-6 gap-y-2 w-full">
-        {segments.map((seg) => {
-          const pct = total > 0 ? Math.round((seg.count / total) * 100) : 0;
-          const isHovered = hoveredLabel === seg.label;
-          return (
-            <div
-              key={seg.label}
-              className="flex items-center gap-2 cursor-default"
-              onMouseEnter={() => setHoveredLabel(seg.label)}
-              onMouseLeave={() => setHoveredLabel(null)}
-              style={{ opacity: hoveredLabel && !isHovered ? 0.5 : 1, transition: 'opacity 0.15s ease' }}
-            >
-              <div
-                className="rounded-full flex-shrink-0"
-                style={{ width: 8, height: 8, backgroundColor: seg.color }}
-              />
-              <span
-                className="text-xs flex-1 truncate"
-                style={{ color: 'var(--color-text-secondary)' }}
-              >
-                {seg.label}
-              </span>
-              <span
-                className="text-xs font-semibold tabular-nums"
-                style={{ color: 'var(--color-text-primary)' }}
-              >
-                {seg.count}
-              </span>
-              <span
-                className="text-xs tabular-nums"
-                style={{ color: 'var(--color-text-muted)', minWidth: '32px', textAlign: 'right' }}
-              >
-                {pct}%
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ─── Section 3: 14-Day Forecast Bar Chart ─────────────────────────────────────
-
-interface ForecastDay {
-  date: Date;
-  dateStr: string;
-  label: string;
-  fullLabel: string;
-  count: number;
-  isToday: boolean;
-}
-
-interface ForecastChartProps {
-  data: ForecastDay[];
+interface XPRingProps {
+  deck: Deck;
+  cards: Card[];
   accentColor: string;
 }
 
-function ForecastChart({ data, accentColor }: ForecastChartProps) {
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
+function XPRing({ deck, cards, accentColor }: XPRingProps) {
+  const storageKey = `divein-xp-${deck.id}`;
 
-  const CHART_H = 120;
-  const LABEL_H = 24;
-  const TOTAL_H = CHART_H + LABEL_H;
-  const BAR_AREA_H = CHART_H - 8; // usable bar height
-  const BAR_WIDTH = 28;
-  const BAR_GAP = 12;
-  const BAR_STEP = BAR_WIDTH + BAR_GAP;
-  const SVG_W = data.length * BAR_STEP + BAR_GAP;
+  const { todayXP, totalXP, level } = useMemo(() => {
+    const today = format(startOfDay(new Date()), 'yyyy-MM-dd');
+    const reviewedToday = cards.filter(c => {
+      if (!c.lastReviewed) return false;
+      return format(startOfDay(new Date(c.lastReviewed)), 'yyyy-MM-dd') === today;
+    }).length;
+    const todayXP = reviewedToday * 10;
 
-  const maxCount = Math.max(...data.map((d) => d.count), 1);
+    let stored = 0;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        stored = parsed.totalXP ?? 0;
+      }
+    } catch {
+      // ignore
+    }
+
+    // Upsert today's XP into stored total
+    let totalXP = stored;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      const parsed = raw ? JSON.parse(raw) : {};
+      if (parsed.todayDate !== today) {
+        totalXP = stored + todayXP;
+        localStorage.setItem(storageKey, JSON.stringify({ totalXP, todayDate: today, todayXP }));
+      } else {
+        totalXP = parsed.totalXP ?? stored;
+      }
+    } catch {
+      // ignore
+    }
+
+    const level = Math.floor(totalXP / 500) + 1;
+    return { todayXP, totalXP, level };
+  }, [cards, deck.id, storageKey]);
+
+  const goalXP = deck.newCardsPerDay * 10 || 100;
+  const progress = Math.min(todayXP / goalXP, 1);
+
+  const size = 100;
+  const strokeWidth = 8;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const dash = progress * circumference;
 
   return (
-    <div style={{ position: 'relative', overflowX: 'auto' }}>
-      <svg
-        viewBox={`0 0 ${SVG_W} ${TOTAL_H}`}
-        width="100%"
-        style={{ display: 'block', overflow: 'visible' }}
-        preserveAspectRatio="xMinYMid meet"
-        onMouseLeave={() => setTooltip(null)}
-      >
-        {data.map((day, i) => {
-          const barH = Math.max(2, (day.count / maxCount) * BAR_AREA_H);
-          const x = i * BAR_STEP + BAR_GAP / 2;
-          const y = CHART_H - barH;
-          const fill = day.isToday ? accentColor : 'var(--color-bg-tertiary)';
-          const stroke = day.isToday ? accentColor : 'var(--color-border)';
-
-          return (
-            <g key={day.dateStr}>
-              <rect
-                x={x}
-                y={y}
-                width={BAR_WIDTH}
-                height={barH}
-                rx="4"
-                fill={fill}
-                stroke={stroke}
-                strokeWidth="1"
-                style={{ cursor: day.count > 0 ? 'pointer' : 'default', transition: 'opacity 0.15s ease' }}
-                onMouseEnter={(e) => {
-                  const svgEl = e.currentTarget.closest('svg')!;
-                  const rect = svgEl.getBoundingClientRect();
-                  const svgX = e.clientX - rect.left;
-                  const svgY = e.clientY - rect.top;
-                  setTooltip({
-                    x: svgX,
-                    y: svgY - 36,
-                    text: `${day.fullLabel}: ${day.count} card${day.count !== 1 ? 's' : ''}`,
-                  });
-                }}
-                onMouseLeave={() => setTooltip(null)}
-              />
-              {/* Count label above bar (only if > 0) */}
-              {day.count > 0 && (
-                <text
-                  x={x + BAR_WIDTH / 2}
-                  y={y - 3}
-                  textAnchor="middle"
-                  style={{ fontSize: '8px', fill: 'var(--color-text-muted)', fontWeight: 600 }}
-                >
-                  {day.count}
-                </text>
-              )}
-              {/* X axis label */}
-              <text
-                x={x + BAR_WIDTH / 2}
-                y={CHART_H + 16}
-                textAnchor="middle"
-                style={{
-                  fontSize: '9px',
-                  fill: day.isToday ? accentColor : 'var(--color-text-muted)',
-                  fontWeight: day.isToday ? 700 : 400,
-                }}
-              >
-                {day.label}
-              </text>
-            </g>
-          );
-        })}
-        {/* Baseline */}
-        <line
-          x1={BAR_GAP / 2}
-          y1={CHART_H}
-          x2={SVG_W - BAR_GAP / 2}
-          y2={CHART_H}
-          stroke="var(--color-border)"
-          strokeWidth="1"
-        />
-      </svg>
-
-      {/* Tooltip */}
-      {tooltip && (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 20,
+        background: 'var(--color-bg-elevated)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 12,
+        padding: '18px 22px',
+        boxShadow: 'var(--shadow-sm)',
+      }}
+    >
+      {/* Ring */}
+      <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+        <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="var(--color-border)"
+            strokeWidth={strokeWidth}
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke={accentColor}
+            strokeWidth={strokeWidth}
+            strokeDasharray={`${dash} ${circumference}`}
+            strokeLinecap="round"
+            style={{ transition: 'stroke-dasharray 0.6s ease' }}
+          />
+        </svg>
         <div
           style={{
             position: 'absolute',
-            left: tooltip.x,
-            top: tooltip.y,
-            transform: 'translateX(-50%)',
-            backgroundColor: 'var(--color-bg-elevated)',
-            border: '1px solid var(--color-border)',
-            borderRadius: '8px',
-            padding: '4px 10px',
-            fontSize: '12px',
-            color: 'var(--color-text-primary)',
-            pointerEvents: 'none',
-            whiteSpace: 'nowrap',
-            boxShadow: 'var(--shadow-md)',
-            zIndex: 10,
-          }}
-        >
-          {tooltip.text}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Section 4: Activity Heatmap ──────────────────────────────────────────────
-
-interface HeatmapProps {
-  countByDate: Record<string, number>;
-  accentColor: string;
-}
-
-const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-
-function ActivityHeatmap({ countByDate, accentColor }: HeatmapProps) {
-  const [hoveredCell, setHoveredCell] = useState<{ date: string; count: number; x: number; y: number } | null>(null);
-  const CELL = 10;
-  const GAP = 2;
-  const STEP = CELL + GAP;
-  const NUM_WEEKS = 12;
-  const NUM_DAYS = 7;
-  const MONTH_LABEL_W = 36;
-
-  // Build grid: 12 weeks × 7 days, starting from the Monday 12 weeks ago
-  const today = startOfDay(new Date());
-
-  // Find the Monday of the week 12 weeks ago
-  const rawStart = addDays(today, -(NUM_WEEKS * 7 - 1));
-  const rawStartDow = rawStart.getDay(); // 0=Sun, 1=Mon
-  const mondayOffset = rawStartDow === 0 ? -6 : 1 - rawStartDow;
-  const firstMonday = addDays(rawStart, mondayOffset);
-
-  // Build all cells
-  const cells: Array<{
-    date: Date;
-    dateStr: string;
-    week: number;   // row index
-    day: number;    // col index (0=Mon, 6=Sun)
-    count: number;
-    isFuture: boolean;
-  }> = [];
-
-  for (let week = 0; week < NUM_WEEKS; week++) {
-    for (let day = 0; day < NUM_DAYS; day++) {
-      const date = addDays(firstMonday, week * 7 + day);
-      const dateStr = format(date, 'yyyy-MM-dd');
-      const todayStr = format(today, 'yyyy-MM-dd');
-      cells.push({
-        date,
-        dateStr,
-        week,
-        day,
-        count: countByDate[dateStr] ?? 0,
-        isFuture: dateStr > todayStr,
-      });
-    }
-  }
-
-  // Month labels: for each week row, show month name if Monday of that week is a new month
-  const monthLabels: Array<{ week: number; label: string }> = [];
-  let lastMonth = -1;
-  for (let week = 0; week < NUM_WEEKS; week++) {
-    const monday = addDays(firstMonday, week * 7);
-    const month = monday.getMonth();
-    if (month !== lastMonth) {
-      monthLabels.push({ week, label: format(monday, 'MMM') });
-      lastMonth = month;
-    }
-  }
-
-  // Color helper
-  function cellColor(count: number, isFuture: boolean): string {
-    if (isFuture || count === 0) return 'var(--color-bg-tertiary)';
-    const valid = isValidHex(accentColor);
-    if (!valid) {
-      if (count <= 2) return 'rgba(99,102,241,0.30)';
-      if (count <= 5) return 'rgba(99,102,241,0.65)';
-      return 'rgba(99,102,241,1)';
-    }
-    if (count <= 2) return hexToRgba(accentColor, 0.30);
-    if (count <= 5) return hexToRgba(accentColor, 0.65);
-    return accentColor;
-  }
-
-  const gridW = NUM_DAYS * STEP - GAP;
-  const gridH = NUM_WEEKS * STEP - GAP;
-
-  return (
-    <div style={{ position: 'relative' }}>
-      <div className="flex gap-4">
-        {/* Month labels (left side) */}
-        <div
-          style={{
+            inset: 0,
             display: 'flex',
             flexDirection: 'column',
-            width: MONTH_LABEL_W,
-            flexShrink: 0,
-            paddingTop: '20px', // account for day-of-week header
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
-          {Array.from({ length: NUM_WEEKS }, (_, i) => {
-            const ml = monthLabels.find((m) => m.week === i);
-            return (
-              <div
-                key={i}
-                style={{
-                  height: STEP,
-                  display: 'flex',
-                  alignItems: 'center',
-                  fontSize: '10px',
-                  color: 'var(--color-text-muted)',
-                  fontWeight: ml ? 600 : 400,
-                  opacity: ml ? 1 : 0,
-                }}
-              >
-                {ml?.label ?? ''}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Grid */}
-        <div>
-          {/* Day of week labels */}
-          <div className="flex" style={{ gap: GAP, marginBottom: GAP }}>
-            {DAY_LABELS.map((d, i) => (
-              <div
-                key={i}
-                style={{
-                  width: CELL,
-                  height: CELL + 2,
-                  fontSize: '9px',
-                  color: 'var(--color-text-muted)',
-                  textAlign: 'center',
-                  lineHeight: `${CELL + 2}px`,
-                }}
-              >
-                {d}
-              </div>
-            ))}
-          </div>
-
-          {/* Grid cells */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: `repeat(${NUM_DAYS}, ${CELL}px)`,
-              gridTemplateRows: `repeat(${NUM_WEEKS}, ${CELL}px)`,
-              gap: GAP,
-              width: gridW,
-              height: gridH,
-            }}
-          >
-            {cells.map((cell) => (
-              <div
-                key={cell.dateStr}
-                title={`${format(cell.date, 'MMM d')}: ${cell.count} card${cell.count !== 1 ? 's' : ''}`}
-                style={{
-                  width: CELL,
-                  height: CELL,
-                  borderRadius: 3,
-                  backgroundColor: cellColor(cell.count, cell.isFuture),
-                  cursor: cell.count > 0 ? 'pointer' : 'default',
-                  transition: 'transform 0.1s ease',
-                  gridColumn: cell.day + 1,
-                  gridRow: cell.week + 1,
-                }}
-                onMouseEnter={(e) => {
-                  if (!cell.isFuture) {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    setHoveredCell({
-                      date: format(cell.date, 'MMM d'),
-                      count: cell.count,
-                      x: rect.left + CELL / 2,
-                      y: rect.top - 8,
-                    });
-                    e.currentTarget.style.transform = 'scale(1.3)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  setHoveredCell(null);
-                  e.currentTarget.style.transform = 'scale(1)';
-                }}
-              />
-            ))}
-          </div>
+          <span style={{ fontSize: 11, fontWeight: 700, color: accentColor }}>Lv.{level}</span>
+          <span style={{ fontSize: 9, color: 'var(--color-text-muted)', marginTop: 1 }}>
+            {todayXP}/{goalXP}
+          </span>
         </div>
       </div>
 
-      {/* Tooltip (portal-like, fixed position) */}
-      {hoveredCell && (
+      {/* Text */}
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+          Level {level}
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+          {todayXP} XP today · {totalXP} XP total
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 4 }}>
+          Daily goal: {goalXP} XP ({deck.newCardsPerDay} cards × 10)
+        </div>
+        {/* Progress bar */}
         <div
           style={{
-            position: 'fixed',
-            left: hoveredCell.x,
-            top: hoveredCell.y,
-            transform: 'translate(-50%, -100%)',
-            backgroundColor: 'var(--color-bg-elevated)',
-            border: '1px solid var(--color-border)',
-            borderRadius: '8px',
-            padding: '4px 10px',
-            fontSize: '11px',
-            color: 'var(--color-text-primary)',
-            pointerEvents: 'none',
-            whiteSpace: 'nowrap',
-            boxShadow: 'var(--shadow-md)',
-            zIndex: 50,
+            marginTop: 8,
+            height: 5,
+            background: 'var(--color-border)',
+            borderRadius: 99,
+            overflow: 'hidden',
           }}
-        >
-          {hoveredCell.date}: {hoveredCell.count} card{hoveredCell.count !== 1 ? 's' : ''}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Section 5: Retention Bar ─────────────────────────────────────────────────
-
-interface RetentionBarProps {
-  pct: number;
-  accentColor: string;
-}
-
-function RetentionBar({ pct, accentColor }: RetentionBarProps) {
-  return (
-    <div className="flex items-center gap-4">
-      <div
-        className="text-4xl font-black tabular-nums"
-        style={{ color: 'var(--color-text-primary)', minWidth: '72px' }}
-      >
-        {pct}%
-      </div>
-      <div className="flex-1 flex flex-col gap-1.5">
-        <div
-          className="w-full rounded-full overflow-hidden"
-          style={{ height: '10px', backgroundColor: 'var(--color-bg-tertiary)' }}
         >
           <div
             style={{
               height: '100%',
-              width: `${pct}%`,
-              borderRadius: '9999px',
-              backgroundColor: pct >= 80 ? '#10b981' : pct >= 60 ? '#f59e0b' : '#ef4444',
+              width: `${progress * 100}%`,
+              background: accentColor,
+              borderRadius: 99,
               transition: 'width 0.6s ease',
             }}
           />
         </div>
-        <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-          {pct >= 80
-            ? '🌟 Excellent retention — keep it up!'
-            : pct >= 60
-            ? '📈 Good progress — review more often to improve'
-            : '🔄 Keep reviewing — consistency is key'}
-        </p>
+        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 3 }}>
+          {Math.round(progress * 100)}% of daily goal
+        </div>
       </div>
     </div>
   );
 }
 
-// ─── Section container ────────────────────────────────────────────────────────
+// ─── Stat Card ────────────────────────────────────────────────────────────────
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+interface StatCardProps {
+  label: string;
+  value: string | number;
+  sub?: string;
+  color?: string;
+  pulse?: boolean;
+  icon?: string;
+}
+
+function StatCard({ label, value, sub, color, pulse, icon }: StatCardProps) {
   return (
     <div
-      className="rounded-2xl p-5 flex flex-col gap-4"
       style={{
-        backgroundColor: 'var(--color-bg-secondary)',
+        background: 'var(--color-bg-elevated)',
         border: '1px solid var(--color-border)',
+        borderRadius: 10,
+        padding: '14px 16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+        boxShadow: 'var(--shadow-sm)',
+        flex: '1 1 0',
+        minWidth: 0,
       }}
     >
-      <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
-        {title}
-      </h3>
-      {children}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        {pulse && (
+          <span style={{ position: 'relative', display: 'inline-flex' }}>
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                background: 'var(--color-danger)',
+                display: 'block',
+              }}
+            />
+            <span
+              style={{
+                position: 'absolute',
+                inset: 0,
+                borderRadius: '50%',
+                background: 'var(--color-danger)',
+                animation: 'ping 1.4s cubic-bezier(0,0,0.2,1) infinite',
+                opacity: 0.6,
+              }}
+            />
+          </span>
+        )}
+        <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          {icon && <span style={{ marginRight: 4 }}>{icon}</span>}
+          {label}
+        </span>
+      </div>
+      <div
+        style={{
+          fontSize: 26,
+          fontWeight: 700,
+          color: color || 'var(--color-text-primary)',
+          lineHeight: 1,
+        }}
+      >
+        {value}
+      </div>
+      {sub && (
+        <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{sub}</div>
+      )}
+    </div>
+  );
+}
+
+// ─── Milestone Badges ─────────────────────────────────────────────────────────
+
+interface BadgeDef {
+  emoji: string;
+  label: string;
+  description: string;
+  unlocked: boolean;
+  color: string;
+}
+
+interface MilestoneBadgesProps {
+  badges: BadgeDef[];
+}
+
+function MilestoneBadges({ badges }: MilestoneBadgesProps) {
+  const [tooltip, setTooltip] = useState<string | null>(null);
+  const [tooltipIdx, setTooltipIdx] = useState<number | null>(null);
+
+  return (
+    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+      {badges.map((badge, i) => (
+        <div
+          key={badge.label}
+          style={{ position: 'relative' }}
+          onMouseEnter={() => { setTooltip(badge.description); setTooltipIdx(i); }}
+          onMouseLeave={() => { setTooltip(null); setTooltipIdx(null); }}
+        >
+          <div
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 22,
+              cursor: 'default',
+              position: 'relative',
+              background: badge.unlocked ? badge.color : 'var(--color-bg-secondary)',
+              border: badge.unlocked
+                ? `2px solid ${badge.color}`
+                : '2px solid var(--color-border)',
+              opacity: badge.unlocked ? 1 : 0.55,
+              transition: 'transform 0.15s, box-shadow 0.15s',
+              boxShadow: badge.unlocked ? 'var(--shadow-md)' : 'none',
+            }}
+            onMouseEnter={e => {
+              if (badge.unlocked) {
+                (e.currentTarget as HTMLDivElement).style.transform = 'scale(1.12)';
+                (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow-lg)';
+              }
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLDivElement).style.transform = 'scale(1)';
+              (e.currentTarget as HTMLDivElement).style.boxShadow = badge.unlocked ? 'var(--shadow-md)' : 'none';
+            }}
+          >
+            {badge.emoji}
+            {!badge.unlocked && (
+              <span
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'rgba(0,0,0,0.3)',
+                  fontSize: 13,
+                }}
+              >
+                🔒
+              </span>
+            )}
+          </div>
+          {tooltipIdx === i && tooltip && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 'calc(100% + 8px)',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                background: 'var(--color-bg-tertiary)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 8,
+                padding: '6px 10px',
+                whiteSpace: 'nowrap',
+                fontSize: 11,
+                color: 'var(--color-text-secondary)',
+                boxShadow: 'var(--shadow-md)',
+                zIndex: 10,
+                pointerEvents: 'none',
+              }}
+            >
+              <div style={{ fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 2 }}>
+                {badge.emoji} {badge.label}
+              </div>
+              {tooltip}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: 0,
+                  height: 0,
+                  borderLeft: '5px solid transparent',
+                  borderRight: '5px solid transparent',
+                  borderTop: '5px solid var(--color-border)',
+                }}
+              />
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Donut Chart ──────────────────────────────────────────────────────────────
+
+interface DonutSegment {
+  value: number;
+  color: string;
+  label: string;
+}
+
+interface DonutChartProps {
+  segments: DonutSegment[];
+  total: number;
+}
+
+function DonutChart({ segments, total }: DonutChartProps) {
+  const size = 140;
+  const strokeWidth = 22;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+
+  let offset = 0;
+  const arcs = segments.map(seg => {
+    const pct = total > 0 ? seg.value / total : 0;
+    const dash = pct * circumference;
+    const gap = circumference - dash;
+    const strokeDashoffset = -offset;
+    offset += dash;
+    return { ...seg, dash, gap, strokeDashoffset };
+  });
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+      <div style={{ position: 'relative', flexShrink: 0 }}>
+        <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+          {total === 0 ? (
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              stroke="var(--color-border)"
+              strokeWidth={strokeWidth}
+            />
+          ) : (
+            arcs.map((arc, i) => (
+              <circle
+                key={i}
+                cx={size / 2}
+                cy={size / 2}
+                r={radius}
+                fill="none"
+                stroke={arc.color}
+                strokeWidth={strokeWidth}
+                strokeDasharray={`${arc.dash} ${arc.gap}`}
+                strokeDashoffset={arc.strokeDashoffset}
+                strokeLinecap="butt"
+              />
+            ))
+          )}
+        </svg>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)' }}>{total}</span>
+          <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>cards</span>
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+        {segments.map((seg, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 10, height: 10, borderRadius: 3, background: seg.color, flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', flex: 1 }}>{seg.label}</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+              {seg.value}
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--color-text-muted)', width: 34, textAlign: 'right' }}>
+              {total > 0 ? Math.round(seg.value / total * 100) : 0}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Ease Histogram ───────────────────────────────────────────────────────────
+
+interface EaseHistogramProps {
+  cards: Card[];
+}
+
+const EASE_RANGES = [
+  { label: '1.3–1.5', min: 1.3, max: 1.5, color: '#ef4444' },
+  { label: '1.5–1.8', min: 1.5, max: 1.8, color: '#f97316' },
+  { label: '1.8–2.1', min: 1.8, max: 2.1, color: '#eab308' },
+  { label: '2.1–2.5', min: 2.1, max: 2.5, color: '#84cc16' },
+  { label: '2.5–3.0', min: 2.5, max: 3.0, color: '#22c55e' },
+  { label: '3.0+',   min: 3.0, max: Infinity, color: '#10b981' },
+];
+
+function EaseHistogram({ cards }: EaseHistogramProps) {
+  const buckets = EASE_RANGES.map(range => ({
+    ...range,
+    count: cards.filter(c => c.easeFactor >= range.min && c.easeFactor < range.max).length,
+  }));
+
+  const maxCount = Math.max(...buckets.map(b => b.count), 1);
+
+  const svgW = 340;
+  const svgH = 110;
+  const padL = 28;
+  const padB = 28;
+  const padT = 10;
+  const padR = 10;
+  const chartW = svgW - padL - padR;
+  const chartH = svgH - padB - padT;
+  const barGap = 4;
+  const barW = (chartW - barGap * (buckets.length - 1)) / buckets.length;
+
+  return (
+    <svg
+      viewBox={`0 0 ${svgW} ${svgH}`}
+      style={{ width: '100%', maxWidth: svgW, display: 'block' }}
+    >
+      {/* Y axis ticks */}
+      {[0, 0.5, 1].map(frac => {
+        const y = padT + chartH * (1 - frac);
+        const val = Math.round(frac * maxCount);
+        return (
+          <g key={frac}>
+            <line x1={padL} y1={y} x2={padL + chartW} y2={y} stroke="var(--color-border)" strokeWidth={0.5} />
+            <text x={padL - 4} y={y + 4} textAnchor="end" fontSize={8} fill="var(--color-text-muted)">{val}</text>
+          </g>
+        );
+      })}
+
+      {/* Bars */}
+      {buckets.map((b, i) => {
+        const x = padL + i * (barW + barGap);
+        const barH = (b.count / maxCount) * chartH;
+        const y = padT + chartH - barH;
+        return (
+          <g key={b.label}>
+            <rect
+              x={x}
+              y={b.count > 0 ? y : padT + chartH - 1}
+              width={barW}
+              height={b.count > 0 ? barH : 1}
+              rx={3}
+              fill={b.color}
+              opacity={0.85}
+            />
+            <text
+              x={x + barW / 2}
+              y={padT + chartH + 14}
+              textAnchor="middle"
+              fontSize={7}
+              fill="var(--color-text-muted)"
+            >
+              {b.label}
+            </text>
+            {b.count > 0 && (
+              <text
+                x={x + barW / 2}
+                y={y - 3}
+                textAnchor="middle"
+                fontSize={8}
+                fill={b.color}
+                fontWeight="600"
+              >
+                {b.count}
+              </text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ─── Interval Distribution ────────────────────────────────────────────────────
+
+interface IntervalDistProps {
+  cards: Card[];
+  accentColor: string;
+}
+
+const INTERVAL_BUCKETS = [
+  { label: 'New', min: 0, max: 0 },
+  { label: '1d',  min: 1, max: 1 },
+  { label: '2–3d', min: 2, max: 3 },
+  { label: '4–7d', min: 4, max: 7 },
+  { label: '1–2w', min: 8, max: 14 },
+  { label: '2–4w', min: 15, max: 28 },
+  { label: '1–3mo', min: 29, max: 90 },
+  { label: '3mo+', min: 91, max: Infinity },
+];
+
+function IntervalDist({ cards, accentColor }: IntervalDistProps) {
+  const buckets = INTERVAL_BUCKETS.map((b, i) => ({
+    ...b,
+    count: cards.filter(c => c.intervalDays >= b.min && c.intervalDays <= b.max).length,
+    opacity: 0.35 + (i / (INTERVAL_BUCKETS.length - 1)) * 0.65,
+  }));
+
+  const maxCount = Math.max(...buckets.map(b => b.count), 1);
+  const svgW = 340;
+  const svgH = 110;
+  const padL = 28;
+  const padB = 28;
+  const padT = 10;
+  const padR = 10;
+  const chartW = svgW - padL - padR;
+  const chartH = svgH - padB - padT;
+  const barGap = 4;
+  const barW = (chartW - barGap * (buckets.length - 1)) / buckets.length;
+
+  return (
+    <svg
+      viewBox={`0 0 ${svgW} ${svgH}`}
+      style={{ width: '100%', maxWidth: svgW, display: 'block' }}
+    >
+      {[0, 0.5, 1].map(frac => {
+        const y = padT + chartH * (1 - frac);
+        const val = Math.round(frac * maxCount);
+        return (
+          <g key={frac}>
+            <line x1={padL} y1={y} x2={padL + chartW} y2={y} stroke="var(--color-border)" strokeWidth={0.5} />
+            <text x={padL - 4} y={y + 4} textAnchor="end" fontSize={8} fill="var(--color-text-muted)">{val}</text>
+          </g>
+        );
+      })}
+
+      {buckets.map((b, i) => {
+        const x = padL + i * (barW + barGap);
+        const barH = (b.count / maxCount) * chartH;
+        const y = padT + chartH - barH;
+        return (
+          <g key={b.label}>
+            <rect
+              x={x}
+              y={b.count > 0 ? y : padT + chartH - 1}
+              width={barW}
+              height={b.count > 0 ? barH : 1}
+              rx={3}
+              fill={accentColor}
+              opacity={b.opacity}
+            />
+            <text
+              x={x + barW / 2}
+              y={padT + chartH + 14}
+              textAnchor="middle"
+              fontSize={7}
+              fill="var(--color-text-muted)"
+            >
+              {b.label}
+            </text>
+            {b.count > 0 && (
+              <text
+                x={x + barW / 2}
+                y={y - 3}
+                textAnchor="middle"
+                fontSize={8}
+                fill={accentColor}
+                fontWeight="600"
+              >
+                {b.count}
+              </text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ─── Study Velocity ───────────────────────────────────────────────────────────
+
+interface StudyVelocityProps {
+  cards: Card[];
+  accentColor: string;
+}
+
+function StudyVelocity({ cards, accentColor }: StudyVelocityProps) {
+  const today = startOfDay(new Date());
+
+  const days = useMemo(() => {
+    return Array.from({ length: 14 }, (_, i) => {
+      const day = addDays(today, -13 + i);
+      const dayStr = format(day, 'yyyy-MM-dd');
+      const count = cards.filter(c => {
+        if (!c.lastReviewed) return false;
+        return format(startOfDay(new Date(c.lastReviewed)), 'yyyy-MM-dd') === dayStr;
+      }).length;
+      return { date: day, count, label: format(day, 'MMM d') };
+    });
+  }, [cards]);
+
+  const maxCount = Math.max(...days.map(d => d.count), 1);
+  const svgW = 340;
+  const svgH = 110;
+  const padL = 28;
+  const padB = 28;
+  const padT = 10;
+  const padR = 10;
+  const chartW = svgW - padL - padR;
+  const chartH = svgH - padB - padT;
+
+  const points = days.map((d, i) => {
+    const x = padL + (i / (days.length - 1)) * chartW;
+    const y = padT + chartH - (d.count / maxCount) * chartH;
+    return { x, y, ...d };
+  });
+
+  const polylinePoints = points.map(p => `${p.x},${p.y}`).join(' ');
+
+  // Area polygon
+  const areaPoints = [
+    `${points[0].x},${padT + chartH}`,
+    ...points.map(p => `${p.x},${p.y}`),
+    `${points[points.length - 1].x},${padT + chartH}`,
+  ].join(' ');
+
+  return (
+    <svg
+      viewBox={`0 0 ${svgW} ${svgH}`}
+      style={{ width: '100%', maxWidth: svgW, display: 'block' }}
+    >
+      {/* Grid lines */}
+      {[0, 0.5, 1].map(frac => {
+        const y = padT + chartH * (1 - frac);
+        const val = Math.round(frac * maxCount);
+        return (
+          <g key={frac}>
+            <line x1={padL} y1={y} x2={padL + chartW} y2={y} stroke="var(--color-border)" strokeWidth={0.5} />
+            <text x={padL - 4} y={y + 4} textAnchor="end" fontSize={8} fill="var(--color-text-muted)">{val}</text>
+          </g>
+        );
+      })}
+
+      {/* Area fill */}
+      <polygon
+        points={areaPoints}
+        fill={hexToRgba(accentColor, 0.1)}
+      />
+
+      {/* Polyline */}
+      <polyline
+        points={polylinePoints}
+        fill="none"
+        stroke={accentColor}
+        strokeWidth={2}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+
+      {/* Dots */}
+      {points.map((p, i) => (
+        <circle
+          key={i}
+          cx={p.x}
+          cy={p.y}
+          r={3}
+          fill={accentColor}
+          stroke="var(--color-bg-elevated)"
+          strokeWidth={1.5}
+        />
+      ))}
+
+      {/* X-axis labels — show every 7th */}
+      {points.filter((_, i) => i === 0 || i === 6 || i === 13).map((p, i) => (
+        <text
+          key={i}
+          x={p.x}
+          y={padT + chartH + 14}
+          textAnchor="middle"
+          fontSize={7.5}
+          fill="var(--color-text-muted)"
+        >
+          {p.label}
+        </text>
+      ))}
+    </svg>
+  );
+}
+
+// ─── 14-Day Forecast Bar Chart ─────────────────────────────────────────────────
+
+interface ForecastChartProps {
+  cards: Card[];
+  accentColor: string;
+}
+
+function ForecastChart({ cards, accentColor }: ForecastChartProps) {
+  const today = startOfDay(new Date());
+
+  const days = useMemo(() => {
+    return Array.from({ length: 14 }, (_, i) => {
+      const day = addDays(today, i);
+      const dayStr = format(day, 'yyyy-MM-dd');
+      const count = cards.filter(c => {
+        if (c.status === 'suspended') return false;
+        return format(startOfDay(new Date(c.nextReview)), 'yyyy-MM-dd') === dayStr;
+      }).length;
+      return { label: i === 0 ? 'Today' : format(day, 'MMM d'), count };
+    });
+  }, [cards]);
+
+  const maxCount = Math.max(...days.map(d => d.count), 1);
+  const svgW = 340;
+  const svgH = 120;
+  const padL = 28;
+  const padB = 32;
+  const padT = 10;
+  const padR = 10;
+  const chartW = svgW - padL - padR;
+  const chartH = svgH - padB - padT;
+  const barGap = 3;
+  const barW = (chartW - barGap * (days.length - 1)) / days.length;
+
+  return (
+    <svg
+      viewBox={`0 0 ${svgW} ${svgH}`}
+      style={{ width: '100%', maxWidth: svgW, display: 'block' }}
+    >
+      {[0, 0.5, 1].map(frac => {
+        const y = padT + chartH * (1 - frac);
+        const val = Math.round(frac * maxCount);
+        return (
+          <g key={frac}>
+            <line x1={padL} y1={y} x2={padL + chartW} y2={y} stroke="var(--color-border)" strokeWidth={0.5} />
+            <text x={padL - 4} y={y + 4} textAnchor="end" fontSize={8} fill="var(--color-text-muted)">{val}</text>
+          </g>
+        );
+      })}
+
+      {days.map((d, i) => {
+        const x = padL + i * (barW + barGap);
+        const barH = (d.count / maxCount) * chartH;
+        const y = padT + chartH - barH;
+        const isToday = i === 0;
+        return (
+          <g key={i}>
+            <rect
+              x={x}
+              y={d.count > 0 ? y : padT + chartH - 1}
+              width={barW}
+              height={d.count > 0 ? barH : 1}
+              rx={3}
+              fill={accentColor}
+              opacity={isToday ? 1 : 0.55}
+            />
+            {i % 2 === 0 && (
+              <text
+                x={x + barW / 2}
+                y={padT + chartH + 14}
+                textAnchor="middle"
+                fontSize={7}
+                fill="var(--color-text-muted)"
+                transform={`rotate(-35, ${x + barW / 2}, ${padT + chartH + 14})`}
+              >
+                {d.label}
+              </text>
+            )}
+            {d.count > 0 && barH > 14 && (
+              <text
+                x={x + barW / 2}
+                y={y + 10}
+                textAnchor="middle"
+                fontSize={7}
+                fill="white"
+                fontWeight="600"
+              >
+                {d.count}
+              </text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ─── Heatmap ──────────────────────────────────────────────────────────────────
+
+interface HeatmapProps {
+  cards: Card[];
+  accentColor: string;
+}
+
+function StudyHeatmap({ cards, accentColor }: HeatmapProps) {
+  const today = startOfDay(new Date());
+  const WEEKS = 12;
+  const DAYS = 7;
+
+  const activityMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    cards.forEach(c => {
+      if (!c.lastReviewed) return;
+      const key = format(startOfDay(new Date(c.lastReviewed)), 'yyyy-MM-dd');
+      map[key] = (map[key] || 0) + 1;
+    });
+    return map;
+  }, [cards]);
+
+  // Build grid: 12 weeks × 7 days, ending today
+  const todayDow = today.getDay(); // 0=Sun
+  const startDay = addDays(today, -(WEEKS * 7 - 1 + todayDow));
+
+  const cells = Array.from({ length: WEEKS * 7 }, (_, i) => {
+    const day = addDays(startDay, i);
+    const key = format(day, 'yyyy-MM-dd');
+    const count = activityMap[key] || 0;
+    return { day, count };
+  });
+
+  const maxCount = Math.max(...cells.map(c => c.count), 1);
+
+  const cellSize = 14;
+  const cellGap = 2;
+  const svgW = WEEKS * (cellSize + cellGap) + 30;
+  const svgH = DAYS * (cellSize + cellGap) + 24;
+
+  const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <svg
+        viewBox={`0 0 ${svgW} ${svgH}`}
+        style={{ display: 'block', minWidth: svgW }}
+      >
+        {/* Day labels */}
+        {dayLabels.map((label, di) => (
+          <text
+            key={di}
+            x={8}
+            y={20 + di * (cellSize + cellGap) + cellSize / 2}
+            textAnchor="middle"
+            fontSize={8}
+            fill="var(--color-text-muted)"
+            dominantBaseline="middle"
+          >
+            {label}
+          </text>
+        ))}
+
+        {/* Cells */}
+        {cells.map((cell, idx) => {
+          const week = Math.floor(idx / 7);
+          const dow = idx % 7;
+          const x = 20 + week * (cellSize + cellGap);
+          const y = 16 + dow * (cellSize + cellGap);
+          const intensity = cell.count / maxCount;
+          const fill = cell.count === 0
+            ? 'var(--color-border)'
+            : hexToRgba(accentColor, 0.2 + intensity * 0.8);
+
+          return (
+            <rect
+              key={idx}
+              x={x}
+              y={y}
+              width={cellSize}
+              height={cellSize}
+              rx={2}
+              fill={fill}
+            >
+              <title>{format(cell.day, 'MMM d, yyyy')}: {cell.count} review{cell.count !== 1 ? 's' : ''}</title>
+            </rect>
+          );
+        })}
+      </svg>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 10, color: 'var(--color-text-muted)' }}>
+        <span>Less</span>
+        {[0, 0.25, 0.5, 0.75, 1].map(v => (
+          <div
+            key={v}
+            style={{
+              width: 11,
+              height: 11,
+              borderRadius: 2,
+              background: v === 0 ? 'var(--color-border)' : hexToRgba(accentColor, 0.2 + v * 0.8),
+            }}
+          />
+        ))}
+        <span>More</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Retention Rate Bar ────────────────────────────────────────────────────────
+
+interface RetentionBarProps {
+  cards: Card[];
+  accentColor: string;
+}
+
+function RetentionBar({ cards, accentColor }: RetentionBarProps) {
+  const mature = cards.filter(c => c.intervalDays >= 21).length;
+  const reviewed = cards.filter(c => c.lastReviewed != null).length;
+  const retention = reviewed > 0 ? Math.round((mature / reviewed) * 100) : 0;
+
+  const getColor = (pct: number) => {
+    if (pct >= 80) return 'var(--color-success)';
+    if (pct >= 60) return accentColor;
+    if (pct >= 40) return 'var(--color-warning)';
+    return 'var(--color-danger)';
+  };
+
+  const color = getColor(retention);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+          Mature cards (21+ day interval) vs reviewed
+        </span>
+        <span style={{ fontSize: 20, fontWeight: 700, color }}>
+          {retention}%
+        </span>
+      </div>
+      <div
+        style={{
+          height: 10,
+          background: 'var(--color-border)',
+          borderRadius: 99,
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            height: '100%',
+            width: `${retention}%`,
+            background: color,
+            borderRadius: 99,
+            transition: 'width 0.8s ease',
+          }}
+        />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-muted)' }}>
+        <span>{mature} mature cards</span>
+        <span>{reviewed} total reviewed</span>
+      </div>
     </div>
   );
 }
@@ -600,149 +1112,269 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function DeckStats({ deck, cards, deckColor }: DeckStatsProps) {
-  const accentColor = (deckColor && isValidHex(deckColor)) ? deckColor : '#3b82f6';
+  // Resolve accent color
+  const resolvedColor = deckColor || deck.color;
+  const accentColor =
+    resolvedColor && isValidHex(resolvedColor)
+      ? resolvedColor
+      : 'var(--color-accent)';
+  const accentHex =
+    resolvedColor && isValidHex(resolvedColor)
+      ? resolvedColor
+      : '#6366f1';
+
+  // ── Computed stats ──────────────────────────────────────────────────────────
   const today = startOfDay(new Date());
-  const todayStr = format(today, 'yyyy-MM-dd');
 
-  // ── Section 1: Summary ──
   const totalCards = cards.length;
-  const dueToday = cards.filter((c) => c.nextReview <= todayStr).length;
-  const mastered = cards.filter((c) => c.status === 'review' && c.intervalDays >= 21).length;
-  const avgEase =
-    totalCards > 0
-      ? (cards.reduce((sum, c) => sum + c.easeFactor, 0) / totalCards).toFixed(1)
-      : '—';
 
-  // ── Section 2: Maturity breakdown ──
-  const maturitySegments: MaturitySegment[] = useMemo(() => {
-    const newCount = cards.filter((c) => c.status === 'new').length;
-    const learningCount = cards.filter((c) => c.status === 'learning').length;
-    const youngCount = cards.filter((c) => c.status === 'review' && c.intervalDays < 21).length;
-    const matureCount = cards.filter((c) => c.status === 'review' && c.intervalDays >= 21).length;
-    const suspendedCount = cards.filter((c) => c.status === 'suspended').length;
-    return [
-      { label: 'New', count: newCount, color: '#6366f1' },
-      { label: 'Learning', count: learningCount, color: '#f59e0b' },
-      { label: 'Young', count: youngCount, color: '#22c55e' },
-      { label: 'Mature', count: matureCount, color: '#10b981' },
-      { label: 'Suspended', count: suspendedCount, color: '#94a3b8' },
-    ];
+  const dueToday = useMemo(
+    () =>
+      cards.filter(c => {
+        if (c.status === 'suspended') return false;
+        const nr = startOfDay(new Date(c.nextReview));
+        return nr <= today;
+      }).length,
+    [cards]
+  );
+
+  const mastered = cards.filter(c => c.status === 'review' && c.intervalDays >= 21).length;
+
+  const avgEase = useMemo(() => {
+    if (cards.length === 0) return 0;
+    return cards.reduce((sum, c) => sum + c.easeFactor, 0) / cards.length;
   }, [cards]);
 
-  const maturityTotal = maturitySegments.reduce((sum, s) => sum + s.count, 0);
+  const leeches = cards.filter(c => c.easeFactor < 1.5 && c.repetitions > 3).length;
 
-  // ── Section 3: 14-day forecast ──
-  const forecastData: ForecastDay[] = useMemo(() => {
-    return Array.from({ length: 14 }, (_, i) => {
-      const date = addDays(today, i);
-      const dateStr = format(date, 'yyyy-MM-dd');
-      const count = cards.filter((c) => c.nextReview === dateStr).length;
-      return {
-        date,
-        dateStr,
-        label: format(date, 'EEE'),
-        fullLabel: format(date, 'MMM d'),
-        count,
-        isToday: i === 0,
-      };
-    });
-  }, [cards, todayStr]);
-
-  // ── Section 4: Heatmap ──
-  const countByDate = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const card of cards) {
-      if (card.lastReviewed) {
-        const dateStr = card.lastReviewed.slice(0, 10);
-        map[dateStr] = (map[dateStr] ?? 0) + 1;
-      }
+  const streak = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('divein-study-streak');
+      if (!raw) return 0;
+      const parsed = JSON.parse(raw);
+      return parsed.streak ?? 0;
+    } catch {
+      return 0;
     }
-    return map;
-  }, [cards]);
+  }, []);
 
-  // ── Section 5: Retention ──
-  const retentionPct = useMemo(() => {
-    if (totalCards === 0) return 0;
-    const retained = cards.filter((c) => c.easeFactor > 2.0).length;
-    return Math.round((retained / totalCards) * 100);
-  }, [cards, totalCards]);
+  // Ease color
+  const easeColor =
+    avgEase > 2.5
+      ? 'var(--color-success)'
+      : avgEase > 2.0
+      ? 'var(--color-warning)'
+      : 'var(--color-danger)';
+
+  // Milestone badges
+  const anyReviewed = cards.some(c => c.lastReviewed != null);
+  const reviewStatusPct = totalCards > 0
+    ? cards.filter(c => c.status === 'review').length / totalCards
+    : 0;
+
+  const badges: BadgeDef[] = [
+    {
+      emoji: '🎯',
+      label: 'First Review',
+      description: 'Review at least one card',
+      unlocked: anyReviewed,
+      color: hexToRgba(accentHex, 0.2),
+    },
+    {
+      emoji: '🔥',
+      label: 'Week Warrior',
+      description: 'Maintain a 7-day study streak',
+      unlocked: streak >= 7,
+      color: 'rgba(249,115,22,0.2)',
+    },
+    {
+      emoji: '💯',
+      label: 'Perfect Session',
+      description: 'Complete a perfect review session (coming soon)',
+      unlocked: false,
+      color: 'rgba(234,179,8,0.2)',
+    },
+    {
+      emoji: '🧠',
+      label: '100 Cards',
+      description: 'Add 100 or more cards to this deck',
+      unlocked: totalCards >= 100,
+      color: 'rgba(168,85,247,0.2)',
+    },
+    {
+      emoji: '⭐',
+      label: 'Master',
+      description: '50% or more cards in review status',
+      unlocked: reviewStatusPct >= 0.5,
+      color: 'rgba(234,179,8,0.2)',
+    },
+    {
+      emoji: '🏆',
+      label: 'Scholar',
+      description: 'Add 500 or more cards to this deck',
+      unlocked: totalCards >= 500,
+      color: 'rgba(16,185,129,0.2)',
+    },
+  ];
+
+  // Donut segments
+  const donutSegments: DonutSegment[] = [
+    {
+      value: cards.filter(c => c.status === 'new').length,
+      color: 'var(--color-text-muted)',
+      label: 'New',
+    },
+    {
+      value: cards.filter(c => c.status === 'learning').length,
+      color: 'var(--color-warning)',
+      label: 'Learning',
+    },
+    {
+      value: cards.filter(c => c.status === 'review').length,
+      color: accentHex,
+      label: 'Review',
+    },
+    {
+      value: cards.filter(c => c.status === 'suspended').length,
+      color: 'var(--color-danger)',
+      label: 'Suspended',
+    },
+  ];
 
   return (
-    <div className="flex flex-col gap-5 pb-8">
-      {/* ── Section 1: Summary row ── */}
-      <div className="flex gap-3">
-        <StatCard icon="🃏" label="Total Cards" value={totalCards} />
-        <StatCard
-          icon="⚡"
-          label="Due Today"
-          value={dueToday}
-          accent={dueToday > 0 ? 'var(--color-warning)' : 'var(--color-success)'}
-        />
-        <StatCard icon="⭐" label="Mastered" value={mastered} accent={accentColor} />
-        <StatCard icon="📊" label="Avg Ease" value={avgEase} />
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Ping keyframe */}
+      <style>{`
+        @keyframes ping {
+          75%, 100% { transform: scale(2); opacity: 0; }
+        }
+      `}</style>
 
-      {/* ── Sections 2 & 5 side by side ── */}
-      <div className="flex gap-5">
-        {/* Section 2: Donut */}
-        <div
-          className="flex-1 rounded-2xl p-5 flex flex-col gap-4"
-          style={{
-            backgroundColor: 'var(--color-bg-secondary)',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
-            🥧 Card Maturity
-          </h3>
-          <DonutChart segments={maturitySegments} total={maturityTotal} />
+      {/* XP Progress Ring */}
+      <XPRing deck={deck} cards={cards} accentColor={accentHex} />
+
+      {/* Summary Stat Cards */}
+      <CollapsibleSection title="Overview">
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <StatCard
+            label="Total Cards"
+            value={totalCards}
+            sub={`${deck.newCardsPerDay} new/day limit`}
+          />
+          <StatCard
+            label="Due Today"
+            value={dueToday}
+            sub="cards pending review"
+            color={dueToday > 0 ? 'var(--color-danger)' : 'var(--color-success)'}
+            pulse={dueToday > 0}
+          />
+          <StatCard
+            label="Mastered"
+            value={mastered}
+            sub="21+ day interval"
+            color="var(--color-success)"
+          />
+          <StatCard
+            label="Avg Ease"
+            value={cards.length > 0 ? avgEase.toFixed(2) : '—'}
+            sub={avgEase > 2.5 ? 'Great' : avgEase > 2.0 ? 'OK' : 'Low'}
+            color={cards.length > 0 ? easeColor : 'var(--color-text-muted)'}
+          />
+          <StatCard
+            label="Leeches"
+            value={leeches}
+            sub="ease<1.5 & reps>3"
+            color={leeches > 0 ? 'var(--color-danger)' : 'var(--color-text-muted)'}
+          />
+          <StatCard
+            label="Study Streak"
+            value={streak}
+            sub="days in a row"
+            icon="🔥"
+            color={streak >= 7 ? 'var(--color-warning)' : streak > 0 ? accentHex : 'var(--color-text-muted)'}
+          />
         </div>
+      </CollapsibleSection>
 
-        {/* Section 5: Retention */}
-        <div
-          className="flex-1 rounded-2xl p-5 flex flex-col gap-4"
-          style={{
-            backgroundColor: 'var(--color-bg-secondary)',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
-            🎯 Retention Rate
-          </h3>
-          <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-            Estimated correct recall in the last 30 days
-          </p>
-          <div className="flex-1 flex items-center">
-            <RetentionBar pct={retentionPct} accentColor={accentColor} />
+      {/* Milestone Badges */}
+      <CollapsibleSection title="Milestones">
+        <MilestoneBadges badges={badges} />
+      </CollapsibleSection>
+
+      {/* Card Maturity Donut */}
+      <CollapsibleSection title="Card Maturity">
+        <DonutChart segments={donutSegments} total={totalCards} />
+      </CollapsibleSection>
+
+      {/* Retention Rate */}
+      <CollapsibleSection title="Retention Rate">
+        <RetentionBar cards={cards} accentColor={accentHex} />
+      </CollapsibleSection>
+
+      {/* 14-Day Forecast */}
+      <CollapsibleSection title="14-Day Review Forecast">
+        {cards.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--color-text-muted)', fontSize: 13 }}>
+            No cards scheduled yet
           </div>
-          {/* Breakdown note */}
-          <p className="text-xs" style={{ color: 'var(--color-text-muted)', marginTop: 'auto' }}>
-            Based on ease factor proxy ({cards.filter((c) => c.easeFactor > 2.0).length} of {totalCards} cards above threshold)
-          </p>
-        </div>
-      </div>
-
-      {/* ── Section 3: 14-Day Forecast ── */}
-      <Section title="📅 14-Day Review Forecast">
-        {forecastData.every((d) => d.count === 0) ? (
-          <p className="text-sm py-4 text-center" style={{ color: 'var(--color-text-muted)' }}>
-            No reviews scheduled in the next 14 days
-          </p>
         ) : (
-          <ForecastChart data={forecastData} accentColor={accentColor} />
+          <ForecastChart cards={cards} accentColor={accentHex} />
         )}
-      </Section>
+      </CollapsibleSection>
 
-      {/* ── Section 4: Activity Heatmap ── */}
-      <Section title="🔥 Study Activity (Last 12 Weeks)">
-        {Object.keys(countByDate).length === 0 ? (
-          <p className="text-sm py-4 text-center" style={{ color: 'var(--color-text-muted)' }}>
-            No study activity recorded yet — start reviewing to see your heatmap!
-          </p>
+      {/* Ease Distribution */}
+      <CollapsibleSection title="Ease Distribution">
+        {cards.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--color-text-muted)', fontSize: 13 }}>
+            No cards yet
+          </div>
         ) : (
-          <ActivityHeatmap countByDate={countByDate} accentColor={accentColor} />
+          <>
+            <EaseHistogram cards={cards} />
+            <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {EASE_RANGES.map(r => (
+                <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: 2, background: r.color }} />
+                  <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>{r.label}</span>
+                </div>
+              ))}
+            </div>
+          </>
         )}
-      </Section>
+      </CollapsibleSection>
+
+      {/* Interval Distribution */}
+      <CollapsibleSection title="Interval Distribution">
+        {cards.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--color-text-muted)', fontSize: 13 }}>
+            No cards yet
+          </div>
+        ) : (
+          <IntervalDist cards={cards} accentColor={accentHex} />
+        )}
+      </CollapsibleSection>
+
+      {/* Study Velocity */}
+      <CollapsibleSection title="Study Velocity (Last 14 Days)">
+        {cards.every(c => !c.lastReviewed) ? (
+          <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--color-text-muted)', fontSize: 13 }}>
+            No study activity recorded yet
+          </div>
+        ) : (
+          <StudyVelocity cards={cards} accentColor={accentHex} />
+        )}
+      </CollapsibleSection>
+
+      {/* Study Heatmap */}
+      <CollapsibleSection title="Study Activity (12 Weeks)">
+        {cards.every(c => !c.lastReviewed) ? (
+          <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--color-text-muted)', fontSize: 13 }}>
+            No study activity recorded yet
+          </div>
+        ) : (
+          <StudyHeatmap cards={cards} accentColor={accentHex} />
+        )}
+      </CollapsibleSection>
     </div>
   );
 }

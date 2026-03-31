@@ -1,10 +1,379 @@
-import { useState, useCallback, useEffect } from 'react';
-import { X, RotateCcw, CheckCircle2 } from 'lucide-react';
-import type { Card, ReviewQuality, UIRating } from '@/shared/types/flashcard';
-import { UI_RATING_QUALITY } from '@/shared/types/flashcard';
-import { previewInterval } from '@/shared/lib/sm2';
-import { useReviewCard } from '../hooks/useFlashcards';
-import { getDeckGradient } from './DeckCard';
+"use client";
+
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { X, RotateCcw, CheckCircle, Clock, Zap, Award } from "lucide-react";
+import { Card, ReviewQuality, UIRating, UI_RATING_QUALITY } from "@/shared/types/flashcard";
+import { previewInterval } from "@/shared/lib/sm2";
+import { useReviewCard } from "../hooks/useFlashcards";
+import { getDeckGradient } from "./DeckCard";
+
+// ─── Rating Config ────────────────────────────────────────────────────────────
+
+const RATING_CONFIG: {
+  rating: UIRating;
+  label: string;
+  shortcut: string;
+  color: string;
+  bgVar: string;
+  borderVar: string;
+}[] = [
+  {
+    rating: "again",
+    label: "Again",
+    shortcut: "1",
+    color: "var(--color-danger)",
+    bgVar: "var(--color-danger-soft)",
+    borderVar: "var(--color-danger)",
+  },
+  {
+    rating: "hard",
+    label: "Hard",
+    shortcut: "2",
+    color: "var(--color-warning)",
+    bgVar: "var(--color-warning-soft)",
+    borderVar: "var(--color-warning)",
+  },
+  {
+    rating: "good",
+    label: "Good",
+    shortcut: "3",
+    color: "var(--color-success)",
+    bgVar: "var(--color-success-soft)",
+    borderVar: "var(--color-success)",
+  },
+  {
+    rating: "easy",
+    label: "Easy",
+    shortcut: "4",
+    color: "var(--color-accent)",
+    bgVar: "var(--color-accent-soft)",
+    borderVar: "var(--color-accent)",
+  },
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatTimer(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  return formatTimer(totalSeconds);
+}
+
+function formatIntervalLabel(days: number): string {
+  if (days < 1) return "<1d";
+  if (days === 1) return "1d";
+  if (days < 30) return `${Math.round(days)}d`;
+  if (days < 365) return `${(days / 30).toFixed(1)}mo`;
+  return `${(days / 365).toFixed(1)}y`;
+}
+
+function getNextReviewDate(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + Math.round(days));
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function computeStreak(ratings: UIRating[]): number {
+  let streak = 0;
+  for (let i = ratings.length - 1; i >= 0; i--) {
+    if (ratings[i] === "good" || ratings[i] === "easy") {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+// ─── RichText Renderer ────────────────────────────────────────────────────────
+
+interface RichTextProps {
+  text: string;
+  className?: string;
+}
+
+function RichText({ text, className }: RichTextProps) {
+  const parse = (input: string): React.ReactNode[] => {
+    // Split on newlines first
+    const lines = input.split("\n");
+    const result: React.ReactNode[] = [];
+
+    lines.forEach((line, lineIdx) => {
+      if (lineIdx > 0) result.push(<br key={`br-${lineIdx}`} />);
+
+      // Check if it's a list item
+      if (line.startsWith("- ")) {
+        const content = line.slice(2);
+        result.push(
+          <li key={`li-${lineIdx}`} style={{ marginLeft: 16 }}>
+            {parseInline(content)}
+          </li>
+        );
+      } else {
+        result.push(...parseInline(line, lineIdx));
+      }
+    });
+
+    return result;
+  };
+
+  const parseInline = (text: string, keyPrefix?: number): React.ReactNode[] => {
+    const nodes: React.ReactNode[] = [];
+    // Combined regex for bold, italic, code, image
+    const pattern = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`(.+?)`)|(!?\[([^\]]*)\]\(([^)]+)\))/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = pattern.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        nodes.push(text.slice(lastIndex, match.index));
+      }
+
+      const k = `${keyPrefix ?? 0}-${match.index}`;
+
+      if (match[1]) {
+        // **bold**
+        nodes.push(<strong key={k}>{match[2]}</strong>);
+      } else if (match[3]) {
+        // *italic*
+        nodes.push(<em key={k}>{match[4]}</em>);
+      } else if (match[5]) {
+        // `code`
+        nodes.push(
+          <code
+            key={k}
+            style={{
+              fontFamily: "monospace",
+              background: "var(--color-bg-tertiary)",
+              padding: "1px 5px",
+              borderRadius: 4,
+              fontSize: "0.9em",
+            }}
+          >
+            {match[6]}
+          </code>
+        );
+      } else if (match[7]) {
+        // image or link
+        const full = match[7];
+        if (full.startsWith("!")) {
+          const alt = match[8];
+          const url = match[9];
+          nodes.push(
+            <img
+              key={k}
+              src={url}
+              alt={alt}
+              style={{ maxWidth: "100%", borderRadius: 8, display: "inline-block" }}
+            />
+          );
+        } else {
+          const label = match[8];
+          const url = match[9];
+          nodes.push(
+            <a key={k} href={url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--color-accent)", textDecoration: "underline" }}>
+              {label}
+            </a>
+          );
+        }
+      }
+
+      lastIndex = pattern.lastIndex;
+    }
+
+    if (lastIndex < text.length) {
+      nodes.push(text.slice(lastIndex));
+    }
+
+    return nodes;
+  };
+
+  return <span className={className}>{parse(text)}</span>;
+}
+
+// ─── Cloze Helpers ────────────────────────────────────────────────────────────
+
+function hasCloze(text: string): boolean {
+  return /\{\{c\d+::([^}]+)\}\}/.test(text);
+}
+
+function renderClozeQuestion(text: string): React.ReactNode {
+  const parts = text.split(/(\{\{c\d+::[^}]+\}\})/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        const match = part.match(/\{\{c\d+::([^}]+)\}\}/);
+        if (match) {
+          return (
+            <span
+              key={i}
+              style={{
+                display: "inline-block",
+                borderBottom: "2px solid var(--color-accent)",
+                minWidth: 48,
+                color: "transparent",
+                userSelect: "none",
+                padding: "0 4px",
+              }}
+            >
+              {match[1]}
+            </span>
+          );
+        }
+        return <RichText key={i} text={part} />;
+      })}
+    </>
+  );
+}
+
+function renderClozeAnswer(text: string): React.ReactNode {
+  const parts = text.split(/(\{\{c\d+::[^}]+\}\})/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        const match = part.match(/\{\{c\d+::([^}]+)\}\}/);
+        if (match) {
+          return (
+            <span
+              key={i}
+              style={{
+                display: "inline-block",
+                background: "var(--color-accent-soft)",
+                color: "var(--color-accent)",
+                borderRadius: 20,
+                padding: "1px 10px",
+                fontWeight: 600,
+              }}
+            >
+              {match[1]}
+            </span>
+          );
+        }
+        return <RichText key={i} text={part} />;
+      })}
+    </>
+  );
+}
+
+// ─── Heat Strip ───────────────────────────────────────────────────────────────
+
+type HeatResult = "good" | "hard" | "again" | "remaining";
+
+function ratingToHeat(r: UIRating): HeatResult {
+  if (r === "good" || r === "easy") return "good";
+  if (r === "hard") return "hard";
+  return "again";
+}
+
+const HEAT_COLORS: Record<HeatResult, string> = {
+  good: "var(--color-success)",
+  hard: "var(--color-warning)",
+  again: "var(--color-danger)",
+  remaining: "var(--color-border)",
+};
+
+interface HeatStripProps {
+  total: number;
+  ratings: UIRating[];
+}
+
+function HeatStrip({ total, ratings }: HeatStripProps) {
+  const dots: HeatResult[] = [];
+  for (let i = 0; i < total; i++) {
+    if (i < ratings.length) {
+      dots.push(ratingToHeat(ratings[i]));
+    } else {
+      dots.push("remaining");
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginTop: 6 }}>
+      {dots.map((d, i) => (
+        <div
+          key={i}
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: HEAT_COLORS[d],
+            flexShrink: 0,
+            transition: "background 0.3s",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ─── SVG Confetti ─────────────────────────────────────────────────────────────
+
+function Confetti() {
+  const pieces = Array.from({ length: 40 }, (_, i) => ({
+    id: i,
+    x: Math.random() * 100,
+    delay: Math.random() * 1.5,
+    duration: 1.5 + Math.random() * 1.5,
+    color: ["#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#8b5cf6", "#ec4899"][
+      Math.floor(Math.random() * 6)
+    ],
+    size: 6 + Math.random() * 8,
+    rotate: Math.random() * 360,
+  }));
+
+  return (
+    <svg
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        pointerEvents: "none",
+        overflow: "hidden",
+      }}
+    >
+      {pieces.map((p) => (
+        <rect
+          key={p.id}
+          x={`${p.x}%`}
+          y="-20"
+          width={p.size}
+          height={p.size / 2}
+          fill={p.color}
+          rx={2}
+          transform={`rotate(${p.rotate})`}
+          style={{
+            animation: `confettiFall ${p.duration}s ${p.delay}s ease-in forwards`,
+          }}
+        />
+      ))}
+      <style>{`
+        @keyframes confettiFall {
+          0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(600px) rotate(720deg); opacity: 0; }
+        }
+      `}</style>
+    </svg>
+  );
+}
+
+// ─── Motivational Messages ────────────────────────────────────────────────────
+
+function getMotivationalMessage(accuracy: number, total: number): string {
+  if (accuracy >= 95) return "Flawless! You're on fire! 🔥";
+  if (accuracy >= 80) return "Excellent work! Keep it up! 🌟";
+  if (accuracy >= 60) return "Good session! Room to grow. 💪";
+  if (accuracy >= 40) return "Keep practicing — it gets easier. 🧠";
+  return "Every rep counts. Don't give up! 🤞";
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 interface StudySessionProps {
   deckId: string;
@@ -15,444 +384,349 @@ interface StudySessionProps {
   onExit: () => void;
 }
 
-interface SessionStats {
-  again: number;
-  hard: number;
-  good: number;
-  easy: number;
-  startTime: number;
-}
+export function StudySession({
+  deckId,
+  queue,
+  deckColor,
+  deckName,
+  allCards,
+  onExit,
+}: StudySessionProps) {
+  const reviewCardMutation = useReviewCard();
+  const reviewCard = reviewCardMutation.mutate;
+  const isLoading = reviewCardMutation.isPending;
 
-const RATING_CONFIG = [
-  {
-    rating: 'again' as UIRating,
-    emoji: '❌',
-    label: 'Again',
-    color: 'var(--color-danger)',
-    bg: 'var(--color-danger-soft)',
-    border: 'rgba(224,62,62,0.3)',
-    hoverBg: 'rgba(224,62,62,0.15)',
-  },
-  {
-    rating: 'hard' as UIRating,
-    emoji: '😐',
-    label: 'Hard',
-    color: 'var(--color-warning)',
-    bg: 'var(--color-warning-soft)',
-    border: 'rgba(207,142,23,0.3)',
-    hoverBg: 'rgba(207,142,23,0.15)',
-  },
-  {
-    rating: 'good' as UIRating,
-    emoji: '✅',
-    label: 'Good',
-    color: 'var(--color-success)',
-    bg: 'var(--color-success-soft)',
-    border: 'rgba(15,123,15,0.3)',
-    hoverBg: 'rgba(15,123,15,0.15)',
-  },
-  {
-    rating: 'easy' as UIRating,
-    emoji: '⚡',
-    label: 'Easy',
-    color: 'var(--color-accent)',
-    bg: 'var(--color-accent-soft)',
-    border: 'rgba(59,130,246,0.3)',
-    hoverBg: 'rgba(59,130,246,0.15)',
-  },
-] as const;
-
-function formatTimer(totalSeconds: number): string {
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
-
-function formatDuration(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  const rem = s % 60;
-  return `${m}m ${rem}s`;
-}
-
-function formatIntervalLabel(days: number): string {
-  if (days < 1) return '<1d';
-  if (days === 1) return '1d';
-  if (days < 7) return `${days}d`;
-  const weeks = Math.round(days / 7);
-  if (weeks < 5) return `${weeks}w`;
-  return `${Math.round(days / 30)}mo`;
-}
-
-function getNextReviewDate(cards: Card[]): string {
-  if (cards.length === 0) return 'Unknown';
-  const timestamps = cards
-    .map((c) => new Date(c.nextReview).getTime())
-    .filter((t) => !isNaN(t));
-  if (timestamps.length === 0) return 'Unknown';
-  const minDate = new Date(Math.min(...timestamps));
-
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const tomorrowStart = new Date(todayStart);
-  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
-  minDate.setHours(0, 0, 0, 0);
-
-  if (minDate.getTime() <= todayStart.getTime()) return 'Today';
-  if (minDate.getTime() === tomorrowStart.getTime()) return 'Tomorrow';
-  return minDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
-function computeStreak(): number {
-  const today = new Date().toISOString().split('T')[0];
-  const yesterday = new Date(Date.now() - 86_400_000).toISOString().split('T')[0];
-  try {
-    const raw = localStorage.getItem('divein-study-streak');
-    if (raw) {
-      const data = JSON.parse(raw) as { lastStudyDate: string; streak: number };
-      if (data.lastStudyDate === today) {
-        return data.streak;
-      } else if (data.lastStudyDate === yesterday) {
-        const newStreak = data.streak + 1;
-        localStorage.setItem(
-          'divein-study-streak',
-          JSON.stringify({ lastStudyDate: today, streak: newStreak }),
-        );
-        return newStreak;
-      }
-    }
-    localStorage.setItem(
-      'divein-study-streak',
-      JSON.stringify({ lastStudyDate: today, streak: 1 }),
-    );
-    return 1;
-  } catch {
-    return 1;
-  }
-}
-
-export function StudySession({ queue, deckColor, deckName, allCards, onExit }: StudySessionProps) {
-  const [localQueue, setLocalQueue] = useState<Card[]>(queue);
+  // ── Session state ──
+  const [cards, setCards] = useState<Card[]>(() => [...queue]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [showingAnswer, setShowingAnswer] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [cardVisible, setCardVisible] = useState(true);
-  const [timerSeconds, setTimerSeconds] = useState(0);
-  const [streakCount, setStreakCount] = useState(0);
-  const [missedIds, setMissedIds] = useState<Set<string>>(new Set());
-  const [sessionStats, setSessionStats] = useState<SessionStats>({
-    again: 0,
-    hard: 0,
-    good: 0,
-    easy: 0,
-    startTime: Date.now(),
-  });
+  const [ratings, setRatings] = useState<UIRating[]>([]);
+  const [sessionStartTime] = useState(Date.now());
+  const [sessionSeconds, setSessionSeconds] = useState(0);
 
-  const reviewCard = useReviewCard();
-  const totalCards = localQueue.length;
-  const currentCard: Card | undefined = localQueue[currentIndex];
-  const progress = totalCards > 0 ? (currentIndex / totalCards) * 100 : 0;
-  const gradient = getDeckGradient(deckColor ?? null);
+  // ── Per-card timer ──
+  const [cardSeconds, setCardSeconds] = useState(0);
+  const cardTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const cardTimesRef = useRef<number[]>([]);
 
-  // Live session timer
-  useEffect(() => {
-    if (isComplete) return;
-    const id = setInterval(() => setTimerSeconds((s) => s + 1), 1000);
-    return () => clearInterval(id);
-  }, [isComplete]);
+  // ── Slide transition ──
+  const [slideState, setSlideState] = useState<"idle" | "exit" | "enter">("idle");
+  const [pendingNext, setPendingNext] = useState<null | (() => void)>(null);
 
-  // Update streak once when session completes
-  useEffect(() => {
-    if (isComplete) {
-      setStreakCount(computeStreak());
-    }
-  }, [isComplete]);
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === ' ' || e.key === 'Enter') {
-        if (!showingAnswer) {
-          e.preventDefault();
-          handleShowAnswer();
-        }
-      } else if (showingAnswer && !isAnimating) {
-        if (e.key === '1') handleRate('again');
-        else if (e.key === '2') handleRate('hard');
-        else if (e.key === '3') handleRate('good');
-        else if (e.key === '4') handleRate('easy');
-        else if (e.key === 'Escape') onExit();
-      }
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
-
-  function handleShowAnswer() {
-    setIsFlipped(true);
-    setTimeout(() => setShowingAnswer(true), 250);
+  // ── Undo ──
+  interface UndoSnapshot {
+    cards: Card[];
+    index: number;
+    ratings: UIRating[];
+    cardTimes: number[];
   }
+  const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(null);
+  const [showUndo, setShowUndo] = useState(false);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── Streak ──
+  const streak = computeStreak(ratings);
+
+  // ── Session timer ──
+  useEffect(() => {
+    const id = setInterval(() => setSessionSeconds((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // ── Per-card timer ──
+  const resetCardTimer = useCallback(() => {
+    setCardSeconds(0);
+    if (cardTimerRef.current) clearInterval(cardTimerRef.current);
+    cardTimerRef.current = setInterval(() => setCardSeconds((s) => s + 1), 1000);
+  }, []);
+
+  useEffect(() => {
+    resetCardTimer();
+    return () => {
+      if (cardTimerRef.current) clearInterval(cardTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex]);
+
+  // ── Slide transition logic ──
+  const triggerSlide = useCallback((cb: () => void) => {
+    setSlideState("exit");
+    setTimeout(() => {
+      cb();
+      setSlideState("enter");
+      setTimeout(() => setSlideState("idle"), 320);
+    }, 300);
+  }, []);
+
+  // ── Flip card ──
+  const handleFlip = useCallback(() => {
+    if (!isFlipped) setIsFlipped(true);
+  }, [isFlipped]);
+
+  // ── Rate card ──
   const handleRate = useCallback(
-    (rating: UIRating) => {
-      if (!currentCard || isAnimating) return;
-      const quality = UI_RATING_QUALITY[rating] as ReviewQuality;
-      reviewCard.mutate({ cardId: currentCard.id, quality });
-      setSessionStats((prev) => ({ ...prev, [rating]: prev[rating] + 1 }));
+    async (rating: UIRating) => {
+      if (!isFlipped && !hasCloze(cards[currentIndex]?.front ?? "")) return;
 
-      if (rating === 'again') {
-        setMissedIds((prev) => new Set(prev).add(currentCard.id));
+      const quality: ReviewQuality = UI_RATING_QUALITY[rating];
+      const card = cards[currentIndex];
+
+      // Save undo snapshot
+      const snap: UndoSnapshot = {
+        cards: [...cards],
+        index: currentIndex,
+        ratings: [...ratings],
+        cardTimes: [...cardTimesRef.current],
+      };
+      setUndoSnapshot(snap);
+
+      // Record card time
+      cardTimesRef.current = [...cardTimesRef.current, cardSeconds];
+
+      // Update ratings
+      const newRatings = [...ratings, rating];
+      setRatings(newRatings);
+
+      // Fire API
+      try {
+        await reviewCard({ cardId: card.id, quality });
+      } catch {
+        // silent fail
       }
 
-      setIsAnimating(true);
-      setCardVisible(false);
-      setTimeout(() => {
-        const nextIndex = currentIndex + 1;
-        if (nextIndex >= totalCards) {
+      // Show undo button
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+      setShowUndo(true);
+      undoTimerRef.current = setTimeout(() => {
+        setShowUndo(false);
+        setUndoSnapshot(null);
+      }, 4000);
+
+      // Advance
+      if (currentIndex + 1 >= cards.length) {
+        triggerSlide(() => {
           setIsComplete(true);
-        } else {
-          setCurrentIndex(nextIndex);
+        });
+      } else {
+        triggerSlide(() => {
+          setCurrentIndex((i) => i + 1);
           setIsFlipped(false);
-          setShowingAnswer(false);
-        }
-        setIsAnimating(false);
-        setCardVisible(true);
-      }, 200);
+        });
+      }
     },
-    [currentCard, currentIndex, totalCards, reviewCard, isAnimating],
+    [isFlipped, cards, currentIndex, ratings, cardSeconds, reviewCard, triggerSlide]
   );
 
-  function handleRetryMissed() {
-    setLocalQueue(localQueue.filter((c) => missedIds.has(c.id)));
-    setCurrentIndex(0);
+  // ── Undo ──
+  const handleUndo = useCallback(() => {
+    if (!undoSnapshot) return;
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+
+    cardTimesRef.current = undoSnapshot.cardTimes;
+    setCards(undoSnapshot.cards);
+    setCurrentIndex(undoSnapshot.index);
+    setRatings(undoSnapshot.ratings);
     setIsFlipped(false);
-    setShowingAnswer(false);
     setIsComplete(false);
-    setIsAnimating(false);
-    setTimerSeconds(0);
-    setMissedIds(new Set());
-    setSessionStats({ again: 0, hard: 0, good: 0, easy: 0, startTime: Date.now() });
-  }
+    setShowUndo(false);
+    setUndoSnapshot(null);
+    resetCardTimer();
+  }, [undoSnapshot, resetCardTimer]);
 
-  function handleStudyAgain() {
-    setCurrentIndex(0);
-    setIsFlipped(false);
-    setShowingAnswer(false);
-    setIsComplete(false);
-    setIsAnimating(false);
-    setTimerSeconds(0);
-    setMissedIds(new Set());
-    setSessionStats({ again: 0, hard: 0, good: 0, easy: 0, startTime: Date.now() });
-  }
+  // ── Keyboard shortcuts ──
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (isComplete) return;
+      if (e.key === "Escape") { onExit(); return; }
+      if (e.key === " " || e.key === "Enter") { e.preventDefault(); handleFlip(); return; }
+      if (isFlipped || hasCloze(cards[currentIndex]?.front ?? "")) {
+        if (e.key === "1") handleRate("again");
+        if (e.key === "2") handleRate("hard");
+        if (e.key === "3") handleRate("good");
+        if (e.key === "4") handleRate("easy");
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isComplete, isFlipped, cards, currentIndex, handleFlip, handleRate, onExit]);
 
-  // Running score for header
-  const correctSoFar = sessionStats.good + sessionStats.easy;
-  const incorrectSoFar = sessionStats.again + sessionStats.hard;
+  // ── Derived ──
+  const currentCard = cards[currentIndex];
+  const total = cards.length;
+  const progress = total > 0 ? (currentIndex / total) * 100 : 0;
+  const isCloze = currentCard ? hasCloze(currentCard.front) : false;
+  const gradient = getDeckGradient(deckColor ?? null);
 
-  // ── Session complete ──────────────────────────────────────────────────────
+  // Completion stats
+  const goodCount = ratings.filter((r) => r === "good" || r === "easy").length;
+  const accuracy = total > 0 ? Math.round((goodCount / ratings.length) * 100) : 0;
+  const avgCardTime =
+    cardTimesRef.current.length > 0
+      ? Math.round(cardTimesRef.current.reduce((a, b) => a + b, 0) / cardTimesRef.current.length)
+      : 0;
+
+  // Slide styles
+  const cardStyle: React.CSSProperties = {
+    transition: "transform 0.3s ease, opacity 0.3s ease",
+    transform:
+      slideState === "exit"
+        ? "translateX(-100%)"
+        : slideState === "enter"
+        ? "translateX(100%)"
+        : "translateX(0)",
+    opacity: slideState === "idle" ? 1 : 0,
+    width: "100%",
+  };
+
+  // ── Complete Screen ──────────────────────────────────────────────────────────
   if (isComplete) {
-    const total = sessionStats.again + sessionStats.hard + sessionStats.good + sessionStats.easy;
-    const correct = sessionStats.good + sessionStats.easy;
-    const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
-    const elapsed = Date.now() - sessionStats.startTime;
-
-    const accuracyEmoji = pct >= 90 ? '🏆' : pct >= 70 ? '🎯' : pct >= 50 ? '💪' : '📚';
-    const ringColor =
-      pct >= 70
-        ? 'var(--color-success)'
-        : pct >= 50
-          ? 'var(--color-warning)'
-          : 'var(--color-danger)';
-    const strokeOffset = 282.7 * (1 - pct / 100);
-
+    const showConfetti = accuracy >= 80;
     return (
-      <div className="flex flex-col items-center justify-center flex-1 gap-6 py-10 px-4 text-center">
-        {/* Accuracy emoji */}
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "var(--color-bg-primary)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        {showConfetti && <Confetti />}
+
         <div
-          className="w-20 h-20 rounded-full flex items-center justify-center"
-          style={{ background: gradient }}
-        >
-          <span style={{ fontSize: '2.25rem' }}>{accuracyEmoji}</span>
-        </div>
-
-        <div>
-          <h2 className="text-3xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
-            Session Complete!
-          </h2>
-          <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
-            Great work on {deckName ?? 'this deck'}
-          </p>
-          {streakCount > 1 && (
-            <p
-              className="text-sm mt-1 font-semibold"
-              style={{ color: 'var(--color-warning)' }}
-            >
-              🔥 {streakCount} day streak!
-            </p>
-          )}
-        </div>
-
-        {/* SVG accuracy ring + stats row */}
-        <div className="flex items-center gap-8 flex-wrap justify-center">
-          {/* Accuracy ring */}
-          <svg width="120" height="120" viewBox="0 0 100 100">
-            <circle
-              cx="50"
-              cy="50"
-              r="45"
-              fill="none"
-              stroke="var(--color-bg-tertiary)"
-              strokeWidth="8"
-            />
-            <circle
-              cx="50"
-              cy="50"
-              r="45"
-              fill="none"
-              stroke={ringColor}
-              strokeWidth="8"
-              strokeDasharray="282.7"
-              strokeDashoffset={strokeOffset}
-              strokeLinecap="round"
-              transform="rotate(-90 50 50)"
-            />
-            <text
-              x="50"
-              y="50"
-              textAnchor="middle"
-              dominantBaseline="middle"
-              fontSize="18"
-              fontWeight="bold"
-              fill="var(--color-text-primary)"
-            >
-              {pct}%
-            </text>
-          </svg>
-
-          {/* Quick stats */}
-          <div className="flex flex-col gap-2 text-left">
-            <div className="flex items-center gap-2">
-              <span style={{ fontSize: '1rem' }}>🃏</span>
-              <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-                {total} cards reviewed
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span style={{ fontSize: '1rem' }}>⏱️</span>
-              <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-                {formatDuration(elapsed)}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span style={{ fontSize: '1rem' }}>✓</span>
-              <span className="text-sm font-medium" style={{ color: 'var(--color-success)' }}>
-                {correct} correct
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span style={{ fontSize: '1rem' }}>✗</span>
-              <span className="text-sm font-medium" style={{ color: 'var(--color-danger)' }}>
-                {sessionStats.again + sessionStats.hard} incorrect
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Rating breakdown — horizontal bar chart */}
-        <div
-          className="w-full max-w-sm rounded-2xl p-4 flex flex-col gap-3"
           style={{
-            backgroundColor: 'var(--color-bg-secondary)',
-            border: '1px solid var(--color-border)',
+            background: "var(--color-bg-elevated)",
+            borderRadius: 20,
+            padding: 40,
+            maxWidth: 480,
+            width: "100%",
+            boxShadow: "var(--shadow-lg)",
+            border: "1px solid var(--color-border)",
+            position: "relative",
+            zIndex: 1,
           }}
         >
-          <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
-            Rating Breakdown
-          </p>
-          {RATING_CONFIG.map(({ rating, label, emoji, color }) => {
-            const count = sessionStats[rating];
-            const pctBar = total > 0 ? (count / total) * 100 : 0;
-            return (
-              <div key={rating} className="flex items-center gap-3">
-                <span style={{ fontSize: '1rem', width: '20px', textAlign: 'center' }}>{emoji}</span>
-                <span className="text-xs font-medium w-10 flex-shrink-0" style={{ color: 'var(--color-text-secondary)' }}>
-                  {label}
-                </span>
+          {/* Header */}
+          <div style={{ textAlign: "center", marginBottom: 28 }}>
+            <div style={{ fontSize: 56, marginBottom: 8 }}>
+              {accuracy >= 80 ? "🎉" : accuracy >= 60 ? "💪" : "🧠"}
+            </div>
+            <h2
+              style={{
+                color: "var(--color-text-primary)",
+                fontSize: 24,
+                fontWeight: 700,
+                margin: 0,
+              }}
+            >
+              Session Complete!
+            </h2>
+            <p style={{ color: "var(--color-text-muted)", marginTop: 6, fontSize: 15 }}>
+              {getMotivationalMessage(accuracy, total)}
+            </p>
+          </div>
+
+          {/* Stats grid */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 12,
+              marginBottom: 24,
+            }}
+          >
+            {[
+              { label: "Cards", value: total, icon: "📚" },
+              { label: "Accuracy", value: `${accuracy}%`, icon: "🎯" },
+              { label: "Time", value: formatTimer(sessionSeconds), icon: "⏱️" },
+              { label: "Avg/Card", value: `${avgCardTime}s`, icon: "⚡" },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                style={{
+                  background: "var(--color-bg-secondary)",
+                  borderRadius: 12,
+                  padding: "14px 16px",
+                  border: "1px solid var(--color-border)",
+                }}
+              >
+                <div style={{ fontSize: 20, marginBottom: 4 }}>{stat.icon}</div>
                 <div
-                  className="flex-1 rounded-full overflow-hidden"
-                  style={{ height: '8px', backgroundColor: 'var(--color-bg-tertiary)' }}
+                  style={{
+                    color: "var(--color-text-primary)",
+                    fontWeight: 700,
+                    fontSize: 22,
+                  }}
+                >
+                  {stat.value}
+                </div>
+                <div style={{ color: "var(--color-text-muted)", fontSize: 12 }}>
+                  {stat.label}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Heat strip summary */}
+          <div style={{ marginBottom: 24 }}>
+            <div
+              style={{
+                color: "var(--color-text-secondary)",
+                fontSize: 12,
+                marginBottom: 6,
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: 1,
+              }}
+            >
+              Session Results
+            </div>
+            <HeatStrip total={total} ratings={ratings} />
+            <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
+              {[
+                { label: "Easy/Good", color: "var(--color-success)", count: ratings.filter((r) => r === "easy" || r === "good").length },
+                { label: "Hard", color: "var(--color-warning)", count: ratings.filter((r) => r === "hard").length },
+                { label: "Again", color: "var(--color-danger)", count: ratings.filter((r) => r === "again").length },
+              ].map((s) => (
+                <div
+                  key={s.label}
+                  style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13 }}
                 >
                   <div
                     style={{
-                      height: '100%',
-                      width: `${pctBar}%`,
-                      backgroundColor: color,
-                      borderRadius: '9999px',
-                      transition: 'width 0.6s ease',
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      background: s.color,
                     }}
                   />
+                  <span style={{ color: "var(--color-text-secondary)" }}>
+                    {s.label}: <strong style={{ color: "var(--color-text-primary)" }}>{s.count}</strong>
+                  </span>
                 </div>
-                <span className="text-xs font-bold tabular-nums w-6 text-right flex-shrink-0" style={{ color }}>
-                  {count}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+              ))}
+            </div>
+          </div>
 
-        {/* Actions */}
-        <div className="flex gap-3 flex-wrap justify-center">
-          <button
-            onClick={handleStudyAgain}
-            className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95"
-            style={{
-              border: '1px solid var(--color-border)',
-              color: 'var(--color-text-primary)',
-              backgroundColor: 'var(--color-bg-secondary)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-bg-secondary)';
-            }}
-          >
-            <RotateCcw size={13} className="inline mr-1.5" />
-            Study Again
-          </button>
-
-          {sessionStats.again > 0 && (
-            <button
-              onClick={handleRetryMissed}
-              className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95"
-              style={{
-                border: '1px solid rgba(224,62,62,0.35)',
-                color: 'var(--color-danger)',
-                backgroundColor: 'var(--color-danger-soft)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(224,62,62,0.15)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--color-danger-soft)';
-              }}
-            >
-              ❌ Retry Missed ({sessionStats.again})
-            </button>
-          )}
-
+          {/* Actions */}
           <button
             onClick={onExit}
-            className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all active:scale-95"
-            style={{ background: gradient }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.opacity = '0.9';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.opacity = '1';
+            style={{
+              width: "100%",
+              background: gradient,
+              border: "none",
+              borderRadius: 12,
+              padding: "14px 0",
+              color: "#fff",
+              fontWeight: 700,
+              fontSize: 16,
+              cursor: "pointer",
+              boxShadow: "var(--shadow-md)",
             }}
           >
             Back to Deck
@@ -462,423 +736,411 @@ export function StudySession({ queue, deckColor, deckName, allCards, onExit }: S
     );
   }
 
-  // ── Empty queue ───────────────────────────────────────────────────────────
-  if (!currentCard || totalCards === 0) {
-    const nextDate =
-      allCards && allCards.length > 0 ? getNextReviewDate(allCards) : null;
+  if (!currentCard) return null;
 
-    return (
-      <div className="flex flex-col items-center justify-center flex-1 gap-6 py-16 text-center">
-        <div
-          className="w-20 h-20 rounded-full flex items-center justify-center"
-          style={{ background: gradient }}
-        >
-          <CheckCircle2 size={36} color="white" />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
-            All caught up! 🎉
-          </h2>
-          <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
-            No cards due right now.
-          </p>
-          {nextDate && (
-            <p className="text-sm mt-1 font-medium" style={{ color: 'var(--color-text-muted)' }}>
-              Next review: <span style={{ color: 'var(--color-accent)' }}>{nextDate}</span>
-            </p>
-          )}
-        </div>
-        <div className="flex gap-3">
-          {allCards && allCards.length > 0 && (
-            <button
-              onClick={() => {
-                setLocalQueue(allCards);
-                setCurrentIndex(0);
-                setIsFlipped(false);
-                setShowingAnswer(false);
-                setTimerSeconds(0);
-                setMissedIds(new Set());
-                setSessionStats({ again: 0, hard: 0, good: 0, easy: 0, startTime: Date.now() });
-              }}
-              className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all"
-              style={{
-                background: gradient,
-                color: 'white',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.opacity = '0.9';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = '1';
-              }}
-            >
-              Study Anyway
-            </button>
-          )}
-          <button
-            onClick={onExit}
-            className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all"
-            style={{
-              border: '1px solid var(--color-border)',
-              color: 'var(--color-text-secondary)',
-              backgroundColor: 'var(--color-bg-secondary)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-bg-secondary)';
-            }}
-          >
-            Back to Deck
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Main study view ───────────────────────────────────────────────────────
+  // ── Study Screen ─────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col flex-1 min-h-0">
-      {/* Top bar: progress + exit */}
-      <div className="flex flex-col gap-2 mb-4 flex-shrink-0">
-        <div className="flex items-center gap-4">
-          {/* Progress label */}
-          <span
-            className="text-xs font-medium tabular-nums flex-shrink-0"
-            style={{ color: 'var(--color-text-muted)' }}
-          >
-            {currentIndex + 1} / {totalCards}
-          </span>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "var(--color-bg-primary)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* Top bar */}
+      <div
+        style={{
+          background: "var(--color-bg-elevated)",
+          borderBottom: "1px solid var(--color-border)",
+          padding: "12px 20px",
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          boxShadow: "var(--shadow-sm)",
+          flexShrink: 0,
+        }}
+      >
+        <button
+          onClick={onExit}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: "var(--color-text-muted)",
+            display: "flex",
+            alignItems: "center",
+            padding: 4,
+            borderRadius: 8,
+          }}
+          title="Exit (Esc)"
+        >
+          <X size={20} />
+        </button>
+
+        <div style={{ flex: 1 }}>
+          {deckName && (
+            <div
+              style={{
+                color: "var(--color-text-secondary)",
+                fontSize: 12,
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: 0.8,
+                marginBottom: 4,
+              }}
+            >
+              {deckName}
+            </div>
+          )}
 
           {/* Progress bar */}
           <div
-            className="flex-1 h-2 rounded-full overflow-hidden"
-            style={{ backgroundColor: 'var(--color-bg-tertiary)' }}
+            style={{
+              height: 6,
+              background: "var(--color-bg-tertiary)",
+              borderRadius: 99,
+              overflow: "hidden",
+            }}
           >
             <div
-              className="h-full rounded-full transition-all duration-500 ease-out"
-              style={{ width: `${progress}%`, background: gradient }}
+              style={{
+                height: "100%",
+                width: `${progress}%`,
+                background: gradient,
+                borderRadius: 99,
+                transition: "width 0.4s ease",
+              }}
             />
           </div>
 
-          {/* Exit */}
-          <button
-            onClick={onExit}
-            className="flex-shrink-0 p-1.5 rounded-lg transition-colors"
-            title="Exit session (Esc)"
-            style={{ color: 'var(--color-text-muted)' }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
-              e.currentTarget.style.color = 'var(--color-text-primary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.color = 'var(--color-text-muted)';
-            }}
-          >
-            <X size={16} />
-          </button>
+          {/* Heat strip */}
+          <HeatStrip total={total} ratings={ratings} />
         </div>
 
-        {/* Deck name + timer + running score */}
-        <div className="flex items-center gap-3 px-1">
-          {deckName && (
-            <span
-              className="text-xs font-medium truncate"
-              style={{ color: 'var(--color-text-muted)' }}
-            >
-              {deckName}
-            </span>
-          )}
-          <span
-            className="text-xs tabular-nums font-mono flex-shrink-0"
-            style={{ color: 'var(--color-text-muted)' }}
-          >
-            {formatTimer(timerSeconds)}
-          </span>
-          {(correctSoFar > 0 || incorrectSoFar > 0) && (
-            <span
-              className="text-xs font-medium flex-shrink-0 ml-auto"
-              style={{ color: 'var(--color-text-muted)' }}
-            >
-              <span style={{ color: 'var(--color-success)' }}>{correctSoFar} ✓</span>
-              {' · '}
-              <span style={{ color: 'var(--color-danger)' }}>{incorrectSoFar} ✗</span>
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* ── Card counter ── */}
-      <div className="flex justify-center mb-2 flex-shrink-0">
-        <span className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>
-          Card {currentIndex + 1} of {totalCards}
-        </span>
-      </div>
-
-      {/* ── 3D Flip Card ── */}
-      <div className="flex-1 flex items-center justify-center px-2 sm:px-4">
-        <div
-          className="w-full max-w-2xl"
-          style={{
-            perspective: '1200px',
-            opacity: cardVisible ? 1 : 0,
-            transition: 'opacity 0.2s ease',
-          }}
-          onClick={!showingAnswer ? handleShowAnswer : undefined}
-        >
+        {/* Card counter + per-card timer */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
           <div
-            className="relative"
             style={{
-              transformStyle: 'preserve-3d',
-              transition: 'transform 0.45s cubic-bezier(0.4, 0, 0.2, 1)',
-              transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-              minHeight: '320px',
-              cursor: !showingAnswer ? 'pointer' : 'default',
+              color: "var(--color-text-secondary)",
+              fontSize: 13,
+              fontWeight: 600,
+              whiteSpace: "nowrap",
             }}
           >
-            {/* Front face */}
-            <div
-              className="absolute inset-0 rounded-3xl flex flex-col overflow-hidden"
-              style={{ backfaceVisibility: 'hidden' }}
-            >
-              {/* Gradient header strip */}
-              <div className="h-2 w-full flex-shrink-0" style={{ background: gradient }} />
-              <div
-                className="flex-1 flex flex-col p-10"
-                style={{
-                  backgroundColor: 'var(--color-bg-elevated)',
-                  border: '1px solid var(--color-border)',
-                  borderTop: 'none',
-                  borderRadius: '0 0 1.5rem 1.5rem',
-                }}
-              >
-                {/* Deck name top-left */}
-                {deckName && (
-                  <span
-                    className="text-xs font-medium mb-4 self-start"
-                    style={{ color: 'var(--color-text-muted)' }}
-                  >
-                    {deckName}
-                  </span>
-                )}
-
-                {/* Question content centered */}
-                <div className="flex-1 flex flex-col items-center justify-center">
-                  <p
-                    className="text-xs font-semibold uppercase tracking-widest mb-6"
-                    style={{ color: 'var(--color-text-muted)' }}
-                  >
-                    Question
-                  </p>
-                  <p
-                    className="text-center leading-relaxed font-medium"
-                    style={{
-                      color: 'var(--color-text-primary)',
-                      fontSize: 'clamp(18px, 2.5vw, 24px)',
-                      maxWidth: '80%',
-                    }}
-                  >
-                    {currentCard.front}
-                  </p>
-
-                  {/* Tags */}
-                  {currentCard.tags && currentCard.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-5 justify-center">
-                      {currentCard.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="px-2 py-0.5 rounded-full text-xs font-medium"
-                          style={{
-                            backgroundColor: 'var(--color-bg-tertiary)',
-                            color: 'var(--color-text-muted)',
-                            border: '1px solid var(--color-border)',
-                          }}
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <p
-                  className="text-xs text-center mt-6"
-                  style={{ color: 'var(--color-text-muted)' }}
-                >
-                  Space or click to reveal
-                </p>
-              </div>
-            </div>
-
-            {/* Back face */}
-            <div
-              className="absolute inset-0 rounded-3xl flex flex-col overflow-hidden"
-              style={{
-                backfaceVisibility: 'hidden',
-                transform: 'rotateY(180deg)',
-              }}
-            >
-              {/* Gradient header strip */}
-              <div className="h-2 w-full flex-shrink-0" style={{ background: gradient }} />
-              <div
-                className="flex-1 flex flex-col items-center justify-center p-10"
-                style={{
-                  backgroundColor: 'var(--color-bg-elevated)',
-                  border: '1px solid var(--color-border)',
-                  borderTop: 'none',
-                  borderRadius: '0 0 1.5rem 1.5rem',
-                  boxShadow: '0 0 0 2px var(--color-success-soft) inset',
-                }}
-              >
-                <p
-                  className="text-xs font-semibold uppercase tracking-widest mb-6"
-                  style={{ color: 'var(--color-success)' }}
-                >
-                  Answer
-                </p>
-                <p
-                  className="text-center leading-relaxed font-medium"
-                  style={{
-                    color: 'var(--color-text-primary)',
-                    fontSize: 'clamp(18px, 2.5vw, 24px)',
-                    maxWidth: '80%',
-                  }}
-                >
-                  {currentCard.back}
-                </p>
-              </div>
-            </div>
+            {currentIndex + 1} / {total}
+          </div>
+          <div
+            style={{
+              color: "var(--color-text-muted)",
+              fontSize: 11,
+              display: "flex",
+              alignItems: "center",
+              gap: 3,
+            }}
+          >
+            <Clock size={10} />
+            {cardSeconds}s
           </div>
         </div>
-      </div>
 
-      {/* ── Action area ── */}
-      <div className="pt-6 pb-4 flex flex-col items-center gap-4 flex-shrink-0">
-        {!showingAnswer ? (
-          <button
-            onClick={handleShowAnswer}
-            className="px-10 py-3.5 rounded-2xl text-sm font-semibold transition-all active:scale-95"
+        {/* Streak */}
+        {streak > 0 && (
+          <div
             style={{
-              background: gradient,
-              color: 'white',
-              boxShadow: 'var(--shadow-md)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.opacity = '0.9';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.opacity = '1';
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              background: streak >= 5 ? "var(--color-accent-soft)" : "var(--color-bg-secondary)",
+              borderRadius: 20,
+              padding: "4px 10px",
+              border: "1px solid var(--color-border)",
+              boxShadow: streak >= 5 ? "0 0 12px var(--color-accent)" : undefined,
+              transition: "all 0.3s",
             }}
           >
-            Show Answer
-          </button>
-        ) : (
-          <div className="flex gap-3 w-full max-w-xl">
-            {RATING_CONFIG.map(({ rating, emoji, label, color, bg, border, hoverBg }) => {
-              const quality = UI_RATING_QUALITY[rating];
-              const days = previewInterval(
-                quality,
-                currentCard.repetitions,
-                currentCard.easeFactor,
-                currentCard.intervalDays,
-              );
-              return (
-                <button
-                  key={rating}
-                  onClick={() => handleRate(rating)}
-                  disabled={reviewCard.isPending || isAnimating}
-                  className="flex-1 flex flex-col items-center gap-1.5 py-3.5 px-2 rounded-2xl text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
-                  style={{
-                    backgroundColor: bg,
-                    border: `1px solid ${border}`,
-                    color,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = hoverBg;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = bg;
-                  }}
-                >
-                  <span style={{ fontSize: '1.2rem' }}>{emoji}</span>
-                  <span>{label}</span>
-                  <span className="text-xs opacity-60 font-normal">
-                    {formatIntervalLabel(days)}
-                  </span>
-                </button>
-              );
-            })}
+            <span style={{ fontSize: 14 }}>🔥</span>
+            <span
+              style={{
+                color: streak >= 5 ? "var(--color-accent)" : "var(--color-text-primary)",
+                fontWeight: 700,
+                fontSize: 14,
+              }}
+            >
+              {streak}
+            </span>
           </div>
         )}
 
-        {/* Keyboard hints */}
-        <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-          {!showingAnswer ? (
-            <>
-              <kbd
-                className="px-1.5 py-0.5 rounded text-xs font-mono"
-                style={{
-                  backgroundColor: 'var(--color-bg-tertiary)',
-                  border: '1px solid var(--color-border)',
-                }}
-              >
-                Space
-              </kbd>
-              {' '}to reveal
-            </>
-          ) : (
-            <>
-              {(['1', '2', '3', '4'] as const).map((k, i) => (
-                <span key={k}>
-                  {i > 0 && ' '}
-                  <kbd
-                    className="px-1.5 py-0.5 rounded text-xs font-mono"
+        {/* Session timer */}
+        <div
+          style={{
+            color: "var(--color-text-muted)",
+            fontSize: 12,
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+          }}
+        >
+          <Zap size={12} />
+          {formatTimer(sessionSeconds)}
+        </div>
+      </div>
+
+      {/* Card area */}
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "24px 16px",
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ width: "100%", maxWidth: 560, ...cardStyle }}>
+          {/* Card */}
+          <div
+            onClick={!isCloze ? handleFlip : undefined}
+            style={{
+              background: "var(--color-bg-elevated)",
+              borderRadius: 20,
+              padding: 36,
+              border: "1px solid var(--color-border)",
+              boxShadow: "var(--shadow-lg)",
+              cursor: isCloze ? "default" : isFlipped ? "default" : "pointer",
+              minHeight: 220,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              alignItems: "center",
+              textAlign: "center",
+              userSelect: "none",
+              position: "relative",
+              transition: "border-color 0.2s",
+            }}
+          >
+            {/* Gradient accent top strip */}
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 4,
+                background: gradient,
+                borderRadius: "20px 20px 0 0",
+              }}
+            />
+
+            {/* Front */}
+            {!isFlipped || isCloze ? (
+              <div>
+                <div
+                  style={{
+                    color: "var(--color-text-muted)",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    letterSpacing: 1,
+                    marginBottom: 16,
+                  }}
+                >
+                  {isCloze ? "Fill in the blank" : "Question"}
+                </div>
+                <div
+                  style={{
+                    color: "var(--color-text-primary)",
+                    fontSize: 22,
+                    fontWeight: 600,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {isCloze
+                    ? isFlipped
+                      ? renderClozeAnswer(currentCard.front)
+                      : renderClozeQuestion(currentCard.front)
+                    : <RichText text={currentCard.front} />}
+                </div>
+                {!isFlipped && !isCloze && (
+                  <div
                     style={{
-                      backgroundColor: 'var(--color-bg-tertiary)',
-                      border: '1px solid var(--color-border)',
+                      marginTop: 24,
+                      color: "var(--color-text-muted)",
+                      fontSize: 13,
                     }}
                   >
-                    {k}
-                  </kbd>
-                </span>
-              ))}{' '}
-              to rate
-            </>
+                    Press <kbd style={{ background: "var(--color-bg-tertiary)", padding: "2px 7px", borderRadius: 6, fontFamily: "monospace" }}>Space</kbd> to reveal
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Back (flipped non-cloze)
+              <div style={{ width: "100%" }}>
+                {/* Show front small */}
+                <div
+                  style={{
+                    color: "var(--color-text-muted)",
+                    fontSize: 14,
+                    marginBottom: 16,
+                    paddingBottom: 16,
+                    borderBottom: "1px solid var(--color-border)",
+                  }}
+                >
+                  <RichText text={currentCard.front} />
+                </div>
+                <div
+                  style={{
+                    color: "var(--color-text-muted)",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    letterSpacing: 1,
+                    marginBottom: 10,
+                  }}
+                >
+                  Answer
+                </div>
+                <div
+                  style={{
+                    color: "var(--color-text-primary)",
+                    fontSize: 22,
+                    fontWeight: 600,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <RichText text={currentCard.back} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Cloze reveal button */}
+          {isCloze && !isFlipped && (
+            <button
+              onClick={handleFlip}
+              style={{
+                marginTop: 16,
+                width: "100%",
+                background: gradient,
+                border: "none",
+                borderRadius: 12,
+                padding: "14px 0",
+                color: "#fff",
+                fontWeight: 700,
+                fontSize: 16,
+                cursor: "pointer",
+                boxShadow: "var(--shadow-md)",
+              }}
+            >
+              Reveal Answer
+            </button>
           )}
-        </p>
+
+          {/* Rating buttons */}
+          {(isFlipped || isCloze) && (
+            <div style={{ marginTop: 20, display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
+              {RATING_CONFIG.map((cfg) => {
+                const days = previewInterval(
+                  UI_RATING_QUALITY[cfg.rating],
+                  currentCard.repetitions,
+                  currentCard.easeFactor,
+                  currentCard.intervalDays,
+                );
+                return (
+                  <button
+                    key={cfg.rating}
+                    onClick={() => handleRate(cfg.rating)}
+                    disabled={isLoading}
+                    style={{
+                      background: cfg.bgVar,
+                      border: `1.5px solid ${cfg.borderVar}`,
+                      borderRadius: 12,
+                      padding: "12px 8px",
+                      cursor: "pointer",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 4,
+                      transition: "transform 0.1s, box-shadow 0.1s",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)";
+                      (e.currentTarget as HTMLButtonElement).style.boxShadow = "var(--shadow-md)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
+                      (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
+                    }}
+                  >
+                    <span style={{ color: cfg.color, fontWeight: 700, fontSize: 14 }}>
+                      {cfg.label}
+                    </span>
+                    <span style={{ color: "var(--color-text-muted)", fontSize: 11 }}>
+                      {formatIntervalLabel(days)}
+                    </span>
+                    <span
+                      style={{
+                        background: "var(--color-bg-secondary)",
+                        color: "var(--color-text-muted)",
+                        borderRadius: 6,
+                        padding: "1px 6px",
+                        fontSize: 11,
+                        fontFamily: "monospace",
+                      }}
+                    >
+                      {cfg.shortcut}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Undo button */}
+      {showUndo && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 24,
+            right: 24,
+            zIndex: 50,
+          }}
+        >
+          <button
+            onClick={handleUndo}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              background: "var(--color-bg-elevated)",
+              border: "1px solid var(--color-border)",
+              borderRadius: 12,
+              padding: "10px 18px",
+              cursor: "pointer",
+              color: "var(--color-text-primary)",
+              fontWeight: 600,
+              fontSize: 14,
+              boxShadow: "var(--shadow-lg)",
+              animation: "undoSlideIn 0.2s ease",
+            }}
+          >
+            <RotateCcw size={15} />
+            Undo
+          </button>
+          <style>{`
+            @keyframes undoSlideIn {
+              from { opacity: 0; transform: translateY(12px); }
+              to   { opacity: 1; transform: translateY(0); }
+            }
+          `}</style>
+        </div>
+      )}
     </div>
   );
 }
 
-function StatBox({
-  label,
-  value,
-  color,
-  icon,
-}: {
-  label: string;
-  value: string;
-  color: string;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <div
-      className="flex flex-col items-center gap-1.5 p-4 rounded-2xl"
-      style={{
-        backgroundColor: 'var(--color-bg-secondary)',
-        border: '1px solid var(--color-border)',
-      }}
-    >
-      {icon && <span style={{ color: 'var(--color-text-muted)' }}>{icon}</span>}
-      <span className="text-2xl font-bold tabular-nums" style={{ color }}>
-        {value}
-      </span>
-      <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-        {label}
-      </span>
-    </div>
-  );
-}
+export default StudySession;

@@ -1,6 +1,8 @@
-import { useState, KeyboardEvent, useRef, useEffect } from 'react';
-import { X } from 'lucide-react';
-import type { Card, CreateCardInput, UpdateCardInput } from '@/shared/types/flashcard';
+import React, { useState, useRef, useCallback, useEffect, KeyboardEvent } from 'react';
+import { X, Tag, Eye, EyeOff, Link, Type, Zap, CheckCircle2 } from 'lucide-react';
+import { Card, CreateCardInput, UpdateCardInput } from '@/shared/types/flashcard';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface CardFormProps {
   deckId: string;
@@ -10,265 +12,826 @@ interface CardFormProps {
   isLoading?: boolean;
 }
 
-export function CardForm({ deckId, initialData, onSave, onCancel, isLoading }: CardFormProps) {
+// ─── RichPreview ─────────────────────────────────────────────────────────────
+
+interface RichPreviewProps {
+  text: string;
+  blurred?: boolean;
+}
+
+function parseRichText(text: string): React.ReactNode[] {
+  if (!text) return [];
+
+  // Split by tokens: **bold**, *italic*, `code`, {{cN::answer}}
+  const tokenRegex = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\{\{c\d+::[^}]+\}\})/g;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let keyIdx = 0;
+
+  while ((match = tokenRegex.exec(text)) !== null) {
+    const raw = match[0];
+    const start = match.index;
+
+    // Push plain text before this match
+    if (start > lastIndex) {
+      parts.push(<span key={keyIdx++}>{text.slice(lastIndex, start)}</span>);
+    }
+
+    if (raw.startsWith('**') && raw.endsWith('**')) {
+      parts.push(<strong key={keyIdx++} style={{ fontWeight: 700 }}>{raw.slice(2, -2)}</strong>);
+    } else if (raw.startsWith('*') && raw.endsWith('*')) {
+      parts.push(<em key={keyIdx++}>{raw.slice(1, -1)}</em>);
+    } else if (raw.startsWith('`') && raw.endsWith('`')) {
+      parts.push(
+        <code
+          key={keyIdx++}
+          style={{
+            background: 'var(--color-bg-elevated)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 4,
+            padding: '1px 5px',
+            fontFamily: 'monospace',
+            fontSize: '0.875em',
+            color: 'var(--color-accent)',
+          }}
+        >
+          {raw.slice(1, -1)}
+        </code>
+      );
+    } else if (/^\{\{c\d+::/.test(raw)) {
+      // {{cN::answer}}
+      const inner = raw.replace(/^\{\{c\d+::/, '').replace(/\}\}$/, '');
+      parts.push(
+        <span
+          key={keyIdx++}
+          style={{
+            display: 'inline-block',
+            background: 'var(--color-accent-soft)',
+            color: 'var(--color-accent)',
+            border: '1px solid var(--color-accent)',
+            borderRadius: 12,
+            padding: '1px 8px',
+            fontWeight: 600,
+            fontSize: '0.875em',
+            margin: '0 1px',
+          }}
+        >
+          {inner}
+        </span>
+      );
+    }
+
+    lastIndex = start + raw.length;
+  }
+
+  // Remaining text
+  if (lastIndex < text.length) {
+    parts.push(<span key={keyIdx++}>{text.slice(lastIndex)}</span>);
+  }
+
+  return parts;
+}
+
+const RichPreview: React.FC<RichPreviewProps> = ({ text, blurred }) => {
+  const nodes = parseRichText(text);
+  return (
+    <span
+      style={{
+        filter: blurred ? 'blur(4px)' : 'none',
+        transition: 'filter 0.2s ease',
+        userSelect: blurred ? 'none' : 'auto',
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
+      }}
+    >
+      {nodes.length > 0 ? nodes : <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Empty</span>}
+    </span>
+  );
+};
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function getNextClozeNumber(text: string): number {
+  const matches = [...text.matchAll(/\{\{c(\d+)::/g)];
+  if (matches.length === 0) return 1;
+  const nums = matches.map((m) => parseInt(m[1], 10));
+  return Math.max(...nums) + 1;
+}
+
+function hasCloze(text: string): boolean {
+  return /\{\{c\d+::/.test(text);
+}
+
+// ─── CardForm ─────────────────────────────────────────────────────────────────
+
+export const CardForm: React.FC<CardFormProps> = ({
+  deckId,
+  initialData,
+  onSave,
+  onCancel,
+  isLoading = false,
+}) => {
   const [front, setFront] = useState(initialData?.front ?? '');
   const [back, setBack] = useState(initialData?.back ?? '');
   const [tags, setTags] = useState<string[]>(initialData?.tags ?? []);
   const [tagInput, setTagInput] = useState('');
-  const [previewRevealed, setPreviewRevealed] = useState(false);
+  const [backRevealed, setBackRevealed] = useState(false);
+  const [showNoteSearch, setShowNoteSearch] = useState(false);
+
   const frontRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
-    frontRef.current?.focus();
-  }, []);
+  const isEditing = Boolean(initialData);
+  const cardType = hasCloze(front) ? 'Cloze' : 'Basic';
+  const isReadyToSave = front.trim().length > 0 && back.trim().length > 0;
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!front.trim() || !back.trim()) return;
-    if (initialData) {
-      const input: UpdateCardInput = { front: front.trim(), back: back.trim(), tags };
-      onSave(input);
+  // ── Cloze shortcut ──────────────────────────────────────────────────────
+
+  const applyCloze = useCallback(() => {
+    const ta = frontRef.current;
+    if (!ta) return;
+
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const selected = front.slice(start, end);
+
+    if (selected.length === 0) {
+      // No selection: insert placeholder at cursor
+      const n = getNextClozeNumber(front);
+      const placeholder = `{{c${n}::}}`;
+      const next = front.slice(0, start) + placeholder + front.slice(end);
+      setFront(next);
+      // Position cursor inside the cloze
+      requestAnimationFrame(() => {
+        ta.focus();
+        const cursorPos = start + placeholder.length - 2; // before }}
+        ta.setSelectionRange(cursorPos, cursorPos);
+      });
     } else {
-      const input: CreateCardInput = { deckId, front: front.trim(), back: back.trim(), tags };
-      onSave(input);
+      const n = getNextClozeNumber(front);
+      const wrapped = `{{c${n}::${selected}}}`;
+      const next = front.slice(0, start) + wrapped + front.slice(end);
+      setFront(next);
+      requestAnimationFrame(() => {
+        ta.focus();
+        ta.setSelectionRange(start, start + wrapped.length);
+      });
     }
-  }
+  }, [front]);
 
-  function handleTagKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if ((e.key === 'Enter' || e.key === ',') && tagInput.trim()) {
-      e.preventDefault();
-      const newTag = tagInput.trim().toLowerCase().replace(/,/g, '');
-      if (newTag && !tags.includes(newTag)) {
-        setTags([...tags, newTag]);
+  // Global Ctrl+Shift+C when front textarea is focused
+  useEffect(() => {
+    const handler = (e: globalThis.KeyboardEvent) => {
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        e.shiftKey &&
+        e.key.toLowerCase() === 'c' &&
+        document.activeElement === frontRef.current
+      ) {
+        e.preventDefault();
+        applyCloze();
       }
-      setTagInput('');
-    } else if (e.key === 'Backspace' && !tagInput && tags.length > 0) {
-      setTags(tags.slice(0, -1));
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [applyCloze]);
+
+  // ── Tag input ────────────────────────────────────────────────────────────
+
+  const commitTag = (raw: string) => {
+    const trimmed = raw.trim().toLowerCase().replace(/,/g, '');
+    if (trimmed && !tags.includes(trimmed)) {
+      setTags((prev) => [...prev, trimmed]);
     }
-  }
+    setTagInput('');
+  };
 
-  function removeTag(tag: string) {
-    setTags(tags.filter((t) => t !== tag));
-  }
+  const handleTagKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      commitTag(tagInput);
+    } else if (e.key === 'Backspace' && tagInput === '' && tags.length > 0) {
+      setTags((prev) => prev.slice(0, -1));
+    }
+  };
 
-  const hasContent = front.trim() || back.trim();
+  const handleTagBlur = () => {
+    if (tagInput.trim()) commitTag(tagInput);
+  };
+
+  const removeTag = (tag: string) => setTags((prev) => prev.filter((t) => t !== tag));
+
+  // ── Submit ───────────────────────────────────────────────────────────────
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isReadyToSave || isLoading) return;
+
+    if (isEditing && initialData) {
+      const payload: UpdateCardInput = {
+        front: front.trim(),
+        back: back.trim(),
+        tags,
+      };
+      onSave(payload);
+    } else {
+      const payload: CreateCardInput = {
+        deckId,
+        front: front.trim(),
+        back: back.trim(),
+        tags,
+      };
+      onSave(payload);
+    }
+  };
+
+  // ── Shared styles ────────────────────────────────────────────────────────
+
+  const cardStyle: React.CSSProperties = {
+    background: 'var(--color-bg-secondary)',
+    border: '1px solid var(--color-border)',
+    borderRadius: 12,
+    padding: '20px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+  };
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: '0.75rem',
+    fontWeight: 600,
+    letterSpacing: '0.05em',
+    textTransform: 'uppercase',
+    color: 'var(--color-text-muted)',
+    marginBottom: 4,
+  };
+
+  const textareaStyle: React.CSSProperties = {
+    width: '100%',
+    minHeight: 120,
+    background: 'var(--color-bg-primary)',
+    border: '1px solid var(--color-border)',
+    borderRadius: 8,
+    padding: '10px 12px',
+    color: 'var(--color-text-primary)',
+    fontSize: '0.9375rem',
+    lineHeight: 1.6,
+    resize: 'vertical',
+    outline: 'none',
+    fontFamily: 'inherit',
+    boxSizing: 'border-box',
+    transition: 'border-color 0.15s ease',
+  };
+
+  const btnStyle = (variant: 'primary' | 'ghost' | 'danger' = 'ghost'): React.CSSProperties => {
+    const base: React.CSSProperties = {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 6,
+      borderRadius: 8,
+      padding: '7px 14px',
+      fontSize: '0.875rem',
+      fontWeight: 600,
+      cursor: 'pointer',
+      border: 'none',
+      transition: 'background 0.15s ease, opacity 0.15s ease',
+      fontFamily: 'inherit',
+    };
+    if (variant === 'primary') {
+      return {
+        ...base,
+        background: 'var(--color-accent)',
+        color: '#fff',
+      };
+    }
+    if (variant === 'danger') {
+      return {
+        ...base,
+        background: 'transparent',
+        color: 'var(--color-text-secondary)',
+        border: '1px solid var(--color-border)',
+      };
+    }
+    return {
+      ...base,
+      background: 'var(--color-bg-elevated)',
+      color: 'var(--color-text-secondary)',
+      border: '1px solid var(--color-border)',
+    };
+  };
+
+  const smallBtnStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 6,
+    padding: '3px 9px',
+    fontSize: '0.78rem',
+    fontWeight: 600,
+    cursor: 'pointer',
+    border: '1px solid var(--color-border)',
+    background: 'var(--color-bg-elevated)',
+    color: 'var(--color-text-secondary)',
+    fontFamily: 'inherit',
+    transition: 'background 0.15s ease',
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-      {/* Side-by-side Front / Back */}
-      <div className="grid grid-cols-2 gap-4">
+    <form
+      onSubmit={handleSubmit}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 20,
+        color: 'var(--color-text-primary)',
+        fontFamily: 'inherit',
+      }}
+    >
+      {/* ── Header ────────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h2 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 700 }}>
+          {isEditing ? 'Edit Card' : 'New Card'}
+        </h2>
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            color: 'var(--color-text-muted)',
+            padding: 4,
+            borderRadius: 6,
+            display: 'flex',
+            alignItems: 'center',
+          }}
+          aria-label="Cancel"
+        >
+          <X size={18} />
+        </button>
+      </div>
+
+      {/* ── Front / Back side-by-side ─────────────────────────────────── */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 16,
+        }}
+        className="sm:grid-cols-2"
+      >
         {/* Front */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <div
-              className="w-5 h-5 rounded flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-              style={{ backgroundColor: 'var(--color-accent)' }}
-            >
-              Q
+        <div style={cardStyle}>
+          {/* Label row with Cloze button */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={labelStyle}>Front</span>
+              {/* Q badge */}
+              <span
+                style={{
+                  background: 'var(--color-accent-soft)',
+                  color: 'var(--color-accent)',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  padding: '1px 7px',
+                  borderRadius: 10,
+                  letterSpacing: '0.04em',
+                }}
+              >
+                Q
+              </span>
             </div>
-            <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)' }}>
-              Front · Question
-            </label>
+
+            {/* Cloze button */}
+            <button
+              type="button"
+              onClick={applyCloze}
+              title="Wrap selected text in cloze deletion (Ctrl+Shift+C)"
+              style={{
+                ...smallBtnStyle,
+                ...(hasCloze(front)
+                  ? {
+                      background: 'var(--color-accent-soft)',
+                      borderColor: 'var(--color-accent)',
+                      color: 'var(--color-accent)',
+                    }
+                  : {}),
+              }}
+            >
+              <Zap size={11} />
+              Cloze
+            </button>
           </div>
+
           <textarea
             ref={frontRef}
             value={front}
             onChange={(e) => setFront(e.target.value)}
-            placeholder="Enter the question or prompt…"
-            rows={4}
-            className="input-base px-3 py-2.5 rounded-xl text-sm leading-relaxed"
-            style={{ resize: 'none' }}
+            placeholder="Question or cloze text…"
+            style={textareaStyle}
+            disabled={isLoading}
+            onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--color-accent)')}
+            onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--color-border)')}
           />
+
+          {/* Cloze syntax indicator */}
+          {hasCloze(front) && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                fontSize: '0.75rem',
+                color: 'var(--color-accent)',
+                marginTop: 2,
+              }}
+            >
+              <Zap size={11} />
+              Cloze deletion detected
+            </div>
+          )}
         </div>
 
         {/* Back */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <div
-              className="w-5 h-5 rounded flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-              style={{ backgroundColor: 'var(--color-success)' }}
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={labelStyle}>Back</span>
+            {/* A badge */}
+            <span
+              style={{
+                background: 'rgba(var(--color-success-rgb, 34,197,94), 0.12)',
+                color: 'var(--color-success)',
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                padding: '1px 7px',
+                borderRadius: 10,
+                letterSpacing: '0.04em',
+              }}
             >
               A
-            </div>
-            <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-secondary)' }}>
-              Back · Answer
-            </label>
+            </span>
           </div>
+
           <textarea
             value={back}
             onChange={(e) => setBack(e.target.value)}
-            placeholder="Enter the answer…"
-            rows={4}
-            className="input-base px-3 py-2.5 rounded-xl text-sm leading-relaxed"
-            style={{ resize: 'none' }}
+            placeholder="Answer or explanation…"
+            style={textareaStyle}
+            disabled={isLoading}
+            onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--color-accent)')}
+            onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--color-border)')}
           />
         </div>
       </div>
 
-      {/* Tags */}
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-          Tags
-          <span className="ml-1 font-normal" style={{ color: 'var(--color-text-muted)' }}>(press Enter or comma)</span>
-        </label>
+      {/* ── Tags ─────────────────────────────────────────────────────────── */}
+      <div
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+          borderRadius: 12,
+          padding: '16px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+        }}
+      >
+        <span style={labelStyle}>Tags</span>
+
         <div
-          className="flex flex-wrap gap-1.5 px-3 py-2 rounded-lg min-h-[40px]"
           style={{
-            backgroundColor: 'var(--color-bg-tertiary)',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 6,
+            alignItems: 'center',
+            minHeight: 36,
+            background: 'var(--color-bg-primary)',
             border: '1px solid var(--color-border)',
+            borderRadius: 8,
+            padding: '6px 10px',
           }}
         >
           {tags.map((tag) => (
             <span
               key={tag}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
               style={{
-                backgroundColor: 'var(--color-accent-soft)',
-                color: 'var(--color-accent)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                background: 'var(--color-bg-elevated)',
                 border: '1px solid var(--color-border)',
+                borderRadius: 20,
+                padding: '2px 10px',
+                fontSize: '0.8125rem',
+                color: 'var(--color-text-secondary)',
               }}
             >
+              <Tag size={10} />
               {tag}
               <button
                 type="button"
                 onClick={() => removeTag(tag)}
-                className="rounded-full p-0.5 transition-all"
-                style={{ color: 'var(--color-accent)' }}
-                onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.7'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--color-text-muted)',
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginLeft: 2,
+                }}
+                aria-label={`Remove tag ${tag}`}
               >
-                <X size={9} />
+                <X size={10} />
               </button>
             </span>
           ))}
+
           <input
             type="text"
             value={tagInput}
-            onChange={(e) => setTagInput(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val.includes(',')) {
+                const parts = val.split(',');
+                parts.slice(0, -1).forEach((p) => commitTag(p));
+                setTagInput(parts[parts.length - 1]);
+              } else {
+                setTagInput(val);
+              }
+            }}
             onKeyDown={handleTagKeyDown}
-            placeholder={tags.length === 0 ? 'Add tags…' : ''}
-            className="flex-1 min-w-[100px] bg-transparent text-sm outline-none"
-            style={{ color: 'var(--color-text-primary)' }}
+            onBlur={handleTagBlur}
+            placeholder={tags.length === 0 ? 'Add tags (Enter or comma)…' : ''}
+            disabled={isLoading}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              outline: 'none',
+              color: 'var(--color-text-primary)',
+              fontSize: '0.875rem',
+              flex: 1,
+              minWidth: 120,
+              fontFamily: 'inherit',
+            }}
           />
         </div>
-      </div>
 
-      {/* Live mini preview */}
-      {hasContent && (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>
-              👁 Preview
-            </span>
-            <button
-              type="button"
-              onClick={() => setPreviewRevealed((v) => !v)}
-              className="text-xs px-2 py-0.5 rounded-full transition-all"
-              style={{
-                backgroundColor: 'var(--color-bg-tertiary)',
-                color: 'var(--color-text-muted)',
-                border: '1px solid var(--color-border)',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-elevated)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
-            >
-              {previewRevealed ? 'Hide answer' : 'Reveal answer'}
-            </button>
-          </div>
-          <div
-            className="rounded-xl p-4 flex flex-col gap-3"
-            style={{
-              backgroundColor: 'var(--color-bg-tertiary)',
-              border: '1px solid var(--color-border)',
-            }}
-          >
-            {/* Front preview */}
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-text-muted)' }}>
-                Question
-              </div>
-              <p className="text-sm font-medium leading-relaxed" style={{ color: 'var(--color-text-primary)' }}>
-                {front || <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>No question yet…</span>}
-              </p>
-            </div>
-
-            {/* Divider */}
-            <div style={{ height: '1px', backgroundColor: 'var(--color-border)' }} />
-
-            {/* Back preview */}
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-text-muted)' }}>
-                Answer
-              </div>
-              <p
-                className="text-sm leading-relaxed"
-                style={{
-                  color: 'var(--color-text-secondary)',
-                  filter: previewRevealed ? 'none' : 'blur(5px)',
-                  transition: 'filter 0.2s ease',
-                  userSelect: previewRevealed ? 'text' : 'none',
-                  cursor: 'pointer',
-                }}
-                onClick={() => setPreviewRevealed((v) => !v)}
-                title={previewRevealed ? 'Click to hide' : 'Click to reveal'}
-              >
-                {back || <span style={{ fontStyle: 'italic' }}>No answer yet…</span>}
-              </p>
-            </div>
-
-            {/* Tags preview */}
-            {tags.length > 0 && (
-              <div className="flex gap-1 flex-wrap">
-                {tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="text-xs px-2 py-0.5 rounded-full"
-                    style={{
-                      backgroundColor: 'var(--color-bg-elevated)',
-                      color: 'var(--color-text-muted)',
-                      border: '1px solid var(--color-border)',
-                    }}
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Actions */}
-      <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
-        <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-          {front.trim() && back.trim() ? '✓ Ready to save' : 'Fill in both sides to continue'}
-        </span>
-        <div className="flex gap-2">
+        {/* Link to Note */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
             type="button"
-            onClick={onCancel}
-            className="px-4 py-2 rounded-lg text-sm transition-colors"
-            style={{ color: 'var(--color-text-secondary)' }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={!front.trim() || !back.trim() || isLoading}
-            className="px-5 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
-            style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
-            onMouseEnter={(e) => {
-              if (front.trim() && back.trim() && !isLoading)
-                e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)';
+            onClick={() => setShowNoteSearch((v) => !v)}
+            style={{
+              ...smallBtnStyle,
+              ...(showNoteSearch
+                ? {
+                    background: 'var(--color-accent-soft)',
+                    borderColor: 'var(--color-accent)',
+                    color: 'var(--color-accent)',
+                  }
+                : {}),
             }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent)'; }}
           >
-            {isLoading ? 'Saving…' : initialData ? 'Save Changes' : 'Add Card'}
+            <Link size={11} />
+            🔗 Link to Note
           </button>
         </div>
+
+        {showNoteSearch && (
+          <div
+            style={{
+              position: 'relative',
+              display: 'inline-block',
+            }}
+          >
+            <input
+              type="text"
+              placeholder="Search notes…"
+              disabled
+              title="Coming soon"
+              style={{
+                background: 'var(--color-bg-primary)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 8,
+                padding: '7px 12px',
+                color: 'var(--color-text-muted)',
+                fontSize: '0.875rem',
+                width: 280,
+                fontFamily: 'inherit',
+                cursor: 'not-allowed',
+                outline: 'none',
+              }}
+            />
+            <span
+              style={{
+                position: 'absolute',
+                right: 10,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                fontSize: '0.7rem',
+                color: 'var(--color-text-muted)',
+                background: 'var(--color-bg-elevated)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 4,
+                padding: '1px 6px',
+                pointerEvents: 'none',
+              }}
+            >
+              Coming soon
+            </span>
+          </div>
+        )}
       </div>
+
+      {/* ── Preview ───────────────────────────────────────────────────────── */}
+      <div
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+          borderRadius: 12,
+          padding: '16px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+        }}
+      >
+        {/* Preview header row */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={labelStyle}>Preview</span>
+
+            {/* Card type badge */}
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                background: cardType === 'Cloze' ? 'var(--color-accent-soft)' : 'var(--color-bg-elevated)',
+                color: cardType === 'Cloze' ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                border: `1px solid ${cardType === 'Cloze' ? 'var(--color-accent)' : 'var(--color-border)'}`,
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                padding: '1px 8px',
+                borderRadius: 10,
+                letterSpacing: '0.04em',
+              }}
+            >
+              {cardType === 'Cloze' ? <Zap size={9} /> : <Type size={9} />}
+              {cardType}
+            </span>
+
+            {/* Ready-to-save indicator */}
+            {isReadyToSave && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  color: 'var(--color-success)',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                }}
+              >
+                <CheckCircle2 size={12} />
+                Ready
+              </span>
+            )}
+          </div>
+
+          {/* Reveal toggle */}
+          <button
+            type="button"
+            onClick={() => setBackRevealed((v) => !v)}
+            style={smallBtnStyle}
+            title={backRevealed ? 'Hide answer' : 'Reveal answer'}
+          >
+            {backRevealed ? <EyeOff size={11} /> : <Eye size={11} />}
+            {backRevealed ? 'Hide' : 'Reveal'}
+          </button>
+        </div>
+
+        {/* Preview cards */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 12,
+          }}
+        >
+          {/* Front preview */}
+          <div
+            style={{
+              background: 'var(--color-bg-primary)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 10,
+              padding: '14px 16px',
+              minHeight: 80,
+              fontSize: '0.9375rem',
+              lineHeight: 1.6,
+              color: 'var(--color-text-primary)',
+            }}
+          >
+            <div
+              style={{
+                fontSize: '0.65rem',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                color: 'var(--color-text-muted)',
+                marginBottom: 6,
+              }}
+            >
+              Front
+            </div>
+            <RichPreview text={front} blurred={false} />
+          </div>
+
+          {/* Back preview */}
+          <div
+            style={{
+              background: 'var(--color-bg-primary)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 10,
+              padding: '14px 16px',
+              minHeight: 80,
+              fontSize: '0.9375rem',
+              lineHeight: 1.6,
+              color: 'var(--color-text-primary)',
+              cursor: backRevealed ? 'default' : 'pointer',
+            }}
+            onClick={() => !backRevealed && setBackRevealed(true)}
+            title={backRevealed ? undefined : 'Click to reveal answer'}
+          >
+            <div
+              style={{
+                fontSize: '0.65rem',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                color: 'var(--color-text-muted)',
+                marginBottom: 6,
+              }}
+            >
+              Back
+            </div>
+            <RichPreview text={back} blurred={!backRevealed} />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Actions ───────────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
+        <button
+          type="button"
+          onClick={onCancel}
+          style={btnStyle('danger')}
+          disabled={isLoading}
+        >
+          Cancel
+        </button>
+
+        <button
+          type="submit"
+          disabled={!isReadyToSave || isLoading}
+          style={{
+            ...btnStyle('primary'),
+            opacity: !isReadyToSave || isLoading ? 0.5 : 1,
+            cursor: !isReadyToSave || isLoading ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {isLoading ? (
+            <>
+              <span
+                style={{
+                  width: 13,
+                  height: 13,
+                  border: '2px solid rgba(255,255,255,0.3)',
+                  borderTopColor: '#fff',
+                  borderRadius: '50%',
+                  display: 'inline-block',
+                  animation: 'spin 0.7s linear infinite',
+                }}
+              />
+              Saving…
+            </>
+          ) : (
+            <>{isEditing ? 'Update Card' : 'Save Card'}</>
+          )}
+        </button>
+      </div>
+
+      {/* Spinner keyframes */}
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </form>
   );
-}
+};
+
+export default CardForm;
