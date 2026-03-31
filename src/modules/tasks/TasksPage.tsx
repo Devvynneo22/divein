@@ -1434,7 +1434,8 @@ export function TasksPage() {
             <div
               style={{
                 flex: 1,
-                overflow: 'hidden',
+                overflow: 'auto',
+                minHeight: 0,
                 transition: 'margin-right 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
                 marginRight: selectedTask ? 420 : 0,
               }}

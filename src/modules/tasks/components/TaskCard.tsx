@@ -171,13 +171,13 @@ function ActionButton({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        width: '24px',
-        height: '24px',
-        borderRadius: '6px',
-        border: '1px solid var(--color-border)',
+        width: '22px',
+        height: '22px',
+        borderRadius: '4px',
+        border: 'none',
         backgroundColor: hovered
-          ? (danger ? 'rgba(239,68,68,0.1)' : 'var(--color-bg-hover)')
-          : 'var(--color-bg-elevated)',
+          ? (danger ? 'rgba(239,68,68,0.15)' : 'var(--color-bg-hover)')
+          : 'transparent',
         cursor: 'pointer',
         fontSize: '12px',
         color: danger ? '#ef4444' : 'var(--color-text-secondary)',
@@ -460,12 +460,17 @@ export function TaskCard({
           <div
             style={{
               position: 'absolute',
-              top: hasCover ? '118px' : '8px',
-              right: '8px',
+              top: hasCover ? '118px' : '6px',
+              right: '6px',
               display: 'flex',
-              gap: '4px',
+              gap: '2px',
               alignItems: 'center',
               zIndex: 10,
+              padding: '2px 4px',
+              borderRadius: '8px',
+              backgroundColor: 'var(--color-bg-elevated)',
+              border: '1px solid var(--color-border)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
             }}
           >
             <ActionButton onClick={cycleStatus} title={`Status: ${STATUS_LABELS[task.status]} → next`}>
@@ -578,7 +583,7 @@ export function TaskCard({
             color: 'var(--color-text-primary)',
             lineHeight: '1.45',
             marginBottom: '10px',
-            paddingRight: isHovered ? '88px' : '0',
+            paddingRight: isHovered ? '72px' : '0',
             display: 'flex',
             alignItems: 'flex-start',
             gap: 5,

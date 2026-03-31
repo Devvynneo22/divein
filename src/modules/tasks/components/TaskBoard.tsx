@@ -337,47 +337,37 @@ export function TaskBoard({
         overflowY: 'hidden',
         flex: 1,
         display: 'flex',
-        flexDirection: 'column',
+        flexDirection: 'row',
+        gap: `${dc.column.gap}px`,
+        padding: '16px 24px',
         minHeight: 0,
+        alignItems: 'stretch',
       }}
     >
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'row',
-          gap: `${dc.column.gap}px`,
-          padding: '16px 24px',
-          alignItems: 'stretch',
-          height: '100%',
-          flex: 1,
-          boxSizing: 'border-box',
-        }}
-      >
-        {visibleStatuses.map((status) => (
-          <TaskBoardColumn
-            key={status}
-            status={status}
-            label={statusLabels[status] ?? status}
-            tasks={tasksByStatus[status] ?? []}
-            onDrop={(taskId) => handleDrop(status, taskId)}
-            onCreateTask={() => onCreateTask(status)}
-            onReorderWithinColumn={(taskId, beforeTaskId) => handleReorderWithinColumn(status, taskId, beforeTaskId)}
-            onSelectTask={onSelectTask}
-            onToggleSelect={onToggleSelect}
-            onHoverTask={onHoverTask}
-            selectedTaskId={selectedTaskId}
-            selectedTaskIds={selectedTaskIds}
-            onStatusChange={onStatusChange}
-            onPriorityChange={onPriorityChange}
-            onDeleteTask={onDeleteTask}
-            draggingTaskId={draggingTaskId}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-            subtaskProgressMap={subtaskProgressMap}
-            blockedTaskIds={blockedTaskIds}
-          />
-        ))}
-      </div>
+      {visibleStatuses.map((status) => (
+        <TaskBoardColumn
+          key={status}
+          status={status}
+          label={statusLabels[status] ?? status}
+          tasks={tasksByStatus[status] ?? []}
+          onDrop={(taskId) => handleDrop(status, taskId)}
+          onCreateTask={() => onCreateTask(status)}
+          onReorderWithinColumn={(taskId, beforeTaskId) => handleReorderWithinColumn(status, taskId, beforeTaskId)}
+          onSelectTask={onSelectTask}
+          onToggleSelect={onToggleSelect}
+          onHoverTask={onHoverTask}
+          selectedTaskId={selectedTaskId}
+          selectedTaskIds={selectedTaskIds}
+          onStatusChange={onStatusChange}
+          onPriorityChange={onPriorityChange}
+          onDeleteTask={onDeleteTask}
+          draggingTaskId={draggingTaskId}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          subtaskProgressMap={subtaskProgressMap}
+          blockedTaskIds={blockedTaskIds}
+        />
+      ))}
     </div>
   );
 }
