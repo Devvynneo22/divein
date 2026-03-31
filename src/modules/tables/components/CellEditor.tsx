@@ -253,6 +253,64 @@ export function CellEditor({
     );
   }
 
+  // ── Rating ────────────────────────────────────────────────────────────────
+  if (column.type === 'rating') {
+    const numVal = typeof value === 'number' ? value : 0;
+    const [hovered, setHovered] = useState<number | null>(null);
+    const display = hovered !== null ? hovered : numVal;
+    return (
+      <div
+        className="flex items-center gap-0.5 px-2 h-full"
+        onKeyDown={handleKey}
+        tabIndex={0}
+        onBlur={() => onSave(numVal === 0 ? null : numVal)}
+      >
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            style={{ fontSize: '16px', lineHeight: 1, color: '#f59e0b', background: 'none', border: 'none', cursor: 'pointer', padding: '0 1px' }}
+            onMouseEnter={() => setHovered(star)}
+            onMouseLeave={() => setHovered(null)}
+            onClick={() => {
+              const next = star === numVal ? null : star;
+              onSave(next);
+            }}
+          >
+            {display >= star ? '★' : '☆'}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  // ── Progress ──────────────────────────────────────────────────────────────
+  if (column.type === 'progress') {
+    const numVal = typeof value === 'number' ? Math.min(100, Math.max(0, value)) : 0;
+    const [local, setLocal] = useState(numVal);
+    const barColor = local > 66 ? 'var(--color-success)' : local > 33 ? 'var(--color-warning)' : 'var(--color-danger)';
+    return (
+      <div
+        className="flex items-center gap-2 px-2 h-full w-full"
+        onKeyDown={handleKey}
+        tabIndex={-1}
+      >
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={local}
+          onChange={(e) => setLocal(Number(e.target.value))}
+          onBlur={() => onSave(local)}
+          style={{ flex: 1, accentColor: barColor }}
+        />
+        <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', minWidth: '32px', textAlign: 'right' }}>
+          {local}%
+        </span>
+      </div>
+    );
+  }
+
   // ── Formula / Checkbox — handled externally ────────────────────────────────
   return null;
 }
@@ -267,5 +325,33 @@ export function SelectPill({ value }: { value: string }) {
     >
       {value}
     </span>
+  );
+}
+
+/** Read-only star rating display */
+export function RatingDisplay({ value }: { value: unknown }) {
+  const num = typeof value === 'number' ? Math.min(5, Math.max(0, Math.round(value))) : 0;
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <span key={star} style={{ fontSize: '14px', lineHeight: 1, color: '#f59e0b' }}>
+          {num >= star ? '★' : '☆'}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** Read-only progress bar display */
+export function ProgressDisplay({ value }: { value: unknown }) {
+  const num = typeof value === 'number' ? Math.min(100, Math.max(0, value)) : 0;
+  const barColor = num > 66 ? 'var(--color-success)' : num > 33 ? 'var(--color-warning)' : 'var(--color-danger)';
+  return (
+    <div className="flex items-center gap-2">
+      <div style={{ width: '100px', height: '6px', borderRadius: '3px', backgroundColor: 'var(--color-border)', overflow: 'hidden', flexShrink: 0 }}>
+        <div style={{ width: `${num}%`, height: '100%', backgroundColor: barColor, borderRadius: '3px', transition: 'width 0.2s' }} />
+      </div>
+      <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', flexShrink: 0 }}>{num}%</span>
+    </div>
   );
 }

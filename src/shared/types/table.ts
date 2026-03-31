@@ -8,7 +8,9 @@ export type ColumnType =
   | 'multiselect'
   | 'url'
   | 'email'
-  | 'formula';
+  | 'formula'
+  | 'rating'
+  | 'progress';
 
 export interface ColumnDef {
   id: string; // stable UUID

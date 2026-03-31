@@ -22,6 +22,8 @@ const COLUMN_TYPES: { type: ColumnType; label: string; icon: React.ReactNode; de
     icon: <span className="text-xs font-bold italic leading-none">ƒ</span>,
     desc: 'Computed value',
   },
+  { type: 'rating' as ColumnType, label: 'Rating', icon: <span className="text-xs">⭐</span>, desc: '1-5 star rating' },
+  { type: 'progress' as ColumnType, label: 'Progress', icon: <span className="text-xs">📊</span>, desc: 'Percentage 0-100%' },
 ];
 
 // Pastel swatches for select options

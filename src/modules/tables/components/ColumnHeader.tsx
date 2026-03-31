@@ -30,6 +30,8 @@ const TYPE_LABELS: Record<ColumnType, string> = {
   url: 'URL',
   email: 'Email',
   formula: 'Formula',
+  rating: 'Rating',
+  progress: 'Progress',
 };
 
 // Compact text icons matching the spec
@@ -43,10 +45,12 @@ export const TYPE_ICONS: Record<ColumnType, React.ReactNode> = {
   url: <span style={{ fontSize: '11px', fontWeight: 700, lineHeight: 1 }}>🔗</span>,
   email: <span style={{ fontSize: '11px', fontWeight: 700, lineHeight: 1 }}>@</span>,
   formula: <span style={{ fontSize: '11px', fontWeight: 700, fontStyle: 'italic', lineHeight: 1 }}>ƒ</span>,
+  rating: <span style={{ fontSize: '12px', lineHeight: 1 }}>⭐</span>,
+  progress: <span style={{ fontSize: '12px', lineHeight: 1 }}>📊</span>,
 };
 
 const COLUMN_TYPES: ColumnType[] = [
-  'text', 'number', 'date', 'checkbox', 'select', 'multiselect', 'url', 'email', 'formula',
+  'text', 'number', 'date', 'checkbox', 'select', 'multiselect', 'url', 'email', 'formula', 'rating', 'progress',
 ];
 
 export function ColumnHeader({
