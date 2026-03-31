@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { X, ListTodo, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 import { startOfDay, endOfDay } from 'date-fns';
 import { useTimerStore } from '@/shared/stores/timerStore';
+import { useActivityStore } from '@/shared/stores/activityStore';
 import {
   useTimeEntries,
   useTodayTotal,
@@ -86,6 +87,9 @@ export function TimerPage() {
   const createManualEntry = useCreateManualEntry();
   const deleteEntry = useDeleteEntry();
 
+  const addActivity = useActivityStore((s) => s.addActivity);
+  const prevPomodoroCountRef = useRef(store.pomodoroCount);
+
   // ─── Tick interval ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!store.isRunning) return;
@@ -94,6 +98,20 @@ export function TimerPage() {
     }, 1000);
     return () => clearInterval(interval);
   }, [store.isRunning, store.tick]);
+
+  // ─── Detect pomodoro work completion ────────────────────────────────────────
+  useEffect(() => {
+    if (store.pomodoroCount > prevPomodoroCountRef.current) {
+      addActivity({
+        type: 'timer_completed',
+        title: `Completed pomodoro #${store.pomodoroCount}${selectedTask ? ` on '${selectedTask.title}'` : ''}`,
+        icon: '🍅',
+        entityId: selectedTaskId ?? undefined,
+        entityType: selectedTaskId ? 'task' : undefined,
+      });
+    }
+    prevPomodoroCountRef.current = store.pomodoroCount;
+  }, [store.pomodoroCount, addActivity, selectedTask, selectedTaskId]);
 
   // ─── Refetch on stop ────────────────────────────────────────────────────────
   useEffect(() => {

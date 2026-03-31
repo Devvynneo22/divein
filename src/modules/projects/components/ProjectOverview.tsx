@@ -3,6 +3,7 @@ import {
   FileText, Clock, Target, Plus, Trash2, Edit3, Check, X, Calendar,
   AlertTriangle, Activity, CheckSquare, TrendingUp,
 } from 'lucide-react';
+import { LinkedItemsPanel } from '@/shared/components/LinkedItemsPanel';
 import { format, parseISO, differenceInDays, isPast } from 'date-fns';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { taskService } from '@/shared/lib/taskService';
@@ -405,6 +406,19 @@ export function ProjectOverview({
         tasks={tasks}
         accentColor={accentColor}
       />
+
+      {/* ── Linked Items ── */}
+      <section>
+        <div
+          className="rounded-xl p-4"
+          style={{
+            backgroundColor: 'var(--color-bg-secondary)',
+            border: '1px solid var(--color-border)',
+          }}
+        >
+          <LinkedItemsPanel sourceType="project" sourceId={projectId} />
+        </div>
+      </section>
 
       {/* ── Time summary ── */}
       {stats.totalTimeSeconds > 0 && (

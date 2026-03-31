@@ -40,9 +40,10 @@ export const DEFAULT_CUSTOM_STATUSES: CustomStatus[] = [
 
 // ─── Persistence helpers ─────────────────────────────────────────────────────
 
-const VIEWS_KEY    = 'divein-task-saved-views';
+const VIEWS_KEY      = 'divein-task-saved-views';
 const TAG_COLORS_KEY = 'divein-task-tag-colors';
-const STATUSES_KEY = 'divein-task-custom-statuses';
+const STATUSES_KEY   = 'divein-task-custom-statuses';
+const WIP_LIMITS_KEY = 'divein-task-wip-limits';
 
 function load<T>(key: string, defaults: T): T {
   try {
@@ -62,6 +63,7 @@ interface TaskSettingsState {
   savedViews: SavedView[];
   customStatuses: CustomStatus[];
   tagColors: Record<string, string>;
+  wipLimits: Record<string, number>; // status id → max count
 
   // Saved views
   addSavedView: (view: Omit<SavedView, 'id'>) => void;
@@ -75,6 +77,10 @@ interface TaskSettingsState {
   resetStatuses: () => void;
   setTagColor: (tag: string, color: string) => void;
   removeTagColor: (tag: string) => void;
+
+  // WIP limits
+  setWipLimit: (status: string, limit: number) => void;
+  removeWipLimit: (status: string) => void;
 }
 
 export const useTaskSettingsStore = create<TaskSettingsState>((set, get) => {
@@ -92,6 +98,7 @@ export const useTaskSettingsStore = create<TaskSettingsState>((set, get) => {
     savedViews: load<SavedView[]>(VIEWS_KEY, []),
     customStatuses: merged,
     tagColors: load<Record<string, string>>(TAG_COLORS_KEY, {}),
+    wipLimits: load<Record<string, number>>(WIP_LIMITS_KEY, {}),
 
     addSavedView: (view) => {
       const newView: SavedView = { ...view, id: crypto.randomUUID() };
@@ -149,6 +156,19 @@ export const useTaskSettingsStore = create<TaskSettingsState>((set, get) => {
       delete next[tag];
       persist(TAG_COLORS_KEY, next);
       set({ tagColors: next });
+    },
+
+    setWipLimit: (status, limit) => {
+      const next = { ...get().wipLimits, [status]: limit };
+      persist(WIP_LIMITS_KEY, next);
+      set({ wipLimits: next });
+    },
+
+    removeWipLimit: (status) => {
+      const next = { ...get().wipLimits };
+      delete next[status];
+      persist(WIP_LIMITS_KEY, next);
+      set({ wipLimits: next });
     },
   };
 });

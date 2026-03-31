@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import type { HabitWithStatus } from '@/shared/types/habit';
 import { useCheckIn, useUncheckIn } from '../hooks/useHabits';
 import { toast } from '@/shared/stores/toastStore';
+import { useActivityStore } from '@/shared/stores/activityStore';
 
 interface HabitItemProps {
   habit: HabitWithStatus;
@@ -39,6 +40,7 @@ export const HabitItem = memo(function HabitItem({
 
   const checkIn = useCheckIn();
   const uncheckIn = useUncheckIn();
+  const addActivity = useActivityStore((s) => s.addActivity);
 
   const isMeasurable = !!habit.unit;
   const currentValue = habit.todayEntry?.value ?? 0;
@@ -82,7 +84,16 @@ export const HabitItem = memo(function HabitItem({
         { habitId: habit.id, date: today, value: 1 },
         {
           onError: onMutationError,
-          onSuccess: () => toast.success('Habit checked in ✓'),
+          onSuccess: () => {
+            toast.success('Habit checked in ✓');
+            addActivity({
+              type: 'habit_checked',
+              title: `Checked in '${habit.name}'`,
+              icon: habit.icon ?? '✔️',
+              entityId: habit.id,
+              entityType: 'habit',
+            });
+          },
         },
       );
     }

@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Editor } from '@tiptap/react';
 import type { Note } from '@/shared/types/note';
 import { formatDistanceToNow, format, isAfter, subDays } from 'date-fns';
+import { LinkedItemsPanel } from '@/shared/components/LinkedItemsPanel';
+import { NoteGraph } from './NoteGraph';
 
 interface NoteRightPanelProps {
   editor: Editor | null;
@@ -15,7 +17,7 @@ interface HeadingItem {
   pos: number;
 }
 
-type Tab = 'contents' | 'info';
+type Tab = 'contents' | 'info' | 'links';
 
 export function NoteRightPanel({ editor, note, onNavigateToHeading }: NoteRightPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>('contents');
@@ -99,7 +101,7 @@ export function NoteRightPanel({ editor, note, onNavigateToHeading }: NoteRightP
         className="flex items-center shrink-0 px-3 pt-3 gap-4"
         style={{ borderBottom: '1px solid var(--color-border)' }}
       >
-        {(['contents', 'info'] as Tab[]).map((tab) => (
+        {(['contents', 'info', 'links'] as Tab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -109,7 +111,7 @@ export function NoteRightPanel({ editor, note, onNavigateToHeading }: NoteRightP
                 activeTab === tab ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
             }}
           >
-            {tab === 'contents' ? 'Contents' : 'Info'}
+            {tab === 'contents' ? 'Contents' : tab === 'info' ? 'Info' : 'Links'}
             {activeTab === tab && (
               <span
                 className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
@@ -124,14 +126,51 @@ export function NoteRightPanel({ editor, note, onNavigateToHeading }: NoteRightP
       <div className="flex-1 overflow-y-auto py-3">
         {activeTab === 'contents' ? (
           <ContentsTab headings={headings} onHeadingClick={handleHeadingClick} />
-        ) : (
+        ) : activeTab === 'info' ? (
           <InfoTab
             note={note}
             wordCount={wordCount}
             readingTime={readingTime}
             formatDate={formatDate}
           />
+        ) : (
+          <div className="px-3 py-2">
+            <LinkedItemsPanel sourceType="note" sourceId={note.id} />
+          </div>
         )}
+
+        {/* Mini graph — always shown below tab content */}
+        <MiniGraphSection noteId={note.id} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Mini Graph Section ───────────────────────────────────────────────────────
+
+function MiniGraphSection({ noteId }: { noteId: string }) {
+  return (
+    <div style={{ padding: '12px 8px 4px' }}>
+      <div
+        style={{
+          fontSize: 10,
+          textTransform: 'uppercase',
+          letterSpacing: '0.08em',
+          fontWeight: 600,
+          color: 'var(--color-text-muted)',
+          marginBottom: 8,
+          paddingLeft: 4,
+        }}
+      >
+        Connections
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <NoteGraph
+          selectedNoteId={noteId}
+          onSelectNote={() => {}}
+          mini
+          miniNoteId={noteId}
+        />
       </div>
     </div>
   );

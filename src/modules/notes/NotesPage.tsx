@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from '@/shared/stores/toastStore';
+import { useActivityStore } from '@/shared/stores/activityStore';
 import { FileText, Search, Maximize2 } from 'lucide-react';
 import { useZenModeStore, useZenShortcut } from '@/shared/stores/zenModeStore';
 import {
@@ -20,12 +21,13 @@ import { NoteBreadcrumb } from './components/NoteBreadcrumb';
 import { BacklinksPanel } from './components/BacklinksPanel';
 import { NoteRightPanel } from './components/NoteRightPanel';
 import { NoteCanvas } from './components/NoteCanvas';
+import { NoteGraph } from './components/NoteGraph';
 import { TemplatePickerModal, type NoteTemplate } from './components/TemplatePickerModal';
 import { useNoteEditor } from './hooks/useNoteEditor';
 import type { Note } from '@/shared/types/note';
 import { EmptyState } from '@/shared/components/EmptyState';
 
-type NoteViewMode = 'document' | 'canvas';
+type NoteViewMode = 'document' | 'canvas' | 'graph';
 
 // ─── Highlight helper ─────────────────────────────────────────────────────────
 
@@ -401,6 +403,7 @@ function NoteSearchModal({ notes, onSelect, onClose }: NoteSearchModalProps) {
 // ─── NotesPage ────────────────────────────────────────────────────────────────
 
 export function NotesPage() {
+  const addActivity = useActivityStore((s) => s.addActivity);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -515,8 +518,15 @@ export function NotesPage() {
       });
       setSelectedNoteId(note.id);
       toast.info('Note created');
+      addActivity({
+        type: 'note_created',
+        title: `Created note '${note.title}'`,
+        icon: '📄',
+        entityId: note.id,
+        entityType: 'note',
+      });
     },
-    [createNote],
+    [createNote, addActivity],
   );
 
   const handleCreateChild = useCallback(
@@ -525,8 +535,15 @@ export function NotesPage() {
       setExpandedIds((prev) => new Set([...prev, parentId]));
       setSelectedNoteId(note.id);
       toast.info('Note created');
+      addActivity({
+        type: 'note_created',
+        title: `Created note 'Untitled'`,
+        icon: '📄',
+        entityId: note.id,
+        entityType: 'note',
+      });
     },
-    [createNote],
+    [createNote, addActivity],
   );
 
   // ─── Update ──────────────────────────────────────────────────────
@@ -773,6 +790,7 @@ export function NotesPage() {
                   {([
                     { key: 'document', label: '📄 Doc' },
                     { key: 'canvas',   label: '🎨 Canvas' },
+                    { key: 'graph',    label: '🕸️ Graph' },
                   ] as { key: NoteViewMode; label: string }[]).map(({ key, label }) => (
                     <button
                       key={key}
@@ -854,7 +872,7 @@ export function NotesPage() {
                 </button>
 
                 {/* Right panel toggle (document mode only) */}
-                {viewMode === 'document' && (
+                {viewMode === 'document' && !zenMode && (
                   <button
                     onClick={() => setRightPanelOpen((v) => !v)}
                     className="ml-auto rounded transition-colors"
@@ -933,7 +951,15 @@ export function NotesPage() {
 
             {/* Main content area */}
             <div className="flex flex-1 min-h-0 overflow-hidden">
-              {viewMode === 'canvas' ? (
+              {viewMode === 'graph' ? (
+                /* ── Graph mode ── */
+                <div className="flex-1 min-w-0 overflow-hidden" style={{ position: 'relative' }}>
+                  <NoteGraph
+                    selectedNoteId={selectedNoteId}
+                    onSelectNote={handleSelect}
+                  />
+                </div>
+              ) : viewMode === 'canvas' ? (
                 /* ── Canvas mode ── */
                 <div className="flex-1 min-w-0 overflow-hidden">
                   <NoteCanvas noteId={selectedNote.id} />

@@ -13,6 +13,7 @@ import {
   Lock,
   Link2,
 } from 'lucide-react';
+import { LinkedItemsPanel } from '@/shared/components/LinkedItemsPanel';
 import type { Task, TaskStatus, TaskPriority, UpdateTaskInput, CreateTaskInput } from '@/shared/types/task';
 import { useTaskSettingsStore } from '@/shared/stores/taskSettingsStore';
 import { useSubtasks, useCreateTask, useUpdateTask, useTasks } from '../hooks/useTasks';
@@ -1381,6 +1382,16 @@ export function TaskDetail({ task, onUpdate, onDelete, onClose }: TaskDetailProp
                 onBlur={(e) => { e.currentTarget.style.borderBottomColor = 'transparent'; }}
               />
             </div>
+          </div>
+
+          {/* Linked Items */}
+          <div
+            style={{
+              paddingTop: 16,
+              borderTop: '1px solid var(--color-border)',
+            }}
+          >
+            <LinkedItemsPanel sourceType="task" sourceId={task.id} />
           </div>
 
           {/* Timestamps */}

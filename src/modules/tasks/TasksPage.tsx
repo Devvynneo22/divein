@@ -10,6 +10,7 @@ import {
   BookmarkPlus,
   X,
   Maximize2,
+  Activity,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -40,12 +41,14 @@ import { TaskBatchFAB } from './components/TaskBatchFAB';
 import { TaskCommandPalette } from './components/TaskCommandPalette';
 import { CustomStatusManager } from './components/CustomStatusManager';
 import { EmptyState } from '@/shared/components/EmptyState';
+import { ActivityFeed } from '@/shared/components/ActivityFeed';
+import { useActivityStore } from '@/shared/stores/activityStore';
 import { groupTasks, sortTasks, type TaskGroupBy, type TaskSortBy } from './components/taskViewUtils';
 import { parseQuickAdd } from './lib/nlpQuickAdd';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ActiveView = 'board' | 'list' | 'today' | 'backlog';
+type ActiveView = 'board' | 'list' | 'today' | 'backlog' | 'activity';
 
 /** Matches the TaskFilters shape used by TaskToolbar + TaskFilterChips */
 interface TaskFilters {
@@ -84,23 +87,26 @@ const SMART_VIEWS: SmartViewDef[] = [
 
 function getDefaultStatusForView(view: ActiveView): TaskStatus {
   switch (view) {
-    case 'backlog':  return 'backlog';
-    case 'today':    return 'todo';
-    case 'board':    return 'inbox';
-    case 'list':     return 'inbox';
+    case 'backlog':   return 'backlog';
+    case 'today':     return 'todo';
+    case 'board':     return 'inbox';
+    case 'list':      return 'inbox';
+    case 'activity':  return 'inbox';
   }
 }
 
 const VIEW_TABS: { key: ActiveView; label: string; Icon: React.ComponentType<{ size?: number }> }[] = [
-  { key: 'board',   label: 'Board',   Icon: LayoutGrid },
-  { key: 'list',    label: 'List',    Icon: List },
-  { key: 'today',   label: 'Today',   Icon: Sun },
-  { key: 'backlog', label: 'Backlog', Icon: Archive },
+  { key: 'board',    label: 'Board',    Icon: LayoutGrid },
+  { key: 'list',     label: 'List',     Icon: List },
+  { key: 'today',    label: 'Today',    Icon: Sun },
+  { key: 'backlog',  label: 'Backlog',  Icon: Archive },
+  { key: 'activity', label: 'Activity', Icon: Activity },
 ];
 
 // ─── TasksPage ────────────────────────────────────────────────────────────────
 
 export function TasksPage() {
+  const addActivity = useActivityStore((s) => s.addActivity);
   const [activeView, setActiveView] = useState<ActiveView>('board');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
@@ -303,26 +309,47 @@ export function TasksPage() {
 
   const handleCreate = useCallback(
     (input: CreateTaskInput) => {
-      createTask.mutate(input);
+      createTask.mutate(input, {
+        onSuccess: (task) => {
+          addActivity({
+            type: 'task_created',
+            title: `Created '${task.title}'`,
+            icon: '📝',
+            entityId: task.id,
+            entityType: 'task',
+          });
+        },
+      });
     },
-    [createTask],
+    [createTask, addActivity],
   );
 
   const handleQuickAdd = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Enter' && quickAddTitle.trim()) {
         const parsed = parseQuickAdd(quickAddTitle.trim());
-        createTask.mutate({
+        const input = {
           title: parsed.title,
           status: getDefaultStatusForView(activeView),
           ...(parsed.dueDate ? { dueDate: parsed.dueDate } : {}),
           ...(parsed.tags.length > 0 ? { tags: parsed.tags } : {}),
           ...(parsed.priority !== null ? { priority: parsed.priority } : {}),
+        };
+        createTask.mutate(input, {
+          onSuccess: (task) => {
+            addActivity({
+              type: 'task_created',
+              title: `Created '${task.title}'`,
+              icon: '📝',
+              entityId: task.id,
+              entityType: 'task',
+            });
+          },
         });
         setQuickAddTitle('');
       }
     },
-    [quickAddTitle, activeView, createTask],
+    [quickAddTitle, activeView, createTask, addActivity],
   );
 
   // Live NLP parse preview — only computed when there's input
@@ -361,19 +388,44 @@ export function TasksPage() {
 
   const handleStatusChange = useCallback(
     (id: string, status: TaskStatus) => {
+      const taskItem = allTasksUnfiltered.find((t) => t.id === id);
       if (status === 'done' && blockedTaskIds.has(id)) {
         setToast({
           message: '⚠️ This task has unfinished blockers — complete them first.',
-          task: allTasksUnfiltered.find((t) => t.id === id) ?? { id, title: '', status: 'todo', priority: 0, description: null, projectId: null, parentId: null, milestoneId: null, dueDate: null, startDate: null, completedAt: null, recurrence: null, sortOrder: 0, tags: [], estimatedMin: null, createdAt: '', updatedAt: '' },
+          task: taskItem ?? { id, title: '', status: 'todo', priority: 0, description: null, projectId: null, parentId: null, milestoneId: null, dueDate: null, startDate: null, completedAt: null, recurrence: null, sortOrder: 0, tags: [], estimatedMin: null, createdAt: '', updatedAt: '' },
           subtasks: [],
         });
-        // Still allow the move (just warn) — remove the early return if you want to block it
-        updateTask.mutate({ id, data: { status } });
+        // Still allow the move (just warn)
+        updateTask.mutate({ id, data: { status } }, {
+          onSuccess: () => {
+            if (taskItem) {
+              addActivity({
+                type: 'task_completed',
+                title: `Completed '${taskItem.title}'`,
+                icon: '✅',
+                entityId: id,
+                entityType: 'task',
+              });
+            }
+          },
+        });
         return;
       }
-      updateTask.mutate({ id, data: { status } });
+      updateTask.mutate({ id, data: { status } }, {
+        onSuccess: () => {
+          if (status === 'done' && taskItem) {
+            addActivity({
+              type: 'task_completed',
+              title: `Completed '${taskItem.title}'`,
+              icon: '✅',
+              entityId: id,
+              entityType: 'task',
+            });
+          }
+        },
+      });
     },
-    [updateTask, blockedTaskIds, allTasksUnfiltered],
+    [updateTask, blockedTaskIds, allTasksUnfiltered, addActivity],
   );
 
   const handlePriorityChange = useCallback(
@@ -704,6 +756,41 @@ export function TasksPage() {
             onDelete={handleDelete}
             blockedTaskIds={blockedTaskIds}
           />
+        );
+      case 'activity':
+        return (
+          <div
+            style={{
+              flex: 1,
+              overflow: 'auto',
+              padding: '16px 28px',
+            }}
+          >
+            <div
+              style={{
+                maxWidth: 640,
+                margin: '0 auto',
+              }}
+            >
+              <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
+                  📊 Activity Feed
+                </h2>
+                <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Recent actions across all modules</span>
+              </div>
+              <div
+                style={{
+                  borderRadius: 12,
+                  border: '1px solid var(--color-border)',
+                  backgroundColor: 'var(--color-bg-elevated)',
+                  overflow: 'hidden',
+                  padding: '4px 0',
+                }}
+              >
+                <ActivityFeed limit={50} />
+              </div>
+            </div>
+          </div>
         );
     }
   }
