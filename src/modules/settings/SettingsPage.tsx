@@ -17,12 +17,14 @@ import {
   Check,
   Download,
   Layers,
+  Bell,
 } from 'lucide-react';
 import { useTimerStore } from '@/shared/stores/timerStore';
 import { useAppSettingsStore } from '@/shared/stores/appSettingsStore';
 import { shortcutService, type ShortcutDef, type ShortcutGroup } from '@/shared/lib/shortcutService';
+import { useNotificationStore } from '@/shared/stores/notificationStore';
 
-type SettingsTab = 'general' | 'pomodoro' | 'flashcards' | 'shortcuts' | 'data' | 'about';
+type SettingsTab = 'general' | 'pomodoro' | 'flashcards' | 'shortcuts' | 'data' | 'about' | 'notifications';
 
 // ─── Tab group definitions ────────────────────────────────────────────────────
 
@@ -43,6 +45,7 @@ const TAB_GROUPS: { label: string; items: { key: SettingsTab; label: string; ico
   {
     label: 'System',
     items: [
+      { key: 'notifications', label: 'Notifications', icon: <Bell size={14} /> },
       { key: 'shortcuts', label: 'Shortcuts', icon: <Keyboard size={14} /> },
       { key: 'data', label: 'Data', icon: <Database size={14} /> },
       { key: 'about', label: 'About', icon: <Info size={14} /> },
@@ -113,6 +116,7 @@ export function SettingsPage() {
           {activeTab === 'general' && <GeneralSettings />}
           {activeTab === 'pomodoro' && <PomodoroSettingsPanel />}
           {activeTab === 'flashcards' && <FlashcardSettings />}
+          {activeTab === 'notifications' && <NotificationSettings />}
           {activeTab === 'shortcuts' && <ShortcutSettings />}
           {activeTab === 'data' && <DataSettings />}
           {activeTab === 'about' && <AboutSection />}
@@ -1477,5 +1481,175 @@ function ToggleSwitch({
         }}
       />
     </button>
+  );
+}
+
+// --- Notification Settings ----------------------------------------------------
+
+function NotificationSettings() {
+  const { preferences, permissionStatus, updatePreferences, requestPermission, refreshPermissionStatus } =
+    useNotificationStore();
+  const [testFired, setTestFired] = useState(false);
+
+  useEffect(() => {
+    refreshPermissionStatus();
+  }, [refreshPermissionStatus]);
+
+  function handleRequestPermission() {
+    void requestPermission();
+  }
+
+  function handleTestNotification() {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    try {
+      const n = new Notification('DiveIn Test Notification ??', {
+        body: "Notifications are working! You'll be reminded about tasks, habits, and events.",
+        icon: '/favicon.ico',
+      });
+      n.onclick = () => { window.focus(); n.close(); };
+      setTestFired(true);
+      setTimeout(() => setTestFired(false), 3000);
+    } catch { /* ignore */ }
+  }
+
+  const isGranted = permissionStatus === 'granted';
+  const isDenied = permissionStatus === 'denied';
+  const isUnsupported = permissionStatus === 'unsupported';
+
+  return (
+    <div>
+      <SectionHeader title="Notifications" description="Configure browser push notifications for reminders and alerts." />
+
+      {/* Permission status */}
+      <div
+        style={{
+          padding: '12px 16px',
+          borderRadius: '10px',
+          marginBottom: '20px',
+          border: `1px solid ${isGranted ? 'var(--color-success)' : isDenied ? 'var(--color-danger)' : 'var(--color-warning)'}`,
+          backgroundColor: isGranted ? 'var(--color-success-soft)' : isDenied ? 'var(--color-danger-soft)' : 'var(--color-warning-soft)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '16px' }}>
+            {isGranted ? '?' : isDenied ? '??' : isUnsupported ? '?' : '??'}
+          </span>
+          <div>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+              {isGranted ? 'Notifications allowed' : isDenied ? 'Permission denied' : isUnsupported ? 'Not supported in this browser' : 'Permission needed'}
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+              {isGranted ? 'Browser will deliver notifications when the app is open' : isDenied ? 'Update browser settings to allow notifications from this site' : isUnsupported ? 'Your browser does not support the Notification API' : 'Click "Enable" to allow browser notifications'}
+            </div>
+          </div>
+        </div>
+        {!isGranted && !isDenied && !isUnsupported && (
+          <button
+            onClick={handleRequestPermission}
+            style={{
+              padding: '6px 16px', borderRadius: '20px',
+              border: 'none', backgroundColor: 'var(--color-warning)',
+              color: '#fff', fontSize: '13px', fontWeight: 500,
+              cursor: 'pointer', flexShrink: 0,
+            }}
+          >
+            Enable
+          </button>
+        )}
+      </div>
+
+      {/* Master toggle */}
+      <SettingRow label="Enable notifications" description="Master switch � turns all notification types on or off">
+        <ToggleSwitch checked={preferences.enabled} onChange={(v) => updatePreferences({ enabled: v })} />
+      </SettingRow>
+
+      {/* Task Reminders */}
+      <div style={{ marginTop: '24px', marginBottom: '8px' }}>
+        <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)' }}>Task Reminders</p>
+      </div>
+      <SettingRow label="?? Task due reminders" description="Notify when a task's due date is approaching">
+        <ToggleSwitch checked={preferences.taskReminders && preferences.enabled} onChange={(v) => updatePreferences({ taskReminders: v })} />
+      </SettingRow>
+      {preferences.taskReminders && preferences.enabled && (
+        <div style={{ paddingLeft: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--color-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '10px' }}>
+            <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>Remind</span>
+            <NumberInput min={5} max={120} value={preferences.taskReminderMinutes} onChange={(v) => updatePreferences({ taskReminderMinutes: v })} />
+            <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>minutes before due</span>
+          </div>
+        </div>
+      )}
+
+      {/* Calendar Events */}
+      <div style={{ marginTop: '24px', marginBottom: '8px' }}>
+        <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)' }}>Calendar Events</p>
+      </div>
+      <SettingRow label="?? Event reminders" description="Notify before calendar events start">
+        <ToggleSwitch checked={preferences.eventReminders && preferences.enabled} onChange={(v) => updatePreferences({ eventReminders: v })} />
+      </SettingRow>
+      {preferences.eventReminders && preferences.enabled && (
+        <div style={{ paddingLeft: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--color-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '10px' }}>
+            <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>Remind</span>
+            <NumberInput min={1} max={60} value={preferences.eventReminderMinutes} onChange={(v) => updatePreferences({ eventReminderMinutes: v })} />
+            <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>minutes before start</span>
+          </div>
+        </div>
+      )}
+
+      {/* Habits */}
+      <div style={{ marginTop: '24px', marginBottom: '8px' }}>
+        <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)' }}>Habits</p>
+      </div>
+      <SettingRow label="?? Habit reminders" description="Evening reminder for incomplete habits">
+        <ToggleSwitch checked={preferences.habitReminders && preferences.enabled} onChange={(v) => updatePreferences({ habitReminders: v })} />
+      </SettingRow>
+      {preferences.habitReminders && preferences.enabled && (
+        <div style={{ paddingLeft: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--color-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '10px' }}>
+            <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>Remind at</span>
+            <NumberInput min={0} max={23} value={preferences.habitReminderHour} onChange={(v) => updatePreferences({ habitReminderHour: v })} />
+            <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>:00 (24h format)</span>
+          </div>
+        </div>
+      )}
+
+      {/* Pomodoro */}
+      <div style={{ marginTop: '24px', marginBottom: '8px' }}>
+        <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)' }}>Focus Timer</p>
+      </div>
+      <SettingRow label="?? Pomodoro phase alerts" description="Notify on work/break phase changes">
+        <ToggleSwitch checked={preferences.pomodoroAlerts && preferences.enabled} onChange={(v) => updatePreferences({ pomodoroAlerts: v })} />
+      </SettingRow>
+
+      {/* Test */}
+      <div style={{ marginTop: '28px', paddingTop: '20px', borderTop: '1px solid var(--color-border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '2px' }}>Test Notification</div>
+            <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Send a sample notification to verify your setup</div>
+          </div>
+          <button
+            onClick={handleTestNotification}
+            disabled={!isGranted || testFired}
+            style={{
+              padding: '7px 18px', borderRadius: '8px', border: 'none',
+              backgroundColor: testFired ? 'var(--color-success)' : isGranted ? 'var(--color-accent)' : 'var(--color-bg-tertiary)',
+              color: isGranted ? '#fff' : 'var(--color-text-muted)',
+              fontSize: '13px', fontWeight: 500,
+              cursor: isGranted && !testFired ? 'pointer' : 'not-allowed',
+              transition: 'background-color 0.2s',
+              display: 'flex', alignItems: 'center', gap: '6px',
+            }}
+          >
+            {testFired ? '? Sent!' : '?? Send Test'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

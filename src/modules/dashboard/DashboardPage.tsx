@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useReducer, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AnalyticsPage } from '@/modules/analytics/AnalyticsPage';
 import {
   CheckSquare,
   Calendar,
@@ -46,6 +47,8 @@ import { useTimerStore } from '@/shared/stores/timerStore';
 import { useProjects } from '@/modules/projects/hooks/useProjects';
 import { useEvents } from '@/modules/calendar/hooks/useEvents';
 import { useTotalDueToday } from '@/modules/flashcards/hooks/useFlashcards';
+import { useSuggestionStore } from '@/shared/stores/suggestionStore';
+import { SuggestionBanner } from '@/shared/components/SuggestionBanner';
 
 import type { Task } from '@/shared/types/task';
 import type { Note } from '@/shared/types/note';
@@ -1252,11 +1255,61 @@ function ActivityTimeline({ items }: { items: ActivityItem[] }) {
   );
 }
 
+// ─── Dashboard Tab Bar ────────────────────────────────────────────────────────
+
+type DashboardTab = 'day' | 'analytics';
+
+function DashboardTabBar({
+  active,
+  onChange,
+}: {
+  active: DashboardTab;
+  onChange: (t: DashboardTab) => void;
+}) {
+  return (
+    <div style={{
+      display: 'flex',
+      gap: '4px',
+      marginBottom: '24px',
+      backgroundColor: 'var(--color-bg-tertiary)',
+      borderRadius: '12px',
+      padding: '4px',
+      border: '1px solid var(--color-border)',
+      width: 'fit-content',
+    }}>
+      {([
+        { key: 'day', label: '📊 My Day' },
+        { key: 'analytics', label: '📈 Analytics' },
+      ] as { key: DashboardTab; label: string }[]).map(({ key, label }) => (
+        <button
+          key={key}
+          onClick={() => onChange(key)}
+          style={{
+            padding: '7px 18px',
+            borderRadius: '9px',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontWeight: 600,
+            transition: 'all 0.15s',
+            backgroundColor: active === key ? 'var(--color-bg-elevated)' : 'transparent',
+            color: active === key ? 'var(--color-accent)' : 'var(--color-text-muted)',
+            boxShadow: active === key ? 'var(--shadow-sm)' : 'none',
+          }}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ─── Main DashboardPage ───────────────────────────────────────────────────────
 
 export function DashboardPage() {
   const navigate = useNavigate();
   const now = useLiveClock();
+  const [dashTab, setDashTab] = useState<DashboardTab>('day');
 
   // ─── All hooks at top level ────────────────────────────────────────────────
   const { data: allTasks = [] } = useTasks();
@@ -1271,6 +1324,21 @@ export function DashboardPage() {
   const { data: upcomingEvents = [] } = useEvents(windowStart, windowEnd);
 
   const createTask = useCreateTask();
+  const generateSuggestions = useSuggestionStore((s) => s.generateSuggestions);
+
+  // Generate suggestions on mount and when data changes
+  useEffect(() => {
+    if (allTasks.length > 0 || habitStatuses.length > 0) {
+      generateSuggestions({
+        tasks: allTasks,
+        habits: habitStatuses,
+        events: upcomingEvents,
+        flashcardsDueToday: totalCardsDue,
+        focusMinutesToday: Math.floor(timer.secondsElapsed / 60),
+        projects: allProjects,
+      });
+    }
+  }, [allTasks, habitStatuses, upcomingEvents, totalCardsDue, timer.secondsElapsed, allProjects, generateSuggestions]);
 
   // ─── Derived data ──────────────────────────────────────────────────────────
   const todayStr = format(now, 'yyyy-MM-dd');
@@ -1378,6 +1446,18 @@ export function DashboardPage() {
     createTask.mutate({ title: value, dueDate: todayStr, status: 'todo' });
   }
 
+  // Analytics tab
+  if (dashTab === 'analytics') {
+    return (
+      <div style={{ minHeight: '100%' }}>
+        <div style={{ padding: '32px 40px 0', maxWidth: '1440px', margin: '0 auto' }}>
+          <DashboardTabBar active={dashTab} onChange={setDashTab} />
+        </div>
+        <AnalyticsPage />
+      </div>
+    );
+  }
+
   return (
     <div style={{
       padding: '32px 40px 64px',
@@ -1386,6 +1466,12 @@ export function DashboardPage() {
       minHeight: '100%',
       boxSizing: 'border-box',
     }}>
+      {/* Tab Bar */}
+      <DashboardTabBar active={dashTab} onChange={setDashTab} />
+
+      {/* Smart Suggestions */}
+      <SuggestionBanner />
+
       {/* Hero */}
       <HeroBand
         now={now}

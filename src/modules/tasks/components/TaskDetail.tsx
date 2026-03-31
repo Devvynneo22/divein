@@ -13,6 +13,7 @@ import {
   Lock,
   Link2,
 } from 'lucide-react';
+import { useFocusSessionStore } from '@/shared/stores/focusSessionStore';
 import { LinkedItemsPanel } from '@/shared/components/LinkedItemsPanel';
 import type { Task, TaskStatus, TaskPriority, UpdateTaskInput, CreateTaskInput } from '@/shared/types/task';
 import { useTaskSettingsStore } from '@/shared/stores/taskSettingsStore';
@@ -693,6 +694,7 @@ interface TaskDetailProps {
 export function TaskDetail({ task, onUpdate, onDelete, onClose }: TaskDetailProps) {
   const tagColors = useTaskSettingsStore((s) => s.tagColors);
   const setTagColor = useTaskSettingsStore((s) => s.setTagColor);
+  const openFocusModal = useFocusSessionStore((s) => s.openModal);
 
   // ── Animation state ───────────────────────────────────────────────────────
   const [visible, setVisible] = useState(false);
@@ -868,6 +870,30 @@ export function TaskDetail({ task, onUpdate, onDelete, onClose }: TaskDetailProp
             title="Close"
           >
             <X size={16} />
+          </button>
+
+          {/* Focus Session button */}
+          <button
+            onClick={() => openFocusModal({ taskId: task.id, taskTitle: task.title })}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '5px 12px',
+              borderRadius: 100,
+              border: '1.5px solid var(--color-accent)',
+              backgroundColor: 'var(--color-accent-soft)',
+              color: 'var(--color-accent)',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent-muted)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-accent-soft)'; }}
+            title="Start a focus session for this task (Alt+F)"
+          >
+            🎯 Focus
           </button>
 
           {/* More menu */}

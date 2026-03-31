@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { X, ListTodo, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 import { startOfDay, endOfDay } from 'date-fns';
 import { useTimerStore } from '@/shared/stores/timerStore';
+import { useFocusSessionStore } from '@/shared/stores/focusSessionStore';
 import { useActivityStore } from '@/shared/stores/activityStore';
 import {
   useTimeEntries,
@@ -16,10 +17,10 @@ import { TimerDisplay } from './components/TimerDisplay';
 import { TimerControls, ModeSwitcher } from './components/TimerControls';
 import { TimeEntryList } from './components/TimeEntryList';
 import { PomodoroSettings } from './components/PomodoroSettings';
-import { TimerReports } from './components/TimerReports';
+import { TimerReports, FocusSessionHistory } from './components/TimerReports';
 import type { PomodoroPhase } from '@/shared/types/timer';
 
-type PageTab = 'timer' | 'reports';
+type PageTab = 'timer' | 'reports' | 'focus-history';
 
 function getPhaseTotalSeconds(
   phase: PomodoroPhase,
@@ -34,6 +35,7 @@ function getPhaseTotalSeconds(
 
 export function TimerPage() {
   const store = useTimerStore();
+  const openFocusModal = useFocusSessionStore((s) => s.openModal);
   const [pageTab, setPageTab] = useState<PageTab>('timer');
   const [description, setDescription] = useState('');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -237,7 +239,10 @@ export function TimerPage() {
   const pageTabs: { id: PageTab; label: string }[] = [
     { id: 'timer', label: '⏱ Timer' },
     { id: 'reports', label: '📊 Reports' },
+    { id: 'focus-history', label: '🎯 Focus History' },
   ];
+
+  const handleOpenFocus = () => openFocusModal();
 
   return (
     <div
@@ -286,12 +291,59 @@ export function TimerPage() {
             </button>
           );
         })}
+        {/* Focus Session shortcut button */}
+        <button
+          onClick={handleOpenFocus}
+          style={{
+            marginLeft: 'auto',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '6px 16px',
+            borderRadius: 100,
+            border: '1.5px solid var(--color-accent)',
+            backgroundColor: 'var(--color-accent-soft)',
+            color: 'var(--color-accent)',
+            fontSize: '0.82rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+            marginBottom: 6,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--color-accent-muted)';
+            e.currentTarget.style.transform = 'translateY(-1px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--color-accent-soft)';
+            e.currentTarget.style.transform = 'translateY(0)';
+          }}
+        >
+          🎯 Focus Session
+        </button>
       </div>
 
       {/* ── Reports tab ──────────────────────────────────────────────── */}
       {pageTab === 'reports' && (
         <div style={{ flex: 1, overflow: 'hidden' }}>
           <TimerReports entries={allEntries} />
+        </div>
+      )}
+
+      {/* ── Focus History tab ─────────────────────────────────────────── */}
+      {pageTab === 'focus-history' && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+          <h2
+            style={{
+              fontSize: '1.1rem',
+              fontWeight: 700,
+              color: 'var(--color-text-primary)',
+              margin: '0 0 16px',
+            }}
+          >
+            🎯 Focus Session History
+          </h2>
+          <FocusSessionHistory />
         </div>
       )}
 

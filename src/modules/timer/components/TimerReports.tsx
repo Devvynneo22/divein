@@ -16,6 +16,8 @@ import { Trash2, Download } from 'lucide-react';
 import { useProjects } from '@/modules/projects/hooks/useProjects';
 import { useDeleteEntry } from '../hooks/useTimer';
 import type { TimeEntry } from '@/shared/types/timer';
+import { useFocusSessionStore } from '@/shared/stores/focusSessionStore';
+import type { FocusSession } from '@/shared/stores/focusSessionStore';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -952,6 +954,188 @@ export function TimerReports({ entries }: TimerReportsProps) {
             ))
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Focus Session History Panel ----------------------------------------------
+
+function calcFocusScore(distractions: number, targetMin: number, actualMin: number): number {
+  const raw = 100 - distractions * 10 - Math.max(0, targetMin - actualMin);
+  return Math.min(100, Math.max(0, raw));
+}
+
+export function FocusSessionHistory() {
+  const sessions = useFocusSessionStore((s) => s.sessions);
+  const getWeeklyMinutes = useFocusSessionStore((s) => s.getWeeklyMinutes);
+  const weeklyMinutes = getWeeklyMinutes();
+
+  const weekSessions = useMemo(() => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 7);
+    return sessions.filter((s) => new Date(s.startedAt) >= cutoff);
+  }, [sessions]);
+
+  const avgScore = useMemo(() => {
+    if (weekSessions.length === 0) return 0;
+    const total = weekSessions.reduce(
+      (sum, s) => sum + calcFocusScore(s.distractionCount, s.targetMinutes, s.actualMinutes),
+      0,
+    );
+    return Math.round(total / weekSessions.length);
+  }, [weekSessions]);
+
+  if (sessions.length === 0) {
+    return (
+      <div
+        style={{
+          padding: '32px 24px',
+          textAlign: 'center',
+          color: 'var(--color-text-muted)',
+          fontSize: '0.9rem',
+        }}
+      >
+        <div style={{ fontSize: '2rem', marginBottom: 10 }}>??</div>
+        <p style={{ margin: 0, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+          No focus sessions yet
+        </p>
+        <p style={{ margin: '6px 0 0', fontSize: '0.82rem' }}>
+          Start one with Alt+F or the Focus Session button
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: 12,
+        }}
+      >
+        {[
+          { label: 'Focus Time', value: `${weeklyMinutes}m`, emoji: '?' },
+          { label: 'Sessions', value: String(weekSessions.length), emoji: '??' },
+          { label: 'Avg Score', value: String(avgScore), emoji: '?' },
+        ].map((stat) => (
+          <div
+            key={stat.label}
+            style={{
+              padding: '14px 16px',
+              borderRadius: 14,
+              border: '1px solid var(--color-border)',
+              backgroundColor: 'var(--color-bg-elevated)',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: '1.3rem', marginBottom: 6 }}>{stat.emoji}</div>
+            <div
+              style={{
+                fontSize: '1.4rem',
+                fontWeight: 800,
+                color: 'var(--color-text-primary)',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {stat.value}
+            </div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 600, marginTop: 2 }}>
+              {stat.label}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {sessions.slice(0, 20).map((session: FocusSession) => {
+          const score = calcFocusScore(
+            session.distractionCount,
+            session.targetMinutes,
+            session.actualMinutes,
+          );
+          const scoreColor =
+            score >= 80 ? '#22c55e' : score >= 60 ? '#f59e0b' : 'var(--color-danger)';
+          const date = new Date(session.startedAt);
+          return (
+            <div
+              key={session.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: '12px 14px',
+                borderRadius: 12,
+                border: '1px solid var(--color-border)',
+                backgroundColor: 'var(--color-bg-elevated)',
+              }}
+            >
+              <div
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: '50%',
+                  border: `2.5px solid ${scoreColor}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  fontSize: '0.75rem',
+                  fontWeight: 800,
+                  color: scoreColor,
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {score}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: '0.88rem',
+                    fontWeight: 600,
+                    color: 'var(--color-text-primary)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {session.taskTitle}
+                </div>
+                <div
+                  style={{
+                    fontSize: '0.75rem',
+                    color: 'var(--color-text-muted)',
+                    marginTop: 2,
+                    display: 'flex',
+                    gap: 8,
+                  }}
+                >
+                  <span>{format(date, 'MMM d, h:mm a')}</span>
+                  <span>�</span>
+                  <span>{session.actualMinutes}m focused</span>
+                  <span>�</span>
+                  <span>
+                    {Array.from({ length: session.pomodorosCompleted }).map((_, i: number) => (
+                      <span key={i}>??</span>
+                    ))}
+                    {session.pomodorosCompleted === 0 && '�'}
+                  </span>
+                </div>
+              </div>
+              <div
+                style={{
+                  fontSize: '0.75rem',
+                  color: session.distractionCount === 0 ? '#22c55e' : 'var(--color-text-muted)',
+                  flexShrink: 0,
+                  fontWeight: 600,
+                }}
+              >
+                {session.distractionCount === 0 ? '?? Clean' : `${session.distractionCount} ?`}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

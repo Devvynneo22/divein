@@ -20,6 +20,7 @@ import {
   GraduationCap,
   Keyboard,
   FilterX,
+  ClipboardList,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -27,6 +28,12 @@ import { globalSearch, type SearchResult, type SearchResultType } from '@/shared
 import { useAppSettingsStore } from '@/shared/stores/appSettingsStore';
 import { noteService } from '@/shared/lib/noteService';
 import { QuickCapture } from './QuickCapture';
+import { DailyReviewModal } from '@/modules/review/DailyReviewModal';
+import { useDailyReviewStore } from '@/shared/stores/dailyReviewStore';
+import { FocusSessionModal } from '@/modules/focus/FocusSessionModal';
+import { useFocusSessionStore } from '@/shared/stores/focusSessionStore';
+import { NotificationManager } from '@/shared/components/NotificationManager';
+import { Lightbulb } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -76,6 +83,8 @@ export function CommandPalette() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { app: appSettings, updateApp } = useAppSettingsStore();
+  const { openModal: openDailyReview, hasReviewedToday } = useDailyReviewStore();
+  const openFocusModal = useFocusSessionStore((s) => s.openModal);
 
   // ── Toggle Ctrl+K ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -84,10 +93,20 @@ export function CommandPalette() {
         e.preventDefault();
         setOpen((prev) => !prev);
       }
+      // Alt+R — open Daily Review
+      if (e.key === 'r' && e.altKey) {
+        e.preventDefault();
+        openDailyReview();
+      }
+      // Alt+F — open Focus Session
+      if (e.key === 'f' && e.altKey) {
+        e.preventDefault();
+        openFocusModal();
+      }
     }
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [openDailyReview, openFocusModal]);
 
   // ── Reset on close ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -162,6 +181,14 @@ export function CommandPalette() {
       { id: 'create-note',  label: 'New Note',  icon: <Plus size={16} />, action: () => go('/notes',    { createNew: true }),       group: 'Create', keywords: ['add note', 'write'] },
       { id: 'create-event', label: 'New Event', icon: <Plus size={16} />, action: () => go('/calendar', { createEvent: true }),     group: 'Create', keywords: ['add event', 'schedule'] },
       { id: 'start-timer',  label: 'Start Timer', icon: <Timer size={16} />, action: () => go('/timer'), group: 'Create', keywords: ['focus', 'pomodoro'] },
+      {
+        id: 'start-focus-session',
+        label: 'Start Focus Session',
+        icon: <span style={{ fontSize: '0.9rem' }}>🎯</span>,
+        action: () => { openFocusModal(); setOpen(false); },
+        group: 'Create',
+        keywords: ['focus', 'deep work', 'pomodoro', 'concentration', 'zen', 'session'],
+      },
       // Actions
       {
         id: 'action-toggle-dark-mode',
@@ -222,8 +249,27 @@ export function CommandPalette() {
         group: 'Actions',
         keywords: ['reset', 'clear', 'filters'],
       },
+      {
+        id: 'action-view-suggestions',
+        label: 'View Suggestions',
+        icon: <Lightbulb size={16} />,
+        action: () => go('/dashboard'),
+        group: 'Actions',
+        keywords: ['suggestions', 'tips', 'insights', 'recommendations', 'smart'],
+      },
+      {
+        id: 'action-daily-review',
+        label: hasReviewedToday() ? '✅ Daily Review (already done)' : '📝 Start Daily Review',
+        icon: <ClipboardList size={16} />,
+        action: () => {
+          setOpen(false);
+          openDailyReview();
+        },
+        group: 'Actions',
+        keywords: ['review', 'daily', 'reflection', 'end of day', 'recap', 'mood', 'journal'],
+      },
     ],
-    [go, appSettings.theme, updateApp, openTodayNote],
+    [go, appSettings.theme, updateApp, openTodayNote, openDailyReview, hasReviewedToday, openFocusModal],
   );
 
   // ── Filter commands by query ──────────────────────────────────────────────
@@ -252,7 +298,14 @@ export function CommandPalette() {
   }, [open]);
 
   // ── Always render QuickCapture (it self-manages open state) ─────────────
-  if (!open) return <QuickCapture />;
+  if (!open) return (
+    <>
+      <QuickCapture />
+      <NotificationManager />
+      <DailyReviewModal />
+      <FocusSessionModal />
+    </>
+  );
 
   const GROUP_LABELS: Record<'Navigation' | 'Create' | 'Actions', string> = {
     Navigation: '🧭 Navigation',
@@ -265,6 +318,9 @@ export function CommandPalette() {
   return (
     <>
       <QuickCapture />
+      <NotificationManager />
+      <DailyReviewModal />
+      <FocusSessionModal />
       <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Command palette">
         {/* Backdrop */}
         <div
