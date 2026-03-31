@@ -214,9 +214,10 @@ export function TaskBoardColumn({
         flexShrink: 0,
         display: 'flex',
         flexDirection: 'column',
-        maxHeight: compactMode ? undefined : '100%',
+        height: compactMode ? undefined : '100%',
+        minHeight: 0,
         borderRadius: '12px',
-        overflow: 'hidden',
+        overflow: 'visible',
         border: columnBorder,
         borderLeft: isWipExceeded ? `3px solid var(--color-danger, #ef4444)` : `3px solid ${accentColor}60`,
         transition: 'background-color 0.15s ease, box-shadow 0.15s ease, border-color 0.2s ease',
@@ -246,6 +247,8 @@ export function TaskBoardColumn({
             borderBottom: '1px solid rgba(0,0,0,0.04)',
             background: headerGradient,
             transition: 'background 0.2s ease',
+            borderRadius: '11px 11px 0 0',
+            overflow: 'hidden',
           }}
         >
           {/* Top accent bar */}
@@ -255,7 +258,7 @@ export function TaskBoardColumn({
               background: isWipExceeded
                 ? `linear-gradient(90deg, var(--color-danger, #ef4444) 0%, rgba(239,68,68,0.5) 100%)`
                 : `linear-gradient(90deg, ${accentColor} 0%, ${accentColor}80 100%)`,
-              borderRadius: '12px 12px 0 0',
+              borderRadius: '11px 11px 0 0',
             }}
           />
 
@@ -462,13 +465,14 @@ export function TaskBoardColumn({
         style={{
           flex: 1,
           overflowY: 'auto',
-          padding: columnCardPaddingH,
+          overflowX: 'hidden',
+          padding: `8px ${columnCardPaddingH}`,
           display: 'flex',
           flexDirection: 'column',
           gap: columnCardGap,
           minHeight: '80px',
-          paddingTop: '8px',
-          paddingBottom: '8px',
+          borderRadius: '0 0 12px 12px',
+          backgroundColor: 'var(--color-bg-secondary)',
         }}
       >
         {tasks.map((task) => (

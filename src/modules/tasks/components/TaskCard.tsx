@@ -415,7 +415,7 @@ export function TaskCard({
       {/* ── Card Body ─────────────────────────────────────────────────────── */}
       <div style={{ padding: `${dc.card.padding}px`, minHeight: dc.card.minHeight > 0 ? `${dc.card.minHeight}px` : undefined }}>
 
-        {/* Multi-select checkbox — top-left corner, hidden until hover or selected */}
+        {/* Multi-select checkbox — top-left corner, outline on hover, filled when selected */}
         {(isHovered || isMultiSelected) && (
           <div
             onClick={(e) => {
@@ -432,14 +432,13 @@ export function TaskCard({
               border: isMultiSelected
                 ? '2px solid var(--color-accent)'
                 : '1.5px solid var(--color-border-hover, #94a3b8)',
-              backgroundColor: isMultiSelected ? 'var(--color-accent)' : 'var(--color-bg-elevated)',
+              backgroundColor: isMultiSelected ? 'var(--color-accent)' : 'transparent',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
               zIndex: 11,
               boxSizing: 'border-box',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
             }}
           >
             {isMultiSelected && (

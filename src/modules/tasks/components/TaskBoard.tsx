@@ -338,6 +338,7 @@ export function TaskBoard({
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
+        minHeight: 0,
       }}
     >
       <div
@@ -345,10 +346,11 @@ export function TaskBoard({
           display: 'flex',
           flexDirection: 'row',
           gap: `${dc.column.gap}px`,
-          padding: '16px 24px 0 24px',
-          alignItems: 'flex-start',
-          minHeight: '100%',
+          padding: '16px 24px',
+          alignItems: 'stretch',
+          height: '100%',
           flex: 1,
+          boxSizing: 'border-box',
         }}
       >
         {visibleStatuses.map((status) => (
