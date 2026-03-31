@@ -1,5 +1,5 @@
 import { useState, KeyboardEvent } from 'react';
-import { X } from 'lucide-react';
+import { X, Brain, Play } from 'lucide-react';
 import { getDeckGradient } from './DeckCard';
 import type { CreateDeckInput, UpdateDeckInput, Deck } from '@/shared/types/flashcard';
 
@@ -58,8 +58,92 @@ export function DeckForm({ initialData, onSave, onCancel, isLoading }: DeckFormP
     });
   }
 
+  const gradient = getDeckGradient(color);
+
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+    <div className="flex gap-6 items-start">
+    {/* ── Live mini DeckCard preview ── */}
+    <div className="hidden sm:flex flex-col gap-2 flex-shrink-0" style={{ width: '160px' }}>
+      <p className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>Preview</p>
+      <div
+        className="relative flex flex-col rounded-xl overflow-hidden select-none"
+        style={{
+          backgroundColor: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+          boxShadow: 'var(--shadow-sm)',
+        }}
+      >
+        {/* Header */}
+        <div
+          className="relative flex items-end px-3 pb-2"
+          style={{ height: '52px', background: gradient, overflow: 'hidden' }}
+        >
+          {/* Dot pattern */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.15) 1px, transparent 1px)',
+              backgroundSize: '8px 8px',
+              opacity: 0.6,
+              pointerEvents: 'none',
+            }}
+          />
+          <div
+            className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mr-1.5 relative z-10"
+            style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
+          >
+            <Brain size={11} color="white" />
+          </div>
+          <p
+            className="text-xs font-bold truncate relative z-10"
+            style={{ color: 'white', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
+          >
+            {name || 'Deck Name'}
+          </p>
+        </div>
+        {/* Body */}
+        <div className="p-3 flex flex-col gap-2">
+          <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>0 cards · 0 due</div>
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {tags.slice(0, 2).map((tag) => (
+                <span
+                  key={tag}
+                  className="px-1.5 py-0.5 rounded-full text-xs"
+                  style={{
+                    backgroundColor: 'var(--color-bg-tertiary)',
+                    color: 'var(--color-text-muted)',
+                    border: '1px solid var(--color-border)',
+                  }}
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+          {/* Mini progress bar */}
+          <div
+            className="h-1 rounded-full mt-1"
+            style={{ backgroundColor: 'var(--color-bg-tertiary)' }}
+          >
+            <div className="h-full rounded-full w-0" style={{ background: gradient }} />
+          </div>
+          {/* Study button */}
+          <button
+            type="button"
+            disabled
+            className="flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-semibold text-white mt-1"
+            style={{ background: gradient, opacity: 0.8 }}
+          >
+            <Play size={9} fill="white" />
+            Study
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5 flex-1 min-w-0">
       {/* Name */}
       <div className="flex flex-col gap-1.5">
         <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
@@ -228,5 +312,6 @@ export function DeckForm({ initialData, onSave, onCancel, isLoading }: DeckFormP
         </button>
       </div>
     </form>
+    </div>
   );
 }

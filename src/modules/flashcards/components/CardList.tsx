@@ -1,9 +1,11 @@
-import { useState } from 'react';
-import { Plus, Trash2, Edit2, Search, X, Upload } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Plus, Trash2, Edit2, Search, X, Upload, ChevronDown } from 'lucide-react';
 import type { Card, CardStatus, CreateCardInput, UpdateCardInput } from '@/shared/types/flashcard';
 import { CardForm } from './CardForm';
 import { useCreateCard, useDeleteCard, useUpdateCard } from '../hooks/useFlashcards';
 import { toast } from '@/shared/stores/toastStore';
+
+type SortMode = 'created' | 'next-review' | 'difficulty';
 
 interface CardListProps {
   deckId: string;
@@ -11,11 +13,17 @@ interface CardListProps {
   onStudyAll?: () => void;
 }
 
-const STATUS_CONFIG: Record<CardStatus, { label: string; bgVar: string; colorVar: string }> = {
-  new: { label: 'New', bgVar: 'var(--color-accent-soft)', colorVar: 'var(--color-accent)' },
-  learning: { label: 'Learning', bgVar: 'var(--color-warning-soft)', colorVar: 'var(--color-warning)' },
-  review: { label: 'Mastered', bgVar: 'var(--color-success-soft)', colorVar: 'var(--color-success)' },
-  suspended: { label: 'Suspended', bgVar: 'var(--color-bg-tertiary)', colorVar: 'var(--color-text-muted)' },
+const STATUS_CONFIG: Record<CardStatus, { label: string; bgVar: string; colorVar: string; dotColor: string }> = {
+  new: { label: 'New', bgVar: 'var(--color-accent-soft)', colorVar: 'var(--color-accent)', dotColor: 'var(--color-accent)' },
+  learning: { label: 'Learning', bgVar: 'var(--color-warning-soft)', colorVar: 'var(--color-warning)', dotColor: 'var(--color-warning)' },
+  review: { label: 'Mastered', bgVar: 'var(--color-success-soft)', colorVar: 'var(--color-success)', dotColor: 'var(--color-success)' },
+  suspended: { label: 'Suspended', bgVar: 'var(--color-bg-tertiary)', colorVar: 'var(--color-text-muted)', dotColor: 'var(--color-text-muted)' },
+};
+
+const SORT_LABELS: Record<SortMode, string> = {
+  created: 'Created',
+  'next-review': 'Next Review',
+  difficulty: 'Difficulty',
 };
 
 type ModalState =
@@ -29,6 +37,8 @@ export function CardList({ deckId, cards, onStudyAll }: CardListProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
+  const [sortMode, setSortMode] = useState<SortMode>('created');
+  const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [importMessage, setImportMessage] = useState<string | null>(null);
 
@@ -36,13 +46,29 @@ export function CardList({ deckId, cards, onStudyAll }: CardListProps) {
   const deleteCard = useDeleteCard();
   const updateCard = useUpdateCard();
 
-  const filtered = search.trim()
-    ? cards.filter(
-        (c) =>
-          c.front.toLowerCase().includes(search.toLowerCase()) ||
-          c.back.toLowerCase().includes(search.toLowerCase()),
-      )
-    : cards;
+  const filtered = useMemo(() => {
+    let list = search.trim()
+      ? cards.filter(
+          (c) =>
+            c.front.toLowerCase().includes(search.toLowerCase()) ||
+            c.back.toLowerCase().includes(search.toLowerCase()),
+        )
+      : [...cards];
+
+    switch (sortMode) {
+      case 'created':
+        list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        break;
+      case 'next-review':
+        list.sort((a, b) => new Date(a.nextReview).getTime() - new Date(b.nextReview).getTime());
+        break;
+      case 'difficulty':
+        // Lower ease factor = harder
+        list.sort((a, b) => a.easeFactor - b.easeFactor);
+        break;
+    }
+    return list;
+  }, [cards, search, sortMode]);
 
   // ─ Stats
   const newCount = cards.filter((c) => c.status === 'new').length;
@@ -145,6 +171,59 @@ export function CardList({ deckId, cards, onStudyAll }: CardListProps) {
             <button onClick={() => setSearch('')} style={{ color: 'var(--color-text-muted)' }}>
               <X size={12} />
             </button>
+          )}
+        </div>
+
+        {/* Sort dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setSortDropdownOpen((v) => !v)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all"
+            style={{
+              backgroundColor: 'var(--color-bg-secondary)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-secondary)',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-secondary)'; }}
+          >
+            <span>{SORT_LABELS[sortMode]}</span>
+            <ChevronDown size={13} style={{ opacity: 0.6 }} />
+          </button>
+          {sortDropdownOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setSortDropdownOpen(false)} />
+              <div
+                className="absolute right-0 top-full mt-1.5 z-20 rounded-xl overflow-hidden py-1"
+                style={{
+                  backgroundColor: 'var(--color-bg-elevated)',
+                  border: '1px solid var(--color-border)',
+                  boxShadow: 'var(--shadow-popup)',
+                  minWidth: '140px',
+                }}
+              >
+                {(Object.keys(SORT_LABELS) as SortMode[]).map((opt) => (
+                  <button
+                    key={opt}
+                    onClick={() => { setSortMode(opt); setSortDropdownOpen(false); }}
+                    className="w-full text-left px-3 py-2 text-sm transition-colors"
+                    style={{
+                      color: sortMode === opt ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                      backgroundColor: sortMode === opt ? 'var(--color-accent-soft)' : 'transparent',
+                      fontWeight: sortMode === opt ? 600 : 400,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortMode !== opt) e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = sortMode === opt ? 'var(--color-accent-soft)' : 'transparent';
+                    }}
+                  >
+                    {SORT_LABELS[opt]}
+                  </button>
+                ))}
+              </div>
+            </>
           )}
         </div>
 
@@ -391,15 +470,29 @@ export function CardList({ deckId, cards, onStudyAll }: CardListProps) {
                     </button>
                   </div>
 
-                  <span
-                    className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-medium"
-                    style={{
-                      backgroundColor: statusCfg.bgVar,
-                      color: statusCfg.colorVar,
-                    }}
-                  >
-                    {statusCfg.label}
-                  </span>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {/* State indicator dot */}
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: '7px',
+                        height: '7px',
+                        borderRadius: '50%',
+                        backgroundColor: statusCfg.dotColor,
+                        flexShrink: 0,
+                      }}
+                      title={statusCfg.label}
+                    />
+                    <span
+                      className="text-xs px-2 py-0.5 rounded-full font-medium"
+                      style={{
+                        backgroundColor: statusCfg.bgVar,
+                        color: statusCfg.colorVar,
+                      }}
+                    >
+                      {statusCfg.label}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Front — always visible */}

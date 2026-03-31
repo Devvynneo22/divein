@@ -139,6 +139,7 @@ export function StudySession({ queue, deckColor, deckName, allCards, onExit }: S
   const [showingAnswer, setShowingAnswer] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [cardVisible, setCardVisible] = useState(true);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [streakCount, setStreakCount] = useState(0);
   const [missedIds, setMissedIds] = useState<Set<string>>(new Set());
@@ -207,6 +208,7 @@ export function StudySession({ queue, deckColor, deckName, allCards, onExit }: S
       }
 
       setIsAnimating(true);
+      setCardVisible(false);
       setTimeout(() => {
         const nextIndex = currentIndex + 1;
         if (nextIndex >= totalCards) {
@@ -217,7 +219,8 @@ export function StudySession({ queue, deckColor, deckName, allCards, onExit }: S
           setShowingAnswer(false);
         }
         setIsAnimating(false);
-      }, 300);
+        setCardVisible(true);
+      }, 200);
     },
     [currentCard, currentIndex, totalCards, reviewCard, isAnimating],
   );
@@ -358,28 +361,46 @@ export function StudySession({ queue, deckColor, deckName, allCards, onExit }: S
           </div>
         </div>
 
-        {/* Rating breakdown */}
+        {/* Rating breakdown — horizontal bar chart */}
         <div
-          className="flex gap-3 w-full max-w-sm rounded-2xl p-4"
+          className="w-full max-w-sm rounded-2xl p-4 flex flex-col gap-3"
           style={{
             backgroundColor: 'var(--color-bg-secondary)',
             border: '1px solid var(--color-border)',
           }}
         >
-          {RATING_CONFIG.map(({ rating, label, emoji, color }) => (
-            <div key={rating} className="flex-1 flex flex-col items-center gap-1">
-              <span style={{ fontSize: '1.1rem' }}>{emoji}</span>
-              <span
-                className="text-lg font-bold tabular-nums"
-                style={{ color }}
-              >
-                {sessionStats[rating]}
-              </span>
-              <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                {label}
-              </span>
-            </div>
-          ))}
+          <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+            Rating Breakdown
+          </p>
+          {RATING_CONFIG.map(({ rating, label, emoji, color }) => {
+            const count = sessionStats[rating];
+            const pctBar = total > 0 ? (count / total) * 100 : 0;
+            return (
+              <div key={rating} className="flex items-center gap-3">
+                <span style={{ fontSize: '1rem', width: '20px', textAlign: 'center' }}>{emoji}</span>
+                <span className="text-xs font-medium w-10 flex-shrink-0" style={{ color: 'var(--color-text-secondary)' }}>
+                  {label}
+                </span>
+                <div
+                  className="flex-1 rounded-full overflow-hidden"
+                  style={{ height: '8px', backgroundColor: 'var(--color-bg-tertiary)' }}
+                >
+                  <div
+                    style={{
+                      height: '100%',
+                      width: `${pctBar}%`,
+                      backgroundColor: color,
+                      borderRadius: '9999px',
+                      transition: 'width 0.6s ease',
+                    }}
+                  />
+                </div>
+                <span className="text-xs font-bold tabular-nums w-6 text-right flex-shrink-0" style={{ color }}>
+                  {count}
+                </span>
+              </div>
+            );
+          })}
         </div>
 
         {/* Actions */}
@@ -589,11 +610,22 @@ export function StudySession({ queue, deckColor, deckName, allCards, onExit }: S
         </div>
       </div>
 
+      {/* ── Card counter ── */}
+      <div className="flex justify-center mb-2 flex-shrink-0">
+        <span className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>
+          Card {currentIndex + 1} of {totalCards}
+        </span>
+      </div>
+
       {/* ── 3D Flip Card ── */}
       <div className="flex-1 flex items-center justify-center px-2 sm:px-4">
         <div
           className="w-full max-w-2xl"
-          style={{ perspective: '1200px' }}
+          style={{
+            perspective: '1200px',
+            opacity: cardVisible ? 1 : 0,
+            transition: 'opacity 0.2s ease',
+          }}
           onClick={!showingAnswer ? handleShowAnswer : undefined}
         >
           <div
@@ -782,25 +814,40 @@ export function StudySession({ queue, deckColor, deckName, allCards, onExit }: S
         )}
 
         {/* Keyboard hints */}
-        {showingAnswer && (
-          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-            {(['1', '2', '3', '4'] as const).map((k, i) => (
-              <span key={k}>
-                {i > 0 && ' '}
-                <kbd
-                  className="px-1.5 py-0.5 rounded text-xs font-mono"
-                  style={{
-                    backgroundColor: 'var(--color-bg-tertiary)',
-                    border: '1px solid var(--color-border)',
-                  }}
-                >
-                  {k}
-                </kbd>
-              </span>
-            ))}{' '}
-            to rate
-          </p>
-        )}
+        <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+          {!showingAnswer ? (
+            <>
+              <kbd
+                className="px-1.5 py-0.5 rounded text-xs font-mono"
+                style={{
+                  backgroundColor: 'var(--color-bg-tertiary)',
+                  border: '1px solid var(--color-border)',
+                }}
+              >
+                Space
+              </kbd>
+              {' '}to reveal
+            </>
+          ) : (
+            <>
+              {(['1', '2', '3', '4'] as const).map((k, i) => (
+                <span key={k}>
+                  {i > 0 && ' '}
+                  <kbd
+                    className="px-1.5 py-0.5 rounded text-xs font-mono"
+                    style={{
+                      backgroundColor: 'var(--color-bg-tertiary)',
+                      border: '1px solid var(--color-border)',
+                    }}
+                  >
+                    {k}
+                  </kbd>
+                </span>
+              ))}{' '}
+              to rate
+            </>
+          )}
+        </p>
       </div>
     </div>
   );

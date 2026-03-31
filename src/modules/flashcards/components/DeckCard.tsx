@@ -19,6 +19,34 @@ export function getDeckGradient(color: string | null): string {
   return DECK_GRADIENT_MAP[c] ?? `linear-gradient(135deg, ${c}, ${c})`;
 }
 
+// Small SVG mastery ring (24x24)
+function MasteryRing({ pct, color }: { pct: number; color: string }) {
+  const r = 10;
+  const circumference = 2 * Math.PI * r;
+  const offset = circumference * (1 - pct / 100);
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+      <circle
+        cx="12" cy="12" r={r}
+        fill="none"
+        stroke="rgba(255,255,255,0.25)"
+        strokeWidth="3"
+      />
+      <circle
+        cx="12" cy="12" r={r}
+        fill="none"
+        stroke="white"
+        strokeWidth="3"
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        strokeLinecap="round"
+        transform="rotate(-90 12 12)"
+        style={{ transition: 'stroke-dashoffset 0.5s ease', opacity: pct > 0 ? 1 : 0.3 }}
+      />
+    </svg>
+  );
+}
+
 interface DeckCardProps {
   deck: Deck;
   stats: DeckStats | undefined;
@@ -31,11 +59,15 @@ export function DeckCard({ deck, stats, onClick, onStudy }: DeckCardProps) {
   const [studyHovered, setStudyHovered] = useState(false);
   const [cardsHovered, setCardsHovered] = useState(false);
   const gradient = getDeckGradient(deck.color);
+  const baseColor = deck.color ?? '#3b82f6';
 
   const totalCards = stats?.totalCards ?? 0;
   const masteredCards = stats?.reviewCards ?? 0;
   const dueToday = stats?.dueToday ?? 0;
   const masteredPct = totalCards > 0 ? Math.round((masteredCards / totalCards) * 100) : 0;
+
+  // Dot pattern overlay using radial-gradient
+  const dotPattern = 'radial-gradient(circle, rgba(255,255,255,0.15) 1px, transparent 1px)';
 
   return (
     <div
@@ -46,7 +78,9 @@ export function DeckCard({ deck, stats, onClick, onStudy }: DeckCardProps) {
       style={{
         backgroundColor: 'var(--color-bg-secondary)',
         border: `1px solid ${hovered ? 'var(--color-border-hover)' : 'var(--color-border)'}`,
-        boxShadow: hovered ? 'var(--shadow-lg)' : 'var(--shadow-sm)',
+        boxShadow: hovered
+          ? `var(--shadow-lg), 0 0 20px ${baseColor}33`
+          : 'var(--shadow-sm)',
         transform: hovered ? 'translateY(-3px)' : 'translateY(0)',
         transition: 'box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease',
         minHeight: '220px',
@@ -56,16 +90,38 @@ export function DeckCard({ deck, stats, onClick, onStudy }: DeckCardProps) {
       <div
         className="relative flex-shrink-0 flex items-end px-4 pb-3"
         style={{
-          height: '64px',
+          height: '72px',
           background: gradient,
+          overflow: 'hidden',
         }}
       >
+        {/* Dot pattern overlay */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: dotPattern,
+            backgroundSize: '10px 10px',
+            opacity: 0.6,
+            pointerEvents: 'none',
+          }}
+        />
+
+        {/* Mastery ring — top left */}
+        <div
+          style={{ position: 'absolute', top: '10px', left: '12px' }}
+          title={`${masteredPct}% mastered`}
+        >
+          <MasteryRing pct={masteredPct} color={baseColor} />
+        </div>
+
         <h3
-          className="font-bold leading-tight line-clamp-2 pr-2"
+          className="font-bold leading-tight line-clamp-2 pr-2 relative z-10"
           style={{
             color: 'white',
             fontSize: '15px',
             textShadow: '0 1px 3px rgba(0,0,0,0.3)',
+            paddingLeft: '32px', // leave space for mastery ring
           }}
         >
           {deck.name}
@@ -74,7 +130,7 @@ export function DeckCard({ deck, stats, onClick, onStudy }: DeckCardProps) {
         {/* Due today badge — top right */}
         {dueToday > 0 && (
           <div
-            className="absolute top-3 right-3 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold"
+            className="absolute top-3 right-3 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold z-10"
             style={{
               backgroundColor: 'rgba(255,255,255,0.95)',
               color: 'var(--color-warning)',
@@ -103,6 +159,36 @@ export function DeckCard({ deck, stats, onClick, onStudy }: DeckCardProps) {
           <span style={{ opacity: 0.4 }}>·</span>
           <span>{masteredPct}% mastered</span>
         </div>
+
+        {/* Tags as pills */}
+        {deck.tags && deck.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {deck.tags.slice(0, 3).map((tag) => (
+              <span
+                key={tag}
+                className="px-2 py-0.5 rounded-full text-xs font-medium"
+                style={{
+                  backgroundColor: 'var(--color-bg-tertiary)',
+                  color: 'var(--color-text-muted)',
+                  border: '1px solid var(--color-border)',
+                }}
+              >
+                {tag}
+              </span>
+            ))}
+            {deck.tags.length > 3 && (
+              <span
+                className="px-2 py-0.5 rounded-full text-xs"
+                style={{
+                  backgroundColor: 'var(--color-bg-tertiary)',
+                  color: 'var(--color-text-muted)',
+                }}
+              >
+                +{deck.tags.length - 3}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Status badge */}
         {dueToday > 0 ? (

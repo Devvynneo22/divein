@@ -1,8 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { toast } from '@/shared/stores/toastStore';
-import { LoadingSpinner } from '@/app/LoadingSpinner';
 import { SkeletonCard } from '@/shared/components/Skeleton';
-import { ArrowLeft, Plus, Brain, Play, ChevronDown, BarChart2 } from 'lucide-react';
+import { Plus, Brain, Play, ChevronDown, BarChart2 } from 'lucide-react';
 import {
   useDecks,
   useCreateDeck,
@@ -16,7 +15,7 @@ import { DeckForm } from './components/DeckForm';
 import { CardList } from './components/CardList';
 import { StudySession } from './components/StudySession';
 import { DeckStats } from './components/DeckStats';
-import type { Deck, CreateDeckInput, UpdateDeckInput, DeckStats as DeckStatsData } from '@/shared/types/flashcard';
+import type { Deck, CreateDeckInput, UpdateDeckInput } from '@/shared/types/flashcard';
 import { EmptyState } from '@/shared/components/EmptyState';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -78,62 +77,19 @@ function DeckCardWithStats({
 
 // ─── Global stats aggregator ──────────────────────────────────────────────────
 
-function useGlobalStats(decks: Deck[]): {
-  totalCards: number;
-  dueToday: number;
-  mastered: number;
-  statsList: Array<{ deckId: string; stats: DeckStatsData | undefined }>;
-} {
-  // We can't call hooks conditionally, but DeckCardWithStats already loads each deck's stats.
-  // For the hero bar, we load all deck stats at page level via individual hooks.
-  // This is a simplified aggregation using a list of useDeckStats calls.
-  // Since hooks can't be called in a loop, we handle this differently below.
-  return { totalCards: 0, dueToday: 0, mastered: 0, statsList: [] };
-}
-
-// We need a component-based approach for aggregated stats
-function GlobalStatsBar({ decks }: { decks: Deck[] }) {
-  // Render individual stat loaders for each deck, then aggregate
-  return (
-    <div className="flex items-center gap-0">
-      {decks.map((deck) => (
-        <DeckStatLoader key={deck.id} deckId={deck.id} />
-      ))}
-    </div>
-  );
-}
-
-// This component just triggers data fetching — rendering is handled by AggregatedStatsDisplay
-function DeckStatLoader({ deckId }: { deckId: string }) {
-  useDeckStats(deckId); // warm the cache
-  return null;
-}
-
-function AggregatedStats({
-  decks,
-  streak,
-}: {
-  decks: Deck[];
-  streak: number;
-}) {
-  // Access the stats from the cache via individual hooks
-  // Because we can't use hooks in a map, we use a recursive component trick
-  if (decks.length === 0) {
-    return <StatsDisplay totalDecks={0} totalCards={0} dueToday={0} mastered={0} streak={streak} />;
-  }
-  return <StatsSumRecurse decks={decks} idx={0} acc={{ totalCards: 0, dueToday: 0, mastered: 0 }} streak={streak} />;
-}
-
+// Recursively collects stats per deck using hooks (hooks-in-a-loop workaround)
 function StatsSumRecurse({
   decks,
   idx,
   acc,
   streak,
+  onStudyAllDue,
 }: {
   decks: Deck[];
   idx: number;
   acc: { totalCards: number; dueToday: number; mastered: number };
   streak: number;
+  onStudyAllDue?: () => void;
 }) {
   const { data: stats } = useDeckStats(decks[idx].id);
   const next = {
@@ -150,11 +106,35 @@ function StatsSumRecurse({
         dueToday={next.dueToday}
         mastered={next.mastered}
         streak={streak}
+        onStudyAllDue={onStudyAllDue}
       />
     );
   }
 
-  return <StatsSumRecurse decks={decks} idx={idx + 1} acc={next} streak={streak} />;
+  return <StatsSumRecurse decks={decks} idx={idx + 1} acc={next} streak={streak} onStudyAllDue={onStudyAllDue} />;
+}
+
+function AggregatedStats({
+  decks,
+  streak,
+  onStudyAllDue,
+}: {
+  decks: Deck[];
+  streak: number;
+  onStudyAllDue?: () => void;
+}) {
+  if (decks.length === 0) {
+    return <StatsDisplay totalDecks={0} totalCards={0} dueToday={0} mastered={0} streak={streak} />;
+  }
+  return (
+    <StatsSumRecurse
+      decks={decks}
+      idx={0}
+      acc={{ totalCards: 0, dueToday: 0, mastered: 0 }}
+      streak={streak}
+      onStudyAllDue={onStudyAllDue}
+    />
+  );
 }
 
 function StatsDisplay({
@@ -163,20 +143,47 @@ function StatsDisplay({
   dueToday,
   mastered,
   streak,
+  onStudyAllDue,
 }: {
   totalDecks: number;
   totalCards: number;
   dueToday: number;
   mastered: number;
   streak: number;
+  onStudyAllDue?: () => void;
 }) {
+  const masteryPct = totalCards > 0 ? Math.round((mastered / totalCards) * 100) : 0;
   return (
-    <div className="flex items-center gap-4 flex-wrap">
-      <StatChip icon="🧠" label={`${totalDecks} deck${totalDecks !== 1 ? 's' : ''}`} />
-      <StatChip icon="🃏" label={`${totalCards} card${totalCards !== 1 ? 's' : ''}`} />
-      <DueChip dueToday={dueToday} />
-      <StatChip icon="⭐" label={`${mastered} mastered`} />
-      {streak > 0 && <StreakChip streak={streak} />}
+    <div className="flex items-center gap-4 flex-wrap w-full justify-between">
+      <div className="flex items-center gap-3 flex-wrap">
+        <StatChip icon="🧠" label={`${totalDecks} deck${totalDecks !== 1 ? 's' : ''}`} />
+        <span style={{ color: 'var(--color-border)', fontSize: '14px' }}>·</span>
+        <StatChip icon="🃏" label={`${totalCards} card${totalCards !== 1 ? 's' : ''}`} />
+        <span style={{ color: 'var(--color-border)', fontSize: '14px' }}>·</span>
+        <DueChip dueToday={dueToday} />
+        <span style={{ color: 'var(--color-border)', fontSize: '14px' }}>·</span>
+        <StatChip icon="⭐" label={`${masteryPct}% mastery`} />
+        {streak > 0 && (
+          <>
+            <span style={{ color: 'var(--color-border)', fontSize: '14px' }}>·</span>
+            <StreakChip streak={streak} />
+          </>
+        )}
+      </div>
+      {dueToday > 0 && onStudyAllDue && (
+        <button
+          onClick={onStudyAllDue}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all active:scale-95 flex-shrink-0"
+          style={{
+            background: 'linear-gradient(135deg, var(--color-warning), #f97316)',
+            boxShadow: '0 2px 8px rgba(207,142,23,0.35)',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+        >
+          ⚡ Study All Due ({dueToday})
+        </button>
+      )}
     </div>
   );
 }
@@ -250,17 +257,22 @@ function DeckView({ deck, initialView = 'cards', onBack }: DeckViewProps) {
         className="px-8 pt-7 pb-5 flex-shrink-0"
         style={{ borderBottom: '1px solid var(--color-border)' }}
       >
-        {/* Back nav */}
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1.5 text-sm mb-5 transition-colors"
-          style={{ color: 'var(--color-text-muted)' }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
-        >
-          <ArrowLeft size={15} />
-          All Decks
-        </button>
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-1.5 text-sm mb-5" aria-label="Breadcrumb">
+          <button
+            onClick={onBack}
+            className="transition-colors"
+            style={{ color: 'var(--color-text-muted)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-accent)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+          >
+            Flashcards
+          </button>
+          <span style={{ color: 'var(--color-text-muted)', opacity: 0.5 }}>›</span>
+          <span className="font-medium truncate max-w-xs" style={{ color: 'var(--color-text-primary)' }}>
+            {deck.name}
+          </span>
+        </nav>
 
         <div className="flex items-start justify-between gap-4">
           {/* Title + description */}
@@ -568,9 +580,18 @@ export function FlashcardsPage() {
                 border: '1px solid var(--color-border)',
               }}
             >
-              {/* Warm the cache for all decks so stats aggregation works */}
-              <GlobalStatsBar decks={decks} />
-              <AggregatedStats decks={decks} streak={streak} />
+              <AggregatedStats
+                decks={decks}
+                streak={streak}
+                onStudyAllDue={() => {
+                  // Find the first deck with due cards and start studying
+                  const firstDue = decks[0];
+                  if (firstDue) {
+                    setInitialDeckView('study');
+                    setSelectedDeck(firstDue);
+                  }
+                }}
+              />
             </div>
           )}
 
@@ -614,7 +635,7 @@ export function FlashcardsPage() {
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-8 py-6">
           {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
               {Array.from({ length: 4 }, (_, i) => (
                 <SkeletonCard key={i} height={220} />
               ))}
@@ -645,7 +666,7 @@ export function FlashcardsPage() {
             </div>
           ) : (
             /* ── Deck grid ── */
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
               {filteredDecks.map((deck) => (
                 <DeckCardWithStats
                   key={deck.id}
