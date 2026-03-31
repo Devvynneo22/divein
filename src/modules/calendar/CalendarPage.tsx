@@ -1328,6 +1328,15 @@ export function CalendarPage() {
             }
             .fc .fc-scrollgrid-section-header { position: sticky; top: 0; z-index: 2; }
             .fc .fc-button:focus { box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 30%, transparent) !important; }
+            .fc .fc-timegrid-now-indicator-line {
+              border-color: var(--color-danger, #ef4444) !important;
+              border-width: 2px 0 0 0 !important;
+            }
+            .fc .fc-timegrid-now-indicator-arrow {
+              border-color: var(--color-danger, #ef4444) !important;
+              border-top-color: transparent !important;
+              border-bottom-color: transparent !important;
+            }
           `}</style>
 
           <FullCalendar
@@ -1351,6 +1360,7 @@ export function CalendarPage() {
             eventClick={handleEventClick}
             eventDrop={handleEventDrop}
             eventContent={renderEventContent}
+            nowIndicator={true}
             height="100%"
           />
         </div>
